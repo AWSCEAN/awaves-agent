@@ -1,23 +1,27 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import AwavesLogo from '@/components/AwavesLogo';
 import InfoPanel from '@/components/InfoPanel';
-import DateRangePicker from '@/components/DateRangePicker';
-import type { SurfSpot, SearchFilters } from '@/types';
+import DateSelector from '@/components/DateSelector';
+import WindParticles from '@/components/WindParticles';
+import type { SurfSpot, SearchFilters, SavedSpotMarker } from '@/types';
 import { mockSpots } from '@/lib/data';
+import { getSavedSpotsFromStorage } from '@/lib/mockForecastData';
 
-// Dynamic import for Mapbox to avoid SSR issues
-const MapboxMap = dynamic(() => import('@/components/MapboxMap'), {
-  ssr: false,
-  loading: () => (
-    <div className="w-full h-full bg-ocean-100 flex items-center justify-center">
-      <div className="text-ocean-500">Loading map...</div>
-    </div>
-  ),
-});
+const EnhancedMapboxMap = dynamic(
+  () => import('@/components/EnhancedMapboxMap'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full bg-ocean-100 flex items-center justify-center">
+        <div className="text-ocean-500">Loading map...</div>
+      </div>
+    ),
+  }
+);
 
 type Language = 'ko' | 'en';
 
@@ -27,6 +31,7 @@ const translations = {
     filters: '필터',
     saved: '저장됨',
     mypage: '마이페이지',
+    windParticles: '바람 입자',
     difficulty: {
       beginner: '초급',
       intermediate: '중급',
@@ -39,6 +44,7 @@ const translations = {
     filters: 'Filters',
     saved: 'Saved',
     mypage: 'My Page',
+    windParticles: 'Wind Particles',
     difficulty: {
       beginner: 'Beginner',
       intermediate: 'Intermediate',
@@ -48,14 +54,21 @@ const translations = {
   },
 };
 
-export default function MapPage() {
+export default function MapPageEnhanced() {
   const [lang, setLang] = useState<Language>('en');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSpot, setSelectedSpot] = useState<SurfSpot | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [filters, setFilters] = useState<SearchFilters>({});
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [showWindParticles, setShowWindParticles] = useState(false);
+  const [savedSpots, setSavedSpots] = useState<SavedSpotMarker[]>([]);
   const t = translations[lang];
+
+  useEffect(() => {
+    setSavedSpots(getSavedSpotsFromStorage());
+  }, []);
 
   const handleSpotClick = (spot: SurfSpot) => {
     setSelectedSpot(spot);
@@ -74,13 +87,11 @@ export default function MapPage() {
 
   return (
     <div className="h-screen flex flex-col">
-      {/* Header */}
       <header className="glass z-50 px-4 py-3 flex items-center justify-between">
         <Link href="/">
           <AwavesLogo size="sm" />
         </Link>
 
-        {/* Search Bar */}
         <div className="flex-1 max-w-xl mx-4">
           <div className="relative">
             <input
@@ -106,18 +117,33 @@ export default function MapPage() {
           </div>
         </div>
 
-        {/* Nav */}
         <nav className="flex items-center gap-4">
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`btn-secondary text-sm ${showFilters ? 'bg-ocean-500 text-white' : ''}`}
+            className={`btn-secondary text-sm ${
+              showFilters ? 'bg-ocean-500 text-white' : ''
+            }`}
           >
             {t.filters}
           </button>
-          <Link href="/saved" className="text-ocean-700 hover:text-ocean-500 text-sm font-medium">
+          <button
+            onClick={() => setShowWindParticles(!showWindParticles)}
+            className={`btn-secondary text-sm ${
+              showWindParticles ? 'bg-ocean-500 text-white' : ''
+            }`}
+          >
+            {t.windParticles}
+          </button>
+          <Link
+            href="/saved"
+            className="text-ocean-700 hover:text-ocean-500 text-sm font-medium"
+          >
             {t.saved}
           </Link>
-          <Link href="/mypage" className="text-ocean-700 hover:text-ocean-500 text-sm font-medium">
+          <Link
+            href="/mypage"
+            className="text-ocean-700 hover:text-ocean-500 text-sm font-medium"
+          >
             {t.mypage}
           </Link>
           <button
@@ -129,19 +155,23 @@ export default function MapPage() {
         </nav>
       </header>
 
-      {/* Filters Panel */}
       {showFilters && (
         <div className="glass px-4 py-3 border-t border-sand-200 flex items-center gap-4 flex-wrap">
-          <DateRangePicker onChange={handleDateRangeChange} lang={lang} />
-
           <select
             value={filters.difficulty || ''}
-            onChange={(e) => setFilters({ ...filters, difficulty: e.target.value as any || undefined })}
+            onChange={(e) =>
+              setFilters({
+                ...filters,
+                difficulty: e.target.value as any || undefined,
+              })
+            }
             className="input-field w-auto"
           >
             <option value="">All Levels</option>
             {Object.entries(t.difficulty).map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
+              <option key={key} value={key}>
+                {label}
+              </option>
             ))}
           </select>
 
@@ -151,7 +181,12 @@ export default function MapPage() {
               type="number"
               placeholder="Min"
               value={filters.minWaveHeight || ''}
-              onChange={(e) => setFilters({ ...filters, minWaveHeight: Number(e.target.value) || undefined })}
+              onChange={(e) =>
+                setFilters({
+                  ...filters,
+                  minWaveHeight: Number(e.target.value) || undefined,
+                })
+              }
               className="input-field w-20"
               min={0}
               step={0.5}
@@ -161,7 +196,12 @@ export default function MapPage() {
               type="number"
               placeholder="Max"
               value={filters.maxWaveHeight || ''}
-              onChange={(e) => setFilters({ ...filters, maxWaveHeight: Number(e.target.value) || undefined })}
+              onChange={(e) =>
+                setFilters({
+                  ...filters,
+                  maxWaveHeight: Number(e.target.value) || undefined,
+                })
+              }
               className="input-field w-20"
               min={0}
               step={0.5}
@@ -171,15 +211,29 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* Main Content */}
+      <DateSelector
+        selectedDate={selectedDate}
+        onDateChange={setSelectedDate}
+      />
+
       <div className="flex-1 relative">
-        <MapboxMap
+        <EnhancedMapboxMap
           spots={mockSpots}
+          savedSpots={savedSpots}
           onSpotClick={handleSpotClick}
           selectedSpotId={selectedSpot?.id}
+          selectedDate={selectedDate}
+          showWindParticles={showWindParticles}
         />
 
-        {/* Info Panel */}
+        {showWindParticles && (
+          <WindParticles
+            windSpeed={15}
+            windDirection={45}
+            enabled={showWindParticles}
+          />
+        )}
+
         <InfoPanel
           spot={selectedSpot}
           isOpen={isPanelOpen}

@@ -428,8 +428,137 @@ Authorization: Bearer {access_token}
 
 ---
 
+---
+
+### 외부 API 통합 (External APIs)
+
+#### Open-Meteo Marine Forecast API
+AWAVES는 파도 및 해양 데이터를 위해 Open-Meteo Marine Forecast API를 사용합니다.
+
+**Endpoint**
+```
+GET https://marine-api.open-meteo.com/v1/marine
+```
+
+**Query Parameters**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| latitude | float | 위도 |
+| longitude | float | 경도 |
+| daily | string | 일별 데이터 변수 (쉼표로 구분) |
+| timezone | string | 타임존 (예: Asia/Seoul) |
+
+**Daily Variables**
+- `wave_height_max`: 최대 파고 (m)
+- `wave_period_max`: 최대 파도 주기 (초)
+- `wave_direction_dominant`: 지배적인 파도 방향 (도)
+- `wind_wave_height_max`: 최대 풍랑 높이 (m)
+
+**Example Request**
+```bash
+curl "https://marine-api.open-meteo.com/v1/marine?latitude=38.0765&longitude=128.6234&daily=wave_height_max,wave_period_max,wave_direction_dominant,wind_wave_height_max&timezone=Asia/Seoul"
+```
+
+**Example Response**
+```json
+{
+  "latitude": 38.0765,
+  "longitude": 128.6234,
+  "daily": {
+    "time": ["2026-02-04", "2026-02-05", ...],
+    "wave_height_max": [1.2, 1.5, 1.8, ...],
+    "wave_period_max": [8, 9, 10, ...],
+    "wave_direction_dominant": [180, 185, 175, ...],
+    "wind_wave_height_max": [1.0, 1.2, 1.5, ...]
+  }
+}
+```
+
+---
+
+#### Open-Meteo Weather Forecast API
+바람 및 기상 데이터를 위해 Open-Meteo Weather Forecast API를 사용합니다.
+
+**Endpoint**
+```
+GET https://api.open-meteo.com/v1/forecast
+```
+
+**Query Parameters**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| latitude | float | 위도 |
+| longitude | float | 경도 |
+| daily | string | 일별 데이터 변수 (쉼표로 구분) |
+| timezone | string | 타임존 (예: Asia/Seoul) |
+
+**Daily Variables**
+- `temperature_2m_max`: 최대 기온 (°C)
+- `temperature_2m_min`: 최소 기온 (°C)
+- `wind_speed_10m_max`: 최대 풍속 (m/s)
+- `wind_direction_10m_dominant`: 지배적인 풍향 (도)
+
+**Example Request**
+```bash
+curl "https://api.open-meteo.com/v1/forecast?latitude=38.0765&longitude=128.6234&daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max,wind_direction_10m_dominant&timezone=Asia/Seoul"
+```
+
+**Example Response**
+```json
+{
+  "latitude": 38.0765,
+  "longitude": 128.6234,
+  "daily": {
+    "time": ["2026-02-04", "2026-02-05", ...],
+    "temperature_2m_max": [15, 16, 14, ...],
+    "temperature_2m_min": [8, 9, 7, ...],
+    "wind_speed_10m_max": [12, 15, 10, ...],
+    "wind_direction_10m_dominant": [270, 280, 260, ...]
+  }
+}
+```
+
+---
+
+### Forecast Data Structure
+
+프론트엔드에서 사용하는 예보 데이터 구조:
+
+```typescript
+interface ForecastDay {
+  date: string;              // ISO 8601 형식 (예: "2026-02-04")
+  waveHeight: number;        // 파고 (m)
+  wavePeriod: number;        // 파도 주기 (초)
+  waveDirection: number;     // 파도 방향 (도)
+  windSpeed: number;         // 풍속 (m/s)
+  windDirection: number;     // 풍향 (도)
+  temperature: number;       // 기온 (°C)
+  surfScore: number;         // 서핑 점수 (1-5)
+  safetyScore: number;       // 안전 점수 (1-5)
+}
+
+interface ForecastData {
+  location: {
+    lat: number;
+    lng: number;
+    name?: string;
+  };
+  days: ForecastDay[];
+}
+```
+
+**Scoring Logic**
+- `surfScore`: 파고, 주기, 풍속을 기반으로 계산 (1=나쁨, 5=최고)
+- `safetyScore`: 파고, 풍속을 기반으로 계산 (1=위험, 5=안전)
+
+---
+
 ## Rate Limiting
 
 TODO: 구현 예정
 - 인증된 사용자: 100 req/min
 - 비인증 사용자: 20 req/min
+
+**Open-Meteo API Rate Limits**
+- 무료 사용자: 10,000 requests/day
+- API 키 불필요 (비상업용 사용)

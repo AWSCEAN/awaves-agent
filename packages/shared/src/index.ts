@@ -136,3 +136,60 @@ export interface CommonApiResponse<T> {
   error?: ErrorDetail;
   data?: T;
 }
+
+// Map Integration Types
+export interface SavedSpotMarker {
+  id: string;
+  spotId?: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  savedAt: string;
+  notes?: string;
+}
+
+export interface SurfForecast {
+  date: string;
+  waveHeight: number;
+  waveHeightMax: number;
+  wavePeriod: number;
+  waveDirection: number;
+  windSpeed: number;
+  windDirection: number;
+  waterTemperature: number;
+  airTemperature: number;
+  swellHeight?: number;
+  swellPeriod?: number;
+  swellDirection?: number;
+  surfScore: number;
+  safetyScore: number;
+}
+
+export interface LocationForecast {
+  latitude: number;
+  longitude: number;
+  locationName: string;
+  forecasts: SurfForecast[];
+}
+
+export interface WeatherOverlayData {
+  type: 'wind' | 'waves' | 'temperature';
+  date: string;
+  data: number[][];
+}
+
+export interface MeasureDistancePoint {
+  id: string;
+  latitude: number;
+  longitude: number;
+  order: number;
+}
+
+export interface WindParticle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  age: number;
+  maxAge: number;
+}
