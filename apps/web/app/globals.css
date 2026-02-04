@@ -1,0 +1,129 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ocean-primary: #0091c3;
+  --ocean-dark: #005775;
+  --sand-light: #faf6ef;
+  --sand-medium: #e6d2af;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Outfit', sans-serif;
+  background-color: var(--sand-light);
+  color: #1a1a1a;
+}
+
+/* Glass effect utility */
+@layer components {
+  .glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .glass-dark {
+    background: rgba(0, 87, 117, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+  }
+
+  .btn-primary {
+    @apply bg-ocean-500 hover:bg-ocean-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+
+  .btn-secondary {
+    @apply bg-sand-200 hover:bg-sand-300 text-ocean-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+
+  .btn-outline {
+    @apply border-2 border-ocean-500 text-ocean-500 hover:bg-ocean-500 hover:text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-2 border border-sand-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ocean-500 focus:border-transparent bg-white;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-md p-4 transition-shadow hover:shadow-lg;
+  }
+
+  .wave-rating {
+    @apply inline-flex items-center gap-1;
+  }
+}
+
+/* Mapbox overrides */
+.mapboxgl-popup-content {
+  padding: 0 !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+}
+
+.mapboxgl-popup-close-button {
+  font-size: 20px;
+  padding: 8px;
+  color: #666;
+}
+
+.mapboxgl-popup-close-button:hover {
+  background-color: transparent;
+  color: #333;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--sand-light);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ocean-primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ocean-dark);
+}
+
+/* Wave animation */
+@keyframes wave {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.animate-wave {
+  animation: wave 2s ease-in-out infinite;
+}
+
+/* Gradient backgrounds */
+.bg-ocean-gradient {
+  background: linear-gradient(135deg, #0091c3 0%, #005775 100%);
+}
+
+.bg-sand-gradient {
+  background: linear-gradient(180deg, #faf6ef 0%, #e6d2af 100%);
+}
