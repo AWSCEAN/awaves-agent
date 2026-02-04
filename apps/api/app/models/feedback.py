@@ -15,8 +15,8 @@ class Feedback(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     user_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("users.id"), nullable=False, index=True
-    )
+        String(36), nullable=False, index=True
+    )  # Note: FK constraint removed temporarily during user model migration
     spot_id: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     type: Mapped[str] = mapped_column(String(20), nullable=False)  # bug, feature, data_correction, general
     message: Mapped[str] = mapped_column(Text, nullable=False)

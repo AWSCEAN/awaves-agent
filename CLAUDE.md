@@ -118,6 +118,38 @@ Backend Dev → Review → QA → Docs
 Backend Dev ←→ Frontend Dev (API 협의) → Review → QA → Docs
 ```
 
+### API Contract Workflow
+
+Full-stack 작업 시 API 계약 문서를 생성하여 협의합니다.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    API Contract Workflow                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. Task 수신 → docs/tasks/active/{task-id}.md 생성              │
+│                                                                  │
+│  2. Contract 생성 → docs/contracts/{task-id}.md                  │
+│     - Frontend: UI 요구사항 명시                                  │
+│     - Backend: API 스펙 제안                                     │
+│                                                                  │
+│  3. 협의 → 양측 동의 시 Status: AGREED                           │
+│                                                                  │
+│  4. 구현 → Backend 먼저, Frontend 이후                           │
+│                                                                  │
+│  5. 완료 → docs/tasks/completed/로 이동                          │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Contract 파일 구조:**
+- Frontend Requirements (UI 요구사항)
+- Backend Proposal (API 스펙)
+- Agreement (합의된 인터페이스)
+- Test Cases (테스트 케이스)
+- Implementation Tracking (구현 상태)
+- Sign-off (에이전트 승인)
+
 ---
 
 ## Project Structure
@@ -145,9 +177,14 @@ awaves-agent/
 │
 ├── docs/                    # Documentation (@docs-agent)
 │   ├── architecture.md
-│   ├── api.md
+│   ├── api.md               # API specification (shared contract)
 │   ├── development.md
 │   ├── progress.md
+│   ├── contracts/           # API contracts between agents
+│   │   └── {task-id}.md     # Contract per feature
+│   ├── tasks/
+│   │   ├── active/          # Tasks in progress
+│   │   └── completed/       # Completed tasks
 │   └── qa/                  # QA reports
 │
 └── .claude/
@@ -193,20 +230,48 @@ awaves-agent/
 
 ---
 
+## Post-Task Rules (Critical)
+
+태스크 완료 후 반드시 다음을 수행합니다:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    ⚠️ Post-Task Checklist                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. 서버 실행 확인                                               │
+│     - Backend: http://localhost:8001 (FastAPI)                  │
+│     - Frontend: http://localhost:3000 (Next.js)                 │
+│                                                                  │
+│  2. 서버 시작 명령어                                             │
+│     - BE: cd apps/api && .venv/Scripts/python -m uvicorn        │
+│           app.main:app --reload --port 8001                     │
+│     - FE: cd apps/web && pnpm dev --port 3000                   │
+│                                                                  │
+│  3. 헬스체크                                                     │
+│     - curl http://localhost:8001/health                         │
+│     - curl http://localhost:3000 (200 OK)                       │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Environment Setup
 
 ### Frontend (.env.local)
 ```env
 NEXT_PUBLIC_MAPBOX_TOKEN=pk.xxx
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8001
 ```
 
-### Backend (.env)
+### Backend (.env.local)
 ```env
-DATABASE_URL=postgresql://...
-REDIS_URL=redis://...
+ENV=local
+PORT=8001
+DATABASE_URL=postgresql+asyncpg://...
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 JWT_SECRET_KEY=your-secret
-CORS_ORIGINS=http://localhost:3000,http://localhost:3003
 ```
 
 ---

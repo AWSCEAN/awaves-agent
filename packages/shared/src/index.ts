@@ -105,3 +105,34 @@ export interface RegisterRequest {
   nickname: string;
   preferredLanguage?: 'ko' | 'en';
 }
+
+// V2 Registration Types (Username-based)
+export type UserLevel = 'beginner' | 'intermediate' | 'advanced';
+
+export interface RegisterV2Request {
+  username: string;
+  password: string;
+  confirm_password: string;
+  user_level: UserLevel;
+  privacy_consent_yn: boolean;
+}
+
+export interface UserV2 {
+  user_id: number;
+  username: string;
+  user_level: UserLevel;
+  privacy_consent_yn: boolean;
+  last_login_dt?: string;
+  created_at: string;
+}
+
+export interface ErrorDetail {
+  code?: string;
+  message?: string;
+}
+
+export interface CommonApiResponse<T> {
+  result: 'success' | 'error';
+  error?: ErrorDetail;
+  data?: T;
+}

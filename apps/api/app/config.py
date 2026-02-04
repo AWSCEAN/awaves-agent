@@ -1,18 +1,37 @@
 """Application configuration and settings."""
 
+import os
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def get_env_files() -> tuple[str, ...]:
+    """Get the env files to load (in order of priority)."""
+    base_dir = Path(__file__).parent.parent
+    env_local = base_dir / ".env.local"
+    env_file = base_dir / ".env"
+
+    files = []
+    # .env.local takes priority if it exists
+    if env_local.exists():
+        files.append(str(env_local))
+    if env_file.exists():
+        files.append(str(env_file))
+
+    return tuple(files) if files else (".env",)
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=get_env_files(),
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
     # Environment

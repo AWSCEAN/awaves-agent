@@ -1,10 +1,24 @@
 """FastAPI application entry point."""
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import auth, feedback, saved, surf
+from app.db.session import close_db, init_db
+from app.routers import auth, feedback, register, saved, surf
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager for startup and shutdown."""
+    # Startup: Initialize database tables
+    await init_db()
+    yield
+    # Shutdown: Close database connections
+    await close_db()
+
 
 app = FastAPI(
     title="AWAVES API",
@@ -12,6 +26,7 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # CORS middleware
@@ -24,6 +39,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(register.router, tags=["Registration"])  # /register at root level
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(surf.router, prefix="/surf", tags=["Surf Data"])
 app.include_router(saved.router, prefix="/saved", tags=["Saved Spots"])

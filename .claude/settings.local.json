@@ -7,7 +7,9 @@
       "Bash(uvicorn app.main:app:*)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(python:*)",
+      "Bash(pnpm --filter web build)"
     ]
   }
 }

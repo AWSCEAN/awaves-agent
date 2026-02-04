@@ -9,6 +9,9 @@ import type {
   AuthTokens,
   LoginRequest,
   RegisterRequest,
+  RegisterV2Request,
+  UserV2,
+  CommonApiResponse,
 } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -94,6 +97,13 @@ export const authService = {
         nickname: data.nickname,
         preferred_language: data.preferredLanguage || 'en',
       }),
+    });
+  },
+
+  async registerV2(data: RegisterV2Request): Promise<ApiResponse<CommonApiResponse<UserV2>>> {
+    return apiRequest<CommonApiResponse<UserV2>>('/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   },
 

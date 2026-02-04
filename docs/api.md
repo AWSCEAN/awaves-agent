@@ -23,6 +23,86 @@ Authorization: Bearer {access_token}
 
 ## Endpoints
 
+### 사용자 등록 V2 (Registration V2)
+
+#### POST /register
+사용자명 기반 회원가입 (다단계 UI 지원)
+
+**Request**
+```json
+{
+  "username": "surferlove",
+  "password": "anypassword",
+  "confirm_password": "anypassword",
+  "user_level": "beginner",
+  "privacy_consent_yn": true
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| username | string | ✅ | 사용자명 (2-50자) |
+| password | string | ✅ | 비밀번호 (제한 없음) |
+| confirm_password | string | ✅ | 비밀번호 확인 |
+| user_level | string | ✅ | 서핑 레벨 (beginner/intermediate/advanced) |
+| privacy_consent_yn | boolean | ✅ | 개인정보 처리 동의 |
+
+**User Level Descriptions**
+| Level | Description |
+|-------|-------------|
+| beginner | 서핑 초보자 또는 파도 위에 올라서기 어려운 분 |
+| intermediate | 보드 위에서 균형을 유지하고 긴 라이딩이 가능한 분 |
+| advanced | 강한 파도를 타고 다양한 퍼포먼스 기술 구사 가능한 분 |
+
+**Response** `200 OK` (Common Response Model)
+```json
+{
+  "result": "success",
+  "error": null,
+  "data": {
+    "user_id": 1,
+    "username": "surferlove",
+    "user_level": "beginner",
+    "privacy_consent_yn": true,
+    "last_login_dt": null,
+    "created_at": "2024-02-04T12:00:00Z"
+  }
+}
+```
+
+**Error Response**
+```json
+{
+  "result": "error",
+  "error": {
+    "code": "USERNAME_EXISTS",
+    "message": "Username already exists"
+  },
+  "data": null
+}
+```
+
+| Error Code | Description |
+|------------|-------------|
+| PASSWORD_MISMATCH | 비밀번호와 확인 비밀번호 불일치 |
+| USERNAME_EXISTS | 이미 존재하는 사용자명 |
+| CONSENT_REQUIRED | 개인정보 처리 동의 필요 |
+
+**Example**
+```bash
+curl -X POST http://localhost:8000/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "surferlove",
+    "password": "mypassword",
+    "confirm_password": "mypassword",
+    "user_level": "beginner",
+    "privacy_consent_yn": true
+  }'
+```
+
+---
+
 ### 인증 (Authentication)
 
 #### POST /auth/register

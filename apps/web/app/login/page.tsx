@@ -11,24 +11,24 @@ type Language = 'ko' | 'en';
 const translations = {
   ko: {
     title: '로그인',
-    email: '이메일',
+    username: '사용자명',
     password: '비밀번호',
     submit: '로그인',
     noAccount: '계정이 없으신가요?',
     register: '회원가입',
     forgotPassword: '비밀번호를 잊으셨나요?',
-    errorInvalid: '이메일 또는 비밀번호가 올바르지 않습니다',
+    errorInvalid: '사용자명 또는 비밀번호가 올바르지 않습니다',
     errorNetwork: '네트워크 오류가 발생했습니다',
   },
   en: {
     title: 'Login',
-    email: 'Email',
+    username: 'Username',
     password: 'Password',
     submit: 'Login',
     noAccount: "Don't have an account?",
     register: 'Register',
     forgotPassword: 'Forgot password?',
-    errorInvalid: 'Invalid email or password',
+    errorInvalid: 'Invalid username or password',
     errorNetwork: 'Network error occurred',
   },
 };
@@ -36,7 +36,7 @@ const translations = {
 export default function LoginPage() {
   const router = useRouter();
   const [lang, setLang] = useState<Language>('en');
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -47,7 +47,9 @@ export default function LoginPage() {
     setIsLoading(true);
     setError('');
 
-    const result = await authService.login({ email, password });
+    // Use username as email for now (backend still expects email field)
+    // TODO: Update backend to accept username for login
+    const result = await authService.login({ email: username, password });
 
     if (result.success && result.data) {
       // Store tokens
@@ -86,14 +88,16 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-ocean-700 mb-1">
-                {t.email}
+                {t.username}
               </label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="input-field"
                 required
+                minLength={2}
+                maxLength={50}
               />
             </div>
 
