@@ -12,14 +12,96 @@ import type {
   RegisterV2Request,
   UserV2,
   CommonApiResponse,
+  LoginV2Response,
 } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-// Helper for making API requests
+// Token management utilities
+const tokenManager = {
+  getAccessToken: (): string | null => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('accessToken');
+  },
+  getRefreshToken: (): string | null => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('refreshToken');
+  },
+  setTokens: (accessToken: string, refreshToken?: string) => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('accessToken', accessToken);
+    if (refreshToken) {
+      localStorage.setItem('refreshToken', refreshToken);
+    }
+  },
+  clearTokens: () => {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+  },
+};
+
+// Flag to prevent multiple simultaneous refresh attempts
+let isRefreshing = false;
+let refreshPromise: Promise<boolean> | null = null;
+
+// Attempt to refresh access token
+async function attemptTokenRefresh(): Promise<boolean> {
+  const refreshToken = tokenManager.getRefreshToken();
+  if (!refreshToken) {
+    return false;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (!response.ok) {
+      tokenManager.clearTokens();
+      return false;
+    }
+
+    const data = await response.json();
+
+    // Handle CommonResponse format
+    if (data.result === 'success' && data.data) {
+      tokenManager.setTokens(data.data.access_token, data.data.refresh_token);
+      return true;
+    }
+
+    tokenManager.clearTokens();
+    return false;
+  } catch {
+    tokenManager.clearTokens();
+    return false;
+  }
+}
+
+// Synchronized refresh to avoid race conditions
+async function synchronizedTokenRefresh(): Promise<boolean> {
+  if (isRefreshing) {
+    return refreshPromise!;
+  }
+
+  isRefreshing = true;
+  refreshPromise = attemptTokenRefresh().finally(() => {
+    isRefreshing = false;
+    refreshPromise = null;
+  });
+
+  return refreshPromise;
+}
+
+// Helper for making API requests with 401 retry
 async function apiRequest<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  retryOnUnauthorized: boolean = true
 ): Promise<ApiResponse<T>> {
   const url = `${API_BASE_URL}${endpoint}`;
 
@@ -29,7 +111,7 @@ async function apiRequest<T>(
   };
 
   // Add auth token if available
-  const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+  const token = tokenManager.getAccessToken();
   if (token) {
     (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
   }
@@ -40,12 +122,26 @@ async function apiRequest<T>(
       headers,
     });
 
+    // Handle 401 Unauthorized - attempt refresh and retry
+    if (response.status === 401 && retryOnUnauthorized) {
+      const refreshed = await synchronizedTokenRefresh();
+      if (refreshed) {
+        // Retry the original request with new token
+        return apiRequest<T>(endpoint, options, false);
+      }
+      // Refresh failed, return unauthorized error
+      return {
+        success: false,
+        error: 'Session expired. Please login again.',
+      };
+    }
+
     const data = await response.json();
 
     if (!response.ok) {
       return {
         success: false,
-        error: data.detail || data.message || 'An error occurred',
+        error: data.detail || data.message || data.error?.message || 'An error occurred',
       };
     }
 
@@ -63,26 +159,32 @@ async function apiRequest<T>(
 
 // Auth Services
 export const authService = {
-  async login(credentials: LoginRequest): Promise<ApiResponse<AuthTokens>> {
-    const response = await apiRequest<{
-      access_token: string;
-      refresh_token?: string;
-      token_type: string;
-      expires_in: number;
-    }>('/auth/login', {
+  async login(credentials: LoginRequest): Promise<ApiResponse<AuthTokens & { user?: UserV2 }>> {
+    const response = await apiRequest<CommonApiResponse<LoginV2Response>>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
-    });
+    }, false);
 
     if (response.success && response.data) {
-      return {
-        success: true,
-        data: {
-          accessToken: response.data.access_token,
-          refreshToken: response.data.refresh_token,
-          expiresIn: response.data.expires_in,
-        },
-      };
+      // Handle CommonResponse format
+      if (response.data.result === 'success' && response.data.data) {
+        const loginData = response.data.data;
+        tokenManager.setTokens(loginData.access_token, loginData.refresh_token);
+        return {
+          success: true,
+          data: {
+            accessToken: loginData.access_token,
+            refreshToken: loginData.refresh_token,
+            expiresIn: loginData.expires_in,
+            user: loginData.user,
+          },
+        };
+      } else if (response.data.result === 'error') {
+        return {
+          success: false,
+          error: response.data.error?.message || 'Login failed',
+        };
+      }
     }
 
     return { success: false, error: response.error };
@@ -97,32 +199,49 @@ export const authService = {
         nickname: data.nickname,
         preferred_language: data.preferredLanguage || 'en',
       }),
-    });
+    }, false);
   },
 
   async registerV2(data: RegisterV2Request): Promise<ApiResponse<CommonApiResponse<UserV2>>> {
     return apiRequest<CommonApiResponse<UserV2>>('/register', {
       method: 'POST',
       body: JSON.stringify(data),
-    });
+    }, false);
   },
 
-  async logout(): Promise<void> {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
+  async logout(): Promise<ApiResponse<void>> {
+    const token = tokenManager.getAccessToken();
+    if (token) {
+      // Call server logout endpoint to invalidate refresh token
+      await apiRequest<void>('/auth/logout', {
+        method: 'POST',
+      }, false);
     }
+    tokenManager.clearTokens();
+    return { success: true };
   },
 
-  async getCurrentUser(): Promise<ApiResponse<User>> {
-    return apiRequest<User>('/auth/me');
+  async getCurrentUser(): Promise<ApiResponse<CommonApiResponse<UserV2>>> {
+    return apiRequest<CommonApiResponse<UserV2>>('/auth/me');
   },
 
-  async refreshToken(refreshToken: string): Promise<ApiResponse<AuthTokens>> {
-    return apiRequest<AuthTokens>('/auth/refresh', {
-      method: 'POST',
-      body: JSON.stringify({ refreshToken }),
-    });
+  async refreshToken(): Promise<ApiResponse<AuthTokens>> {
+    const refreshed = await synchronizedTokenRefresh();
+    if (refreshed) {
+      return {
+        success: true,
+        data: {
+          accessToken: tokenManager.getAccessToken()!,
+          refreshToken: tokenManager.getRefreshToken() || undefined,
+          expiresIn: 1800, // 30 minutes
+        },
+      };
+    }
+    return { success: false, error: 'Token refresh failed' };
+  },
+
+  isLoggedIn(): boolean {
+    return !!tokenManager.getAccessToken();
   },
 };
 

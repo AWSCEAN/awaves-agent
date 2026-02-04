@@ -1,57 +1,33 @@
-"""Authentication service."""
+"""Authentication service with JWT and session cache."""
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
-import uuid
 
 import bcrypt
 import jwt
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.schemas.user import TokenResponse, UserResponse
+from app.models.user import User
+from app.repositories.user_repository import UserRepository
+from app.services.cache import CacheService
 
 
-def _create_test_users() -> dict[str, dict]:
-    """Create pre-seeded test users."""
-    # Pre-hashed passwords (all passwords are "password123")
-    password_hash = bcrypt.hashpw("password123".encode(), bcrypt.gensalt()).decode()
-
-    return {
-        "user-1": {
-            "id": "user-1",
-            "email": "test@example.com",
-            "nickname": "TestSurfer",
-            "password_hash": password_hash,
-            "preferred_language": "en",
-            "profile_image_url": None,
-            "created_at": datetime.utcnow(),
-        },
-        "user-2": {
-            "id": "user-2",
-            "email": "demo@awaves.com",
-            "nickname": "DemoUser",
-            "password_hash": password_hash,
-            "preferred_language": "en",
-            "profile_image_url": None,
-            "created_at": datetime.utcnow(),
-        },
-        "user-3": {
-            "id": "user-3",
-            "email": "surfer@korea.com",
-            "nickname": "KoreanSurfer",
-            "password_hash": password_hash,
-            "preferred_language": "ko",
-            "profile_image_url": None,
-            "created_at": datetime.utcnow(),
-        },
-    }
+@dataclass
+class TokenPair:
+    """Access and refresh token pair."""
+    access_token: str
+    refresh_token: str
+    expires_in: int  # seconds
 
 
 class AuthService:
-    """Authentication service handling registration, login, and tokens."""
+    """Authentication service with JWT and Redis session cache."""
 
-    # Mock user storage with test users
-    _users: dict[str, dict] = _create_test_users()
+    def __init__(self, session: AsyncSession):
+        self.session = session
+        self.user_repo = UserRepository(session)
 
     def _hash_password(self, password: str) -> str:
         """Hash a password using bcrypt."""
@@ -61,13 +37,13 @@ class AuthService:
         """Verify a password against its hash."""
         return bcrypt.checkpw(password.encode(), hashed.encode())
 
-    def _create_access_token(self, user_id: str) -> tuple[str, int]:
+    def _create_access_token(self, user_id: int) -> tuple[str, int]:
         """Create a JWT access token."""
         expires_in = settings.jwt_access_token_expire_minutes * 60
         expire = datetime.utcnow() + timedelta(minutes=settings.jwt_access_token_expire_minutes)
 
         payload = {
-            "sub": user_id,
+            "sub": str(user_id),
             "exp": expire,
             "type": "access",
         }
@@ -75,17 +51,18 @@ class AuthService:
         token = jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
         return token, expires_in
 
-    def _create_refresh_token(self, user_id: str) -> str:
-        """Create a JWT refresh token."""
-        expire = datetime.utcnow() + timedelta(days=settings.jwt_refresh_token_expire_days)
+    def _create_refresh_token(self, user_id: int) -> tuple[str, datetime]:
+        """Create a JWT refresh token and return with expiration datetime."""
+        expires_at = datetime.utcnow() + timedelta(days=settings.jwt_refresh_token_expire_days)
 
         payload = {
-            "sub": user_id,
-            "exp": expire,
+            "sub": str(user_id),
+            "exp": expires_at,
             "type": "refresh",
         }
 
-        return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+        token = jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+        return token, expires_at
 
     def _decode_token(self, token: str) -> Optional[dict]:
         """Decode and validate a JWT token."""
@@ -99,104 +76,101 @@ class AuthService:
         except jwt.InvalidTokenError:
             return None
 
-    async def register(
-        self,
-        email: str,
-        password: str,
-        nickname: str,
-        preferred_language: str = "en",
-    ) -> UserResponse:
-        """Register a new user."""
-        # Check if user exists
-        for user in self._users.values():
-            if user["email"] == email:
-                raise ValueError("User with this email already exists")
-
-        # Create user
-        user_id = str(uuid.uuid4())
-        user = {
-            "id": user_id,
-            "email": email,
-            "nickname": nickname,
-            "password_hash": self._hash_password(password),
-            "preferred_language": preferred_language,
-            "profile_image_url": None,
-            "created_at": datetime.utcnow(),
-        }
-
-        self._users[user_id] = user
-
-        return UserResponse(
-            id=user_id,
-            email=email,
-            nickname=nickname,
-            preferred_language=preferred_language,
-            profile_image_url=None,
-            created_at=user["created_at"],
-        )
-
-    async def login(self, email: str, password: str) -> Optional[TokenResponse]:
-        """Login and return tokens."""
-        # Find user
-        user = None
-        for u in self._users.values():
-            if u["email"] == email:
-                user = u
-                break
-
+    async def login(self, username: str, password: str) -> Optional[tuple[TokenPair, User]]:
+        """
+        Login with username and password.
+        Returns token pair and user on success, None on failure.
+        """
+        # Find user by username
+        user = await self.user_repo.get_by_username(username)
         if not user:
             return None
 
         # Verify password
-        if not self._verify_password(password, user["password_hash"]):
+        if not self._verify_password(password, user.password_hash):
             return None
 
         # Create tokens
-        access_token, expires_in = self._create_access_token(user["id"])
-        refresh_token = self._create_refresh_token(user["id"])
+        access_token, expires_in = self._create_access_token(user.user_id)
+        refresh_token, refresh_expires_at = self._create_refresh_token(user.user_id)
 
-        return TokenResponse(
+        # Store refresh token in cache
+        await CacheService.store_refresh_token(
+            user_id=user.user_id,
+            token=refresh_token,
+            expires_at=refresh_expires_at,
+        )
+
+        # Update last login
+        await self.user_repo.update_last_login(user.user_id)
+        await self.session.commit()
+
+        token_pair = TokenPair(
             access_token=access_token,
             refresh_token=refresh_token,
             expires_in=expires_in,
         )
 
-    async def get_current_user(self, token: str) -> Optional[UserResponse]:
+        return token_pair, user
+
+    async def refresh_tokens(self, refresh_token: str) -> Optional[TokenPair]:
+        """
+        Refresh tokens using a valid refresh token.
+        Implements token rotation (old token invalidated).
+        """
+        # Decode the refresh token
+        payload = self._decode_token(refresh_token)
+        if not payload or payload.get("type") != "refresh":
+            return None
+
+        user_id = int(payload.get("sub"))
+
+        # Validate against cache
+        is_valid = await CacheService.validate_refresh_token(user_id, refresh_token)
+        if not is_valid:
+            return None
+
+        # Verify user still exists
+        user = await self.user_repo.get_by_id(user_id)
+        if not user:
+            return None
+
+        # Invalidate old refresh token
+        await CacheService.invalidate_refresh_token(user_id)
+
+        # Create new tokens
+        access_token, expires_in = self._create_access_token(user_id)
+        new_refresh_token, refresh_expires_at = self._create_refresh_token(user_id)
+
+        # Store new refresh token in cache
+        await CacheService.store_refresh_token(
+            user_id=user_id,
+            token=new_refresh_token,
+            expires_at=refresh_expires_at,
+        )
+
+        return TokenPair(
+            access_token=access_token,
+            refresh_token=new_refresh_token,
+            expires_in=expires_in,
+        )
+
+    async def logout(self, user_id: int) -> None:
+        """Logout user by invalidating refresh token."""
+        await CacheService.invalidate_refresh_token(user_id)
+
+    async def get_current_user(self, token: str) -> Optional[User]:
         """Get user from access token."""
         payload = self._decode_token(token)
         if not payload or payload.get("type") != "access":
             return None
 
-        user_id = payload.get("sub")
-        if not user_id or user_id not in self._users:
+        user_id = int(payload.get("sub"))
+        return await self.user_repo.get_by_id(user_id)
+
+    async def verify_access_token(self, token: str) -> Optional[int]:
+        """Verify access token and return user_id."""
+        payload = self._decode_token(token)
+        if not payload or payload.get("type") != "access":
             return None
-
-        user = self._users[user_id]
-        return UserResponse(
-            id=user["id"],
-            email=user["email"],
-            nickname=user["nickname"],
-            preferred_language=user["preferred_language"],
-            profile_image_url=user["profile_image_url"],
-            created_at=user["created_at"],
-        )
-
-    async def refresh_token(self, refresh_token: str) -> Optional[TokenResponse]:
-        """Refresh access token using refresh token."""
-        payload = self._decode_token(refresh_token)
-        if not payload or payload.get("type") != "refresh":
-            return None
-
-        user_id = payload.get("sub")
-        if not user_id or user_id not in self._users:
-            return None
-
-        # Create new tokens
-        access_token, expires_in = self._create_access_token(user_id)
-        new_refresh_token = self._create_refresh_token(user_id)
-
-        return TokenResponse(
-            access_token=access_token,
-            refresh_token=new_refresh_token,
-            expires_in=expires_in,
-        )
+        return int(payload.get("sub"))

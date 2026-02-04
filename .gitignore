@@ -14,6 +14,26 @@ build/
 .env
 .env.*
 !.env.example
+.envrc
+env/
+ENV/
+env.bak/
+
+# Python virtual environments
+.venv/
+.venv/**
+venv/
+venv.bak/
+*/.venv/
+**/.venv/
+
+# Python cache
+__pycache__/
+**/__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
 
 # Python
 __pycache__/

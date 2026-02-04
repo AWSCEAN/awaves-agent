@@ -47,16 +47,10 @@ export default function LoginPage() {
     setIsLoading(true);
     setError('');
 
-    // Use username as email for now (backend still expects email field)
-    // TODO: Update backend to accept username for login
-    const result = await authService.login({ email: username, password });
+    const result = await authService.login({ username, password });
 
     if (result.success && result.data) {
-      // Store tokens
-      localStorage.setItem('accessToken', result.data.accessToken);
-      if (result.data.refreshToken) {
-        localStorage.setItem('refreshToken', result.data.refreshToken);
-      }
+      // Tokens are automatically stored by authService.login
       // Redirect to map
       router.push('/map');
     } else {

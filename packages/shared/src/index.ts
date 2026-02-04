@@ -95,8 +95,20 @@ export interface AuthTokens {
 }
 
 export interface LoginRequest {
-  email: string;
+  username: string;
   password: string;
+}
+
+export interface RefreshTokenRequest {
+  refresh_token: string;
+}
+
+export interface LoginV2Response {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
+  user: UserV2;
 }
 
 export interface RegisterRequest {
