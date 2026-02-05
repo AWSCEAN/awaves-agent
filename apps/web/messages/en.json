@@ -1,0 +1,102 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "search": "Search",
+    "noResults": "No results found",
+    "results": "{count} results",
+    "km": "km"
+  },
+  "header": {
+    "search": "Search surf spots...",
+    "filters": "Filters",
+    "saved": "Saved",
+    "mypage": "My Page",
+    "map": "Map",
+    "windParticles": "Wind",
+    "surfScore": "Surf",
+    "safetyScore": "Safety"
+  },
+  "search": {
+    "location": "Location",
+    "locationPlaceholder": "Search location...",
+    "date": "Date",
+    "time": "Time",
+    "allTimes": "All Times",
+    "surferLevel": "Level",
+    "allLevels": "All Levels",
+    "searchButton": "Search",
+    "resultsTitle": "Search Results",
+    "sortedBy": "Sorted by surf score",
+    "distance": "Distance",
+    "useMyLocation": "Use my location",
+    "locationPermission": "Allow location access for distance calculation",
+    "allowLocation": "Allow",
+    "denyLocation": "Not now",
+    "nearYou": "Near you",
+    "page": "Page",
+    "of": "of",
+    "difficulty": {
+      "beginner": "Beginner",
+      "intermediate": "Intermediate",
+      "advanced": "Advanced",
+      "expert": "Expert"
+    }
+  },
+  "filters": {
+    "allLevels": "All Levels",
+    "waveHeight": "Wave Height",
+    "difficulty": {
+      "beginner": "Beginner",
+      "intermediate": "Intermediate",
+      "advanced": "Advanced",
+      "expert": "Expert"
+    }
+  },
+  "date": {
+    "today": "Today",
+    "tomorrow": "Tomorrow"
+  },
+  "forecast": {
+    "surfScore": "Surf Score",
+    "safety": "Safety",
+    "scoreLabels": {
+      "good": "Good",
+      "fair": "Fair",
+      "poor": "Poor"
+    },
+    "safetyLabels": {
+      "safe": "Safe",
+      "moderate": "Moderate",
+      "caution": "Caution"
+    },
+    "dataLabels": {
+      "waveHeight": "Wave Height",
+      "wavePeriod": "Wave Period",
+      "windSpeed": "Wind Speed",
+      "swellHeight": "Swell Height",
+      "waterTemp": "Water Temp",
+      "airTemp": "Air Temp"
+    },
+    "saveSpot": "Save Spot",
+    "saved": "Saved"
+  },
+  "map": {
+    "loadingMap": "Loading map...",
+    "measureDistance": "Measure Distance",
+    "stopMeasuring": "Stop Measuring",
+    "clear": "Clear",
+    "points": "points"
+  },
+  "saved": {
+    "title": "Saved Spots",
+    "empty": "No saved surf spots yet",
+    "explore": "Explore Spots",
+    "remove": "Remove",
+    "savedOn": "Saved on",
+    "viewOnMap": "View on Map"
+  }
+}

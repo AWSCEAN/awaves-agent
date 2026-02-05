@@ -1,0 +1,102 @@
+{
+  "common": {
+    "loading": "로딩 중...",
+    "error": "오류가 발생했습니다",
+    "save": "저장",
+    "cancel": "취소",
+    "close": "닫기",
+    "search": "검색",
+    "noResults": "검색 결과가 없습니다",
+    "results": "{count}개 결과",
+    "km": "km"
+  },
+  "header": {
+    "search": "서핑 스팟 검색...",
+    "filters": "필터",
+    "saved": "저장됨",
+    "mypage": "마이페이지",
+    "map": "지도",
+    "windParticles": "바람",
+    "surfScore": "서핑",
+    "safetyScore": "안전"
+  },
+  "search": {
+    "location": "위치",
+    "locationPlaceholder": "위치 검색...",
+    "date": "날짜",
+    "time": "시간",
+    "allTimes": "전체 시간",
+    "surferLevel": "레벨",
+    "allLevels": "전체 레벨",
+    "searchButton": "검색",
+    "resultsTitle": "검색 결과",
+    "sortedBy": "서핑 점수 순",
+    "distance": "거리",
+    "useMyLocation": "내 위치 사용",
+    "locationPermission": "거리 계산을 위해 위치 접근을 허용하세요",
+    "allowLocation": "허용",
+    "denyLocation": "나중에",
+    "nearYou": "내 근처",
+    "page": "페이지",
+    "of": "/",
+    "difficulty": {
+      "beginner": "초급",
+      "intermediate": "중급",
+      "advanced": "고급",
+      "expert": "전문가"
+    }
+  },
+  "filters": {
+    "allLevels": "모든 레벨",
+    "waveHeight": "파고",
+    "difficulty": {
+      "beginner": "초급",
+      "intermediate": "중급",
+      "advanced": "고급",
+      "expert": "전문가"
+    }
+  },
+  "date": {
+    "today": "오늘",
+    "tomorrow": "내일"
+  },
+  "forecast": {
+    "surfScore": "서핑 점수",
+    "safety": "안전도",
+    "scoreLabels": {
+      "good": "좋음",
+      "fair": "보통",
+      "poor": "나쁨"
+    },
+    "safetyLabels": {
+      "safe": "안전",
+      "moderate": "주의",
+      "caution": "위험"
+    },
+    "dataLabels": {
+      "waveHeight": "파고",
+      "wavePeriod": "파주기",
+      "windSpeed": "풍속",
+      "swellHeight": "너울",
+      "waterTemp": "수온",
+      "airTemp": "기온"
+    },
+    "saveSpot": "스팟 저장",
+    "saved": "저장됨"
+  },
+  "map": {
+    "loadingMap": "지도 로딩 중...",
+    "measureDistance": "거리 측정",
+    "stopMeasuring": "측정 중지",
+    "clear": "지우기",
+    "points": "포인트"
+  },
+  "saved": {
+    "title": "저장된 스팟",
+    "empty": "저장된 서핑 스팟이 없습니다",
+    "explore": "스팟 탐색하기",
+    "remove": "삭제",
+    "savedOn": "저장일",
+    "viewOnMap": "지도에서 보기"
+  }
+}

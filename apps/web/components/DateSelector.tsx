@@ -1,22 +1,28 @@
 'use client';
 
 import { format, addDays } from 'date-fns';
+import { ko, enUS } from 'date-fns/locale';
+import { useTranslations, useLocale } from 'next-intl';
 
 interface DateSelectorProps {
   selectedDate: Date;
   onDateChange: (date: Date) => void;
 }
 
-function getDayLabel(dayIndex: number): string {
-  if (dayIndex === 0) return 'Today';
-  if (dayIndex === 1) return 'Tomorrow';
-  return '';
-}
-
 export default function DateSelector({
   selectedDate,
   onDateChange
 }: DateSelectorProps) {
+  const t = useTranslations('date');
+  const locale = useLocale();
+  const dateLocale = locale === 'ko' ? ko : enUS;
+
+  const getDayLabel = (dayIndex: number): string => {
+    if (dayIndex === 0) return t('today');
+    if (dayIndex === 1) return t('tomorrow');
+    return '';
+  };
+
   const today = new Date();
   const dates = Array.from({ length: 10 }, (_, i) => addDays(today, i));
 
@@ -39,13 +45,13 @@ export default function DateSelector({
               }`}
             >
               <span className="text-xs font-medium mb-1">
-                {getDayLabel(index) || format(date, 'EEE')}
+                {getDayLabel(index) || format(date, 'EEE', { locale: dateLocale })}
               </span>
               <span className="text-lg font-bold">
                 {format(date, 'd')}
               </span>
               <span className="text-xs">
-                {format(date, 'MMM')}
+                {format(date, 'MMM', { locale: dateLocale })}
               </span>
             </button>
           );

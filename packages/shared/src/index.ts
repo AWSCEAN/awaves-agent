@@ -148,6 +148,23 @@ export interface SavedSpotMarker {
   notes?: string;
 }
 
+export interface ForecastTimeSlot {
+  time: string; // HH:mm format (e.g., "06:00", "09:00")
+  waveHeight: number;
+  waveHeightMax: number;
+  wavePeriod: number;
+  waveDirection: number;
+  windSpeed: number;
+  windDirection: number;
+  waterTemperature: number;
+  airTemperature: number;
+  swellHeight?: number;
+  swellPeriod?: number;
+  swellDirection?: number;
+  surfScore: number; // 0-100
+  safetyScore: number; // 0-100
+}
+
 export interface SurfForecast {
   date: string;
   waveHeight: number;
@@ -163,6 +180,15 @@ export interface SurfForecast {
   swellDirection?: number;
   surfScore: number;
   safetyScore: number;
+  timeSlots?: ForecastTimeSlot[];
+}
+
+export type SurferLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert';
+
+export interface SpotForecastData {
+  spotId: string;
+  availableDates: string[]; // ISO date strings
+  forecasts: { [date: string]: ForecastTimeSlot[] };
 }
 
 export interface LocationForecast {
