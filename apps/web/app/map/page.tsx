@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import AwavesLogo from '@/components/AwavesLogo';
 import InfoPanel from '@/components/InfoPanel';
 import DateRangePicker from '@/components/DateRangePicker';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import type { SurfSpot, SearchFilters } from '@/types';
 import { mockSpots } from '@/lib/data';
 
@@ -73,9 +74,10 @@ export default function MapPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col">
-      {/* Header */}
-      <header className="glass z-50 px-4 py-3 flex items-center justify-between">
+    <ProtectedRoute>
+      <div className="h-screen flex flex-col">
+        {/* Header */}
+        <header className="glass z-50 px-4 py-3 flex items-center justify-between">
         <Link href="/">
           <AwavesLogo size="sm" />
         </Link>
@@ -188,5 +190,6 @@ export default function MapPage() {
         />
       </div>
     </div>
+    </ProtectedRoute>
   );
 }

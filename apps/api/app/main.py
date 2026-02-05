@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.db.session import close_db, init_db
 from app.routers import auth, feedback, register, saved, surf
+from app.services.cache import CacheService
 
 
 @asynccontextmanager
@@ -16,8 +17,9 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize database tables
     await init_db()
     yield
-    # Shutdown: Close database connections
+    # Shutdown: Close database and cache connections
     await close_db()
+    await CacheService.close()
 
 
 app = FastAPI(

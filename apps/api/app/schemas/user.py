@@ -21,10 +21,16 @@ class RegisterRequest(UserBase):
 
 
 class LoginRequest(BaseModel):
-    """Login request."""
+    """Login request (username-based)."""
 
-    email: EmailStr
+    username: str = Field(..., min_length=2, max_length=50)
     password: str
+
+
+class RefreshTokenRequest(BaseModel):
+    """Refresh token request."""
+
+    refresh_token: str
 
 
 class UserResponse(UserBase):
@@ -92,3 +98,13 @@ class UserV2Response(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class LoginV2Response(BaseModel):
+    """V2 Login response with tokens."""
+
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int  # seconds
+    user: UserV2Response

@@ -2,7 +2,10 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import AwavesLogo from '@/components/AwavesLogo';
+import { useAuth } from '@/contexts/AuthContext';
 
 type Language = 'ko' | 'en';
 
@@ -12,6 +15,7 @@ const translations = {
     subtitle: 'AI 기반 서핑 스팟 탐색 플랫폼',
     cta: '지금 시작하기',
     login: '로그인',
+    logout: '로그아웃',
     features: {
       title: '주요 기능',
       realtime: '실시간 파도 데이터',
@@ -27,6 +31,7 @@ const translations = {
     subtitle: 'AI-powered surf spot discovery platform',
     cta: 'Get Started',
     login: 'Login',
+    logout: 'Logout',
     features: {
       title: 'Key Features',
       realtime: 'Real-time Wave Data',
@@ -74,8 +79,22 @@ function LogoOverlay() {
 }
 
 export default function LandingPage() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading, logout } = useAuth();
   const [lang, setLang] = useState<Language>('en');
   const t = translations[lang];
+
+  const handleGetStarted = () => {
+    if (isAuthenticated) {
+      router.push('/map');
+    } else {
+      router.push('/login');
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+  };
 
   return (
     <>
@@ -91,9 +110,17 @@ export default function LandingPage() {
             >
               {lang === 'ko' ? 'EN' : '한국어'}
             </button>
-            <Link href="/login" className="btn-outline text-sm">
-              {t.login}
-            </Link>
+            {isLoading ? (
+              <span className="text-sm text-ocean-500">...</span>
+            ) : isAuthenticated ? (
+              <button onClick={handleLogout} className="btn-outline text-sm">
+                {t.logout}
+              </button>
+            ) : (
+              <Link href="/login" className="btn-outline text-sm">
+                {t.login}
+              </Link>
+            )}
           </div>
         </div>
       </header>
@@ -118,8 +145,9 @@ export default function LandingPage() {
             {t.subtitle}
           </p>
           <Link href="/map" className="btn-primary text-base px-10 py-3 inline-block whitespace-nowrap">
+          <button onClick={handleGetStarted} className="btn-primary text-lg px-8 py-3">
             {t.cta}
-          </Link>
+          </button>
         </div>
 
         {/* Wave illustration placeholder */}
