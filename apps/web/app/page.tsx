@@ -4,7 +4,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import AwavesLogo from '@/components/AwavesLogo';
 import { useAuth } from '@/contexts/AuthContext';
 
 type Language = 'ko' | 'en';
@@ -145,9 +144,10 @@ export default function LandingPage() {
             {t.subtitle}
           </p>
           <Link href="/map" className="btn-primary text-base px-10 py-3 inline-block whitespace-nowrap">
-          <button onClick={handleGetStarted} className="btn-primary text-lg px-8 py-3">
-            {t.cta}
-          </button>
+            <button onClick={handleGetStarted} className="btn-primary text-lg px-8 py-3">
+              {t.cta}
+            </button>
+          </Link>
         </div>
 
         {/* Wave illustration placeholder */}
