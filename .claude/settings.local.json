@@ -9,7 +9,9 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(git add:*)",
       "Bash(python:*)",
-      "Bash(pnpm --filter web build)"
+      "Bash(pnpm --filter web build)",
+      "Bash(powershell.exe -Command \"Stop-Process -Id 17528 -Force\")",
+      "Bash(pnpm dev:*)"
     ]
   }
 }

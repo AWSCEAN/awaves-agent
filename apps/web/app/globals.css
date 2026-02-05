@@ -1,12 +1,71 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+/* IBM Plex Sans KR - Local Font */
+@font-face {
+  font-family: 'IBM Plex Sans KR';
+  src: url('/fonts/IBMPlexSansKR-Thin.ttf') format('truetype');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans KR';
+  src: url('/fonts/IBMPlexSansKR-ExtraLight.ttf') format('truetype');
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans KR';
+  src: url('/fonts/IBMPlexSansKR-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans KR';
+  src: url('/fonts/IBMPlexSansKR-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans KR';
+  src: url('/fonts/IBMPlexSansKR-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans KR';
+  src: url('/fonts/IBMPlexSansKR-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans KR';
+  src: url('/fonts/IBMPlexSansKR-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --ocean-primary: #0091c3;
-  --ocean-dark: #005775;
+  /* Ocean Sunset Theme */
+  --ocean-deep: #094074;
+  --ocean-medium: #3C6997;
+  --ocean-light: #5ADBFF;
+  --sunset-yellow: #FFDD4A;
+  --sunset-orange: #FE9000;
   --sand-light: #faf6ef;
   --sand-medium: #e6d2af;
 }
@@ -19,7 +78,7 @@ html,
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Outfit', sans-serif;
+  font-family: 'IBM Plex Sans KR', sans-serif;
   background-color: var(--sand-light);
   color: #1a1a1a;
 }
@@ -34,7 +93,7 @@ body {
   }
 
   .glass-dark {
-    background: rgba(0, 87, 117, 0.8);
+    background: rgba(9, 64, 116, 0.8);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -42,15 +101,19 @@ body {
   }
 
   .btn-primary {
-    @apply bg-ocean-500 hover:bg-ocean-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-ocean-600 hover:bg-ocean-500 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
   }
 
   .btn-secondary {
-    @apply bg-sand-200 hover:bg-sand-300 text-ocean-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-sand-200 hover:bg-sand-300 text-ocean-600 font-medium py-2 px-4 rounded-lg transition-colors duration-200;
   }
 
   .btn-outline {
-    @apply border-2 border-ocean-500 text-ocean-500 hover:bg-ocean-500 hover:text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply border-2 border-ocean-600 text-ocean-600 hover:bg-ocean-600 hover:text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+
+  .btn-accent {
+    @apply bg-sunset-500 hover:bg-sunset-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
   }
 
   .input-field {
@@ -97,12 +160,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--ocean-primary);
+  background: var(--ocean-medium);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--ocean-dark);
+  background: var(--ocean-deep);
 }
 
 /* Wave animation */
@@ -119,11 +182,35 @@ body {
   animation: wave 2s ease-in-out infinite;
 }
 
+/* Ripple wave animation for logo */
+@keyframes ripple-wave {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-3px) rotate(0.5deg);
+  }
+  50% {
+    transform: translateY(0) rotate(0deg);
+  }
+  75% {
+    transform: translateY(3px) rotate(-0.5deg);
+  }
+}
+
+.animate-ripple {
+  animation: ripple-wave 4s ease-in-out infinite;
+}
+
 /* Gradient backgrounds */
 .bg-ocean-gradient {
-  background: linear-gradient(135deg, #0091c3 0%, #005775 100%);
+  background: linear-gradient(135deg, var(--ocean-medium) 0%, var(--ocean-deep) 100%);
 }
 
 .bg-sand-gradient {
   background: linear-gradient(180deg, #faf6ef 0%, #e6d2af 100%);
+}
+
+.bg-sunset-gradient {
+  background: linear-gradient(135deg, var(--sunset-yellow) 0%, var(--sunset-orange) 100%);
 }
