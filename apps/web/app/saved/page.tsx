@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import AwavesLogo from '@/components/AwavesLogo';
+import { useRouter } from 'next/navigation';
+import LogoOverlay from '@/components/LogoOverlay';
 import SpotCard from '@/components/SpotCard';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { useAuth } from '@/contexts/AuthContext';
 import type { SurfSpot } from '@/types';
 import { mockSpots } from '@/lib/data';
 
@@ -18,6 +20,7 @@ const translations = {
     map: '지도',
     mypage: '마이페이지',
     remove: '삭제',
+    logout: '로그아웃',
   },
   en: {
     title: 'Saved Spots',
@@ -26,10 +29,13 @@ const translations = {
     map: 'Map',
     mypage: 'My Page',
     remove: 'Remove',
+    logout: 'Logout',
   },
 };
 
 export default function SavedPage() {
+  const router = useRouter();
+  const { logout } = useAuth();
   const [lang, setLang] = useState<Language>('en');
   // Mock saved spots - using first 3 spots for demo
   const [savedSpots, setSavedSpots] = useState<SurfSpot[]>(mockSpots.slice(0, 3));
@@ -39,33 +45,40 @@ export default function SavedPage() {
     setSavedSpots(savedSpots.filter((spot) => spot.id !== spotId));
   };
 
+  const handleLogout = async () => {
+    await logout();
+    router.push('/');
+  };
+
   return (
     <ProtectedRoute>
+    <LogoOverlay />
     <div className="min-h-screen bg-sand-gradient">
       {/* Header */}
-      <header className="glass sticky top-0 z-50 px-4 py-3 flex items-center justify-between">
-        <Link href="/">
-          <AwavesLogo size="sm" />
-        </Link>
-
-        <nav className="flex items-center gap-4">
-          <Link href="/map" className="text-ocean-700 hover:text-ocean-500 text-sm font-medium">
-            {t.map}
-          </Link>
-          <Link href="/mypage" className="text-ocean-700 hover:text-ocean-500 text-sm font-medium">
-            {t.mypage}
-          </Link>
-          <button
-            onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
-            className="text-sm text-ocean-600 hover:text-ocean-500"
-          >
-            {lang === 'ko' ? 'EN' : '한국어'}
-          </button>
-        </nav>
+      <header className="fixed top-0 left-0 right-0 z-40 glass">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-end">
+          <div className="flex items-center gap-4">
+            <Link href="/map" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+              {t.map}
+            </Link>
+            <Link href="/mypage" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+              {t.mypage}
+            </Link>
+            <button
+              onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
+              className="text-sm font-medium text-ocean-700 hover:text-ocean-500"
+            >
+              {lang === 'ko' ? 'EN' : '한국어'}
+            </button>
+            <button onClick={handleLogout} className="btn-outline text-sm">
+              {t.logout}
+            </button>
+          </div>
+        </div>
       </header>
 
       {/* Content */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
+      <main className="max-w-6xl mx-auto px-4 py-8 pt-16">
         <h1 className="text-3xl font-bold text-ocean-800 mb-8">{t.title}</h1>
 
         {savedSpots.length === 0 ? (

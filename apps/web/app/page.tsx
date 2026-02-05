@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import LogoOverlay from '@/components/LogoOverlay';
 
 type Language = 'ko' | 'en';
 
@@ -42,40 +43,6 @@ const translations = {
     },
   },
 };
-
-function LogoOverlay() {
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        top: '4px',
-        left: 0,
-        zIndex: 9999,
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        padding: '6px 16px',
-        height: '48px',
-        pointerEvents: 'none',
-      }}
-    >
-      <Image
-        src="/awaves_letter.svg"
-        alt="AWAVES"
-        width={60}
-        height={20}
-        style={{ height: '20px', width: 'auto', marginTop: '4px' }}
-      />
-      <Image
-        src="/awaves_logo.svg"
-        alt="AWAVES Logo"
-        width={36}
-        height={36}
-        style={{ height: '36px', width: 'auto' }}
-      />
-    </div>
-  );
-}
 
 export default function LandingPage() {
   const router = useRouter();

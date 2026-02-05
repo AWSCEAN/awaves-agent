@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import AwavesLogo from '@/components/AwavesLogo';
+import LogoOverlay from '@/components/LogoOverlay';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -77,31 +77,33 @@ export default function MyPage() {
 
   return (
     <ProtectedRoute>
+    <LogoOverlay />
     <div className="min-h-screen bg-sand-gradient">
       {/* Header */}
-      <header className="glass sticky top-0 z-50 px-4 py-3 flex items-center justify-between">
-        <Link href="/">
-          <AwavesLogo size="sm" />
-        </Link>
-
-        <nav className="flex items-center gap-4">
-          <Link href="/map" className="text-ocean-700 hover:text-ocean-500 text-sm font-medium">
-            {t.map}
-          </Link>
-          <Link href="/saved" className="text-ocean-700 hover:text-ocean-500 text-sm font-medium">
-            {t.savedSpots}
-          </Link>
-          <button
-            onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
-            className="text-sm text-ocean-600 hover:text-ocean-500"
-          >
-            {lang === 'ko' ? 'EN' : '한국어'}
-          </button>
-        </nav>
+      <header className="fixed top-0 left-0 right-0 z-40 glass">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-end">
+          <div className="flex items-center gap-4">
+            <Link href="/map" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+              {t.map}
+            </Link>
+            <Link href="/saved" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+              {t.savedSpots}
+            </Link>
+            <button
+              onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
+              className="text-sm font-medium text-ocean-700 hover:text-ocean-500"
+            >
+              {lang === 'ko' ? 'EN' : '한국어'}
+            </button>
+            <button onClick={handleLogout} className="btn-outline text-sm">
+              {t.logout}
+            </button>
+          </div>
+        </div>
       </header>
 
       {/* Content */}
-      <main className="max-w-2xl mx-auto px-4 py-8">
+      <main className="max-w-2xl mx-auto px-4 py-8 pt-16">
         <h1 className="text-3xl font-bold text-ocean-800 mb-8">{t.title}</h1>
 
         {/* Profile Section */}
@@ -150,9 +152,6 @@ export default function MyPage() {
             <div className="flex gap-4 pt-4">
               <button onClick={handleSaveProfile} className="btn-primary">
                 {t.save}
-              </button>
-              <button onClick={handleLogout} className="btn-outline">
-                {t.logout}
               </button>
             </div>
           </div>

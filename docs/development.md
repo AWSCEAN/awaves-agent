@@ -37,7 +37,7 @@ cd ../..
 
 ```env
 NEXT_PUBLIC_MAPBOX_TOKEN=pk.your-mapbox-token
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8001
 ```
 
 #### Backend (.env)
@@ -87,9 +87,9 @@ pnpm dev
 | 서비스 | URL |
 |--------|-----|
 | Frontend | http://localhost:3000 |
-| Backend API | http://localhost:8000 |
-| API Docs (Swagger) | http://localhost:8000/docs |
-| API Docs (ReDoc) | http://localhost:8000/redoc |
+| Backend API | http://localhost:8001 |
+| API Docs (Swagger) | http://localhost:8001/docs |
+| API Docs (ReDoc) | http://localhost:8001/redoc |
 
 ## 테스트 계정
 
@@ -162,15 +162,15 @@ ruff check app
 
 ```bash
 # 헬스 체크
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 
 # 로그인
-curl -X POST http://localhost:8000/auth/login \
+curl -X POST http://localhost:8001/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "password": "password123"}'
 
 # 인증이 필요한 API (토큰 사용)
-curl http://localhost:8000/auth/me \
+curl http://localhost:8001/auth/me \
   -H "Authorization: Bearer {your-token}"
 ```
 
@@ -211,7 +211,7 @@ curl http://localhost:8000/auth/me \
 ```bash
 # 사용 중인 포트 확인 (Windows)
 netstat -ano | findstr :3000
-netstat -ano | findstr :8000
+netstat -ano | findstr :8001
 
 # 프로세스 종료 (Windows)
 taskkill /PID {PID} /F
