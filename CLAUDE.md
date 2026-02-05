@@ -288,7 +288,7 @@ pnpm --filter web build  # Type check
 ```bash
 cd apps/api
 pytest
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 ```
 
 ### Test Credentials
@@ -342,5 +342,5 @@ uvicorn app.main:app --reload   # FastAPI 개발 서버
 pytest                          # 테스트 실행
 
 # API Testing
-curl http://localhost:8000/docs # Swagger UI
+curl http://localhost:8001/docs # Swagger UI
 ```
