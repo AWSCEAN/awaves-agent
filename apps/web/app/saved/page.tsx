@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import AwavesLogo from '@/components/AwavesLogo';
 import SpotCard from '@/components/SpotCard';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import type { SurfSpot } from '@/types';
 import { mockSpots } from '@/lib/data';
 
@@ -39,6 +40,7 @@ export default function SavedPage() {
   };
 
   return (
+    <ProtectedRoute>
     <div className="min-h-screen bg-sand-gradient">
       {/* Header */}
       <header className="glass sticky top-0 z-50 px-4 py-3 flex items-center justify-between">
@@ -89,5 +91,6 @@ export default function SavedPage() {
         )}
       </main>
     </div>
+    </ProtectedRoute>
   );
 }
