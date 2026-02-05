@@ -26,3 +26,32 @@ class FeedbackResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# Saved Item Feedback schemas
+FeedbackStatus = Literal["POSITIVE", "NEGATIVE", "DEFERRED"]
+
+
+class SavedItemFeedbackRequest(BaseModel):
+    """Request to submit feedback for a saved item."""
+
+    location_id: str = Field(..., description="Location ID of the saved item")
+    surf_timestamp: str = Field(..., description="Surf timestamp of the saved item")
+    feedback_status: FeedbackStatus = Field(
+        ..., description="POSITIVE (good), NEGATIVE (not good), or DEFERRED (later)"
+    )
+
+
+class SavedItemFeedbackResponse(BaseModel):
+    """Response for saved item feedback."""
+
+    id: str
+    user_id: str
+    location_id: str
+    surf_timestamp: str
+    feedback_result: Optional[int] = None  # 1 = good, 0 = not good, null = deferred
+    feedback_status: FeedbackStatus
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

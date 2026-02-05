@@ -13,6 +13,13 @@ import type {
   UserV2,
   CommonApiResponse,
   LoginV2Response,
+  SavedItemRequest,
+  SavedItemResponse,
+  SavedListResponse,
+  DeleteSavedItemRequest,
+  AcknowledgeChangeRequest,
+  SavedItemFeedbackRequest,
+  SavedItemFeedbackResponse,
 } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
@@ -276,8 +283,40 @@ export const surfService = {
   },
 };
 
-// Saved Spots Services
+// Saved Spots Services (DynamoDB)
 export const savedService = {
+  async getSavedItems(): Promise<ApiResponse<CommonApiResponse<SavedListResponse>>> {
+    return apiRequest<CommonApiResponse<SavedListResponse>>('/saved');
+  },
+
+  async saveItem(item: SavedItemRequest): Promise<ApiResponse<CommonApiResponse<SavedItemResponse>>> {
+    return apiRequest<CommonApiResponse<SavedItemResponse>>('/saved', {
+      method: 'POST',
+      body: JSON.stringify(item),
+    });
+  },
+
+  async getSavedItem(locationId: string, surfTimestamp: string): Promise<ApiResponse<CommonApiResponse<SavedItemResponse>>> {
+    return apiRequest<CommonApiResponse<SavedItemResponse>>(
+      `/saved/${encodeURIComponent(locationId)}/${encodeURIComponent(surfTimestamp)}`
+    );
+  },
+
+  async removeSavedItem(request: DeleteSavedItemRequest): Promise<ApiResponse<CommonApiResponse<{ message: string }>>> {
+    return apiRequest<CommonApiResponse<{ message: string }>>('/saved', {
+      method: 'DELETE',
+      body: JSON.stringify(request),
+    });
+  },
+
+  async acknowledgeChange(request: AcknowledgeChangeRequest): Promise<ApiResponse<CommonApiResponse<SavedItemResponse>>> {
+    return apiRequest<CommonApiResponse<SavedItemResponse>>('/saved/acknowledge-change', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  },
+
+  // Legacy methods for backward compatibility
   async getSavedSpots(): Promise<ApiResponse<SavedSpot[]>> {
     return apiRequest<SavedSpot[]>('/saved');
   },
@@ -294,13 +333,6 @@ export const savedService = {
       method: 'DELETE',
     });
   },
-
-  async updateSavedSpot(savedId: string, notes: string): Promise<ApiResponse<SavedSpot>> {
-    return apiRequest<SavedSpot>(`/saved/${savedId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ notes }),
-    });
-  },
 };
 
 // Feedback Services
@@ -310,6 +342,24 @@ export const feedbackService = {
       method: 'POST',
       body: JSON.stringify(feedback),
     });
+  },
+
+  async submitSavedItemFeedback(
+    feedback: SavedItemFeedbackRequest
+  ): Promise<ApiResponse<CommonApiResponse<SavedItemFeedbackResponse>>> {
+    return apiRequest<CommonApiResponse<SavedItemFeedbackResponse>>('/feedback/saved-item', {
+      method: 'POST',
+      body: JSON.stringify(feedback),
+    });
+  },
+
+  async getSavedItemFeedback(
+    locationId: string,
+    surfTimestamp: string
+  ): Promise<ApiResponse<CommonApiResponse<SavedItemFeedbackResponse>>> {
+    return apiRequest<CommonApiResponse<SavedItemFeedbackResponse>>(
+      `/feedback/saved-item/${encodeURIComponent(locationId)}/${encodeURIComponent(surfTimestamp)}`
+    );
   },
 };
 

@@ -1,16 +1,16 @@
 # 프로젝트 진행 상황
 
 ## 현재 상태
-- **마일스톤**: M2 - 사용자 인증 완성
+- **마일스톤**: M4 - 저장 & 피드백 기능
 - **상태**: ✅ 완료
-- **마지막 업데이트**: 2026-02-05 12:00
+- **마지막 업데이트**: 2026-02-05 22:20
 
 ## 다음 작업
 1. [x] 사용자명 기반 회원가입 V2 구현 (t01_user-registration01)
 2. [x] 회원가입 UI/DB 개선 (t02_user-registration02)
 3. [x] 인증 기반 UI 동작 및 접근 제어 (t04_user-login02)
-4. [ ] 지도 페이지 Mapbox 통합 테스트
-5. [ ] 저장된 스팟 기능 구현
+4. [x] 저장된 스팟 기능 구현 (t06_savedlist01)
+5. [ ] 지도 페이지 Mapbox 통합 테스트
 
 ## 블로커
 - 없음
@@ -21,6 +21,19 @@
 
 ### 2026-02-05
 #### 완료
+- 저장된 스팟 기능 구현 (Task: t06_savedlist01)
+  - Backend: DynamoDB 서비스 구현 (aioboto3 기반 비동기 작업)
+  - Backend: 저장 목록 스키마/라우터 DynamoDB 통합
+  - Backend: Redis 캐시 확장 (saved items 캐시 레이어)
+  - Backend: PostgreSQL에 saved_item_feedback 테이블 추가
+  - Frontend: SavedItemCard 컴포넌트 신규 생성
+  - Frontend: Saved 페이지 API 통합 및 상태 관리
+  - Frontend: 조건 변경 알림 UI 구현
+  - Frontend: 피드백 UI (thumbs up/down) 구현
+  - Frontend: 삭제 확인 모달 구현
+  - QA: API 엔드포인트 테스트 완료
+  - Review: 보안 및 품질 검토 통과
+
 - 인증 기반 UI 동작 및 접근 제어 (Task: t04_user-login02)
   - Frontend: AuthContext 구현 (사용자 인증 상태 관리)
   - Frontend: ProtectedRoute 컴포넌트 구현 (라우트 가드)
@@ -95,7 +108,7 @@
 | # | 마일스톤 | 상태 | 완료일 |
 |---|---------|------|--------|
 | M1 | 프로젝트 초기 설정 | ✅ | 2024-02-04 |
-| M2 | 사용자 인증 완성 | 🟡 | - |
-| M3 | 지도 & 스팟 기능 | ⬜ | - |
-| M4 | 저장 & 피드백 기능 | ⬜ | - |
+| M2 | 사용자 인증 완성 | ✅ | 2026-02-05 |
+| M3 | 지도 & 스팟 기능 | 🟡 | - |
+| M4 | 저장 & 피드백 기능 | ✅ | 2026-02-05 |
 | M5 | 배포 & 최적화 | ⬜ | - |

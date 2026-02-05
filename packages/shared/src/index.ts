@@ -148,3 +148,78 @@ export interface CommonApiResponse<T> {
   error?: ErrorDetail;
   data?: T;
 }
+
+// Saved Item Types (DynamoDB)
+export interface SavedItemRequest {
+  location_id: string;
+  surf_timestamp: string;
+  departure_date?: string;
+  address?: string;
+  region?: string;
+  country?: string;
+  wave_height?: number;
+  wave_period?: number;
+  wind_speed?: number;
+  water_temperature?: number;
+  surfer_level: string;
+  surf_score: number;
+  surf_grade: string;
+  surf_safety_grade: string;
+}
+
+export interface SavedItemResponse {
+  user_id: string;
+  sort_key: string;
+  location_id: string;
+  surf_timestamp: string;
+  saved_at: string;
+  address?: string;
+  region?: string;
+  country?: string;
+  departure_date?: string;
+  wave_height?: number;
+  wave_period?: number;
+  wind_speed?: number;
+  water_temperature?: number;
+  surfer_level: string;
+  surf_score: number;
+  surf_grade: string;
+  surf_safety_grade: string;
+  flag_change: boolean;
+  change_message?: string;
+}
+
+export interface SavedListResponse {
+  items: SavedItemResponse[];
+  total: number;
+}
+
+export interface DeleteSavedItemRequest {
+  location_id: string;
+  surf_timestamp: string;
+}
+
+export interface AcknowledgeChangeRequest {
+  location_id: string;
+  surf_timestamp: string;
+}
+
+// Saved Item Feedback Types
+export type FeedbackStatus = 'POSITIVE' | 'NEGATIVE' | 'DEFERRED';
+
+export interface SavedItemFeedbackRequest {
+  location_id: string;
+  surf_timestamp: string;
+  feedback_result?: number;
+  feedback_status: FeedbackStatus;
+}
+
+export interface SavedItemFeedbackResponse {
+  id: string;
+  user_id: string;
+  location_id: string;
+  surf_timestamp: string;
+  feedback_result?: number;
+  feedback_status: FeedbackStatus;
+  created_at: string;
+}
