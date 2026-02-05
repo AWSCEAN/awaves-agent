@@ -48,7 +48,7 @@ export default function SpotCard({ spot, lang, onRemove, showRemove }: SpotCardP
           {showRemove && onRemove && (
             <button
               onClick={onRemove}
-              className="text-coral-500 hover:text-coral-600 text-sm"
+              className="text-sunset-500 hover:text-sunset-600 text-sm"
             >
               ✕
             </button>
