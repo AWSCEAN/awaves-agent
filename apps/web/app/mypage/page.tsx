@@ -2,7 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import AwavesLogo from '@/components/AwavesLogo';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import { useAuth } from '@/contexts/AuthContext';
 
 type Language = 'ko' | 'en';
 
@@ -44,17 +47,14 @@ const translations = {
 };
 
 export default function MyPage() {
+  const router = useRouter();
+  const { user: authUser, logout } = useAuth();
   const [lang, setLang] = useState<Language>('en');
-  const [nickname, setNickname] = useState('Surfer123');
+  const [nickname, setNickname] = useState(authUser?.username || 'Surfer123');
   const [preferredLang, setPreferredLang] = useState<Language>('en');
   const [feedback, setFeedback] = useState('');
   const [feedbackSent, setFeedbackSent] = useState(false);
   const t = translations[lang];
-
-  // Mock user data
-  const user = {
-    email: 'surfer@example.com',
-  };
 
   const handleSaveProfile = () => {
     // TODO: Implement profile save
@@ -70,12 +70,13 @@ export default function MyPage() {
     setTimeout(() => setFeedbackSent(false), 3000);
   };
 
-  const handleLogout = () => {
-    // TODO: Implement logout
-    console.log('Logout');
+  const handleLogout = async () => {
+    await logout();
+    router.push('/');
   };
 
   return (
+    <ProtectedRoute>
     <div className="min-h-screen bg-sand-gradient">
       {/* Header */}
       <header className="glass sticky top-0 z-50 px-4 py-3 flex items-center justify-between">
@@ -113,8 +114,8 @@ export default function MyPage() {
                 {t.email}
               </label>
               <input
-                type="email"
-                value={user.email}
+                type="text"
+                value={authUser?.username || ''}
                 disabled
                 className="input-field bg-sand-100 cursor-not-allowed"
               />
@@ -185,5 +186,6 @@ export default function MyPage() {
         </section>
       </main>
     </div>
+    </ProtectedRoute>
   );
 }
