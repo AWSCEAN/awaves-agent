@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -43,6 +44,40 @@ const translations = {
   },
 };
 
+function LogoOverlay() {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: '4px',
+        left: 0,
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        padding: '6px 16px',
+        height: '48px',
+        pointerEvents: 'none',
+      }}
+    >
+      <Image
+        src="/awaves_letter.svg"
+        alt="AWAVES"
+        width={60}
+        height={20}
+        style={{ height: '20px', width: 'auto', marginTop: '4px' }}
+      />
+      <Image
+        src="/awaves_logo.svg"
+        alt="AWAVES Logo"
+        width={36}
+        height={36}
+        style={{ height: '36px', width: 'auto' }}
+      />
+    </div>
+  );
+}
+
 export default function LandingPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading, logout } = useAuth();
@@ -62,11 +97,12 @@ export default function LandingPage() {
   };
 
   return (
-    <main className="min-h-screen bg-sand-gradient">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 glass">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <AwavesLogo size="md" />
+    <>
+      <LogoOverlay />
+      <main className="min-h-screen bg-sand-gradient">
+        {/* Header */}
+      <header className="fixed top-0 left-0 right-0 z-40 glass">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-end">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
@@ -90,14 +126,25 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4">
+      <section className="pt-24 pb-20 px-4">
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-5xl md:text-6xl font-bold text-ocean-800 mb-6">
+          <div className="flex justify-center mb-6">
+            <Image
+              src="/awaves_main.svg"
+              alt="AWAVES"
+              width={280}
+              height={280}
+              className="animate-ripple"
+              style={{ width: 'auto', height: 'auto', maxWidth: '280px' }}
+            />
+          </div>
+          <h1 className="text-5xl font-bold text-ocean-800 mb-6">
             {t.tagline}
           </h1>
           <p className="text-xl text-ocean-600 mb-10">
             {t.subtitle}
           </p>
+          <Link href="/map" className="btn-primary text-base px-10 py-3 inline-block whitespace-nowrap">
           <button onClick={handleGetStarted} className="btn-primary text-lg px-8 py-3">
             {t.cta}
           </button>
@@ -145,7 +192,8 @@ export default function LandingPage() {
           </p>
         </div>
       </footer>
-    </main>
+      </main>
+    </>
   );
 }
 

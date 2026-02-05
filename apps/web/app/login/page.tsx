@@ -1,8 +1,10 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { authService } from '@/lib/apiServices';
 import AwavesLogo from '@/components/AwavesLogo';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -62,14 +64,21 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen bg-sand-gradient flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
+      <div className="flex items-center gap-24">
+        <div className="flex-shrink-0">
           <Link href="/">
-            <AwavesLogo size="lg" />
+            <Image
+              src="/awaves_main.svg"
+              alt="AWAVES"
+              width={180}
+              height={180}
+              className="animate-ripple"
+              style={{ width: 'auto', height: 'auto', maxWidth: '180px' }}
+            />
           </Link>
         </div>
 
-        <div className="card">
+        <div className="w-[480px] card">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-ocean-800">{t.title}</h1>
             <button
@@ -119,7 +128,7 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <p className="text-coral-500 text-sm text-center">{error}</p>
+              <p className="text-sunset-500 text-sm text-center">{error}</p>
             )}
 
             <button
