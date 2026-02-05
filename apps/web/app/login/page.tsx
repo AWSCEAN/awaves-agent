@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import AwavesLogo from '@/components/AwavesLogo';
-import { authService } from '@/lib/apiServices';
+import { useAuth } from '@/contexts/AuthContext';
 
 type Language = 'ko' | 'en';
 
@@ -35,6 +35,7 @@ const translations = {
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [lang, setLang] = useState<Language>('en');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -47,14 +48,14 @@ export default function LoginPage() {
     setIsLoading(true);
     setError('');
 
-    const result = await authService.login({ username, password });
+    const success = await login(username, password);
 
-    if (result.success && result.data) {
-      // Tokens are automatically stored by authService.login
+    if (success) {
+      // AuthContext user state is now updated
       // Redirect to map
       router.push('/map');
     } else {
-      setError(result.error === 'Network error' ? t.errorNetwork : t.errorInvalid);
+      setError(t.errorInvalid);
       setIsLoading(false);
     }
   };
