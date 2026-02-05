@@ -135,7 +135,7 @@ CREATE TABLE users_v2 (
 
 ### Success Case
 ```bash
-curl -X POST http://localhost:8000/register \
+curl -X POST http://localhost:8001/register \
   -H "Content-Type: application/json" \
   -d '{
     "username": "testuser",
@@ -164,7 +164,7 @@ Expected:
 
 ### Error Case - Password Mismatch
 ```bash
-curl -X POST http://localhost:8000/register \
+curl -X POST http://localhost:8001/register \
   -H "Content-Type: application/json" \
   -d '{
     "username": "testuser",

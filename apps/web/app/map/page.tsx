@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import AwavesLogo from '@/components/AwavesLogo';
+import LogoOverlay from '@/components/LogoOverlay';
 import InfoPanel from '@/components/InfoPanel';
 import DateRangePicker from '@/components/DateRangePicker';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -75,13 +75,10 @@ export default function MapPage() {
 
   return (
     <ProtectedRoute>
+      <LogoOverlay />
       <div className="h-screen flex flex-col">
         {/* Header */}
-        <header className="glass z-50 px-4 py-3 flex items-center justify-between">
-        <Link href="/">
-          <AwavesLogo size="sm" />
-        </Link>
-
+        <header className="glass z-50 px-4 py-3 flex items-center">
         {/* Search Bar */}
         <div className="flex-1 max-w-xl mx-4">
           <div className="relative">
