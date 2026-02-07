@@ -150,6 +150,18 @@ Full-stack 작업 시 API 계약 문서를 생성하여 협의합니다.
 - Implementation Tracking (구현 상태)
 - Sign-off (에이전트 승인)
 
+### Task Execution Rules (필수)
+
+Agent에게 `task_id.md`로 작업을 할당할 때 아래 규칙을 **반드시** 적용합니다.
+상세 내용은 `.claude/agents/README.md`의 "Task Execution Rules" 섹션을 참조합니다.
+
+1. **Task 파일 생성** - 작업 시작 시 `docs/tasks/active/{task-id}.md` 생성
+2. **Contract 기록** - 작업 중 변경사항/결정사항/가정을 `docs/contracts/{task-id}.md`에 기록
+   - 병렬 브랜치 작업 시 다른 Agent가 맥락을 파악할 수 있도록 수시 업데이트
+   - 머지 충돌 해결 시 각 변경의 의도를 파악할 수 있도록 기록
+3. **완료 요약** - 모든 Agent 작업 완료 후 `docs/tasks/completed/{task-id}.md`에 통합 요약 저장
+   - 구현 내용, 변경 파일, 주요 결정사항, Agent Sign-off 포함
+
 ---
 
 ## Project Structure
