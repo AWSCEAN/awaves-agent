@@ -87,7 +87,6 @@ async def save_item(
             surfer_level=request.surfer_level,
             surf_score=request.surf_score,
             surf_grade=request.surf_grade,
-            surf_safety_grade=request.surf_safety_grade,
             address=request.address,
             region=request.region,
             country=request.country,
@@ -132,6 +131,7 @@ async def delete_saved_item(
     """Delete a saved item."""
     success = await DynamoDBService.delete_item(
         user_id=user_id,
+        location_surf_key=request.location_surf_key,
         location_id=request.location_id,
         surf_timestamp=request.surf_timestamp,
     )
@@ -187,6 +187,7 @@ async def acknowledge_change(
     """Acknowledge a change notification."""
     success = await DynamoDBService.acknowledge_change(
         user_id=user_id,
+        location_surf_key=request.location_surf_key,
         location_id=request.location_id,
         surf_timestamp=request.surf_timestamp,
     )

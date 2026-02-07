@@ -1,6 +1,5 @@
 """Saved list Pydantic schemas."""
 
-from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -28,23 +27,22 @@ class SavedItemRequest(BaseModel):
     surfer_level: str = Field(..., description="User's surf skill level")
     surf_score: float = Field(..., ge=0, le=100)
     surf_grade: str = Field(..., description="Surf grade (A, B, C, etc.)")
-    surf_safety_grade: str = Field(..., description="Safety grade")
 
 
 class SavedItemResponse(BaseModel):
     """Saved item response."""
 
     user_id: str
-    sort_key: str
+    location_surf_key: str = Field(..., description="Composite key: {locationId}#{surfTimestamp}")
     location_id: str
     surf_timestamp: str
     saved_at: str
+    departure_date: Optional[str] = None
 
     # Location info
     address: Optional[str] = None
     region: Optional[str] = None
     country: Optional[str] = None
-    departure_date: Optional[str] = None
 
     # Surf conditions
     wave_height: Optional[float] = None
@@ -56,7 +54,6 @@ class SavedItemResponse(BaseModel):
     surfer_level: str
     surf_score: float
     surf_grade: str
-    surf_safety_grade: str
 
     # Change notification
     flag_change: bool = False
@@ -69,16 +66,20 @@ class SavedItemResponse(BaseModel):
     @classmethod
     def from_dynamodb(cls, item: dict) -> "SavedItemResponse":
         """Create response from DynamoDB item."""
+        location_id = item.get("LocationId", "")
+        surf_timestamp = item.get("SurfTimestamp", "")
+        location_surf_key = item.get("SortKey", f"{location_id}#{surf_timestamp}")
+
         return cls(
             user_id=item.get("UserId", ""),
-            sort_key=item.get("SortKey", ""),
-            location_id=item.get("LocationId", ""),
-            surf_timestamp=item.get("SurfTimestamp", ""),
+            location_surf_key=location_surf_key,
+            location_id=location_id,
+            surf_timestamp=surf_timestamp,
             saved_at=item.get("SavedAt", ""),
+            departure_date=item.get("DepartureDate"),
             address=item.get("Address"),
             region=item.get("Region"),
             country=item.get("Country"),
-            departure_date=item.get("DepartureDate"),
             wave_height=item.get("waveHeight"),
             wave_period=item.get("wavePeriod"),
             wind_speed=item.get("windSpeed"),
@@ -86,7 +87,6 @@ class SavedItemResponse(BaseModel):
             surfer_level=item.get("SurferLevel", ""),
             surf_score=item.get("surfScore", 0),
             surf_grade=item.get("surfGrade", ""),
-            surf_safety_grade=item.get("surfSafetyGrade", ""),
             flag_change=item.get("flagChange", False),
             change_message=item.get("changeMessage"),
         )
@@ -102,12 +102,14 @@ class SavedListResponse(BaseModel):
 class DeleteSavedItemRequest(BaseModel):
     """Request to delete a saved item."""
 
-    location_id: str
-    surf_timestamp: str
+    location_surf_key: Optional[str] = Field(default=None, description="Composite key: {locationId}#{surfTimestamp}")
+    location_id: Optional[str] = Field(default=None)
+    surf_timestamp: Optional[str] = Field(default=None)
 
 
 class AcknowledgeChangeRequest(BaseModel):
     """Request to acknowledge a change notification."""
 
-    location_id: str
-    surf_timestamp: str
+    location_surf_key: Optional[str] = Field(default=None, description="Composite key: {locationId}#{surfTimestamp}")
+    location_id: Optional[str] = Field(default=None)
+    surf_timestamp: Optional[str] = Field(default=None)

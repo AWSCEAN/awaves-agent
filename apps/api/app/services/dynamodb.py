@@ -62,7 +62,7 @@ class DynamoDBService:
                         TableName=cls.TABLE_NAME,
                         KeySchema=[
                             {"AttributeName": "UserId", "KeyType": "HASH"},  # Partition Key
-                            {"AttributeName": "SortKey", "KeyType": "RANGE"},  # Sort Key
+                            {"AttributeName": "SortKey", "KeyType": "RANGE"},  # Sort Key (LocationSurfKey)
                         ],
                         AttributeDefinitions=[
                             {"AttributeName": "UserId", "AttributeType": "S"},
@@ -78,6 +78,22 @@ class DynamoDBService:
             return False
 
     @classmethod
+    def _parse_location_surf_key(cls, location_surf_key: Optional[str], location_id: Optional[str], surf_timestamp: Optional[str]) -> tuple[str, str]:
+        """Parse location_surf_key or use separate location_id and surf_timestamp."""
+        if location_surf_key:
+            parts = location_surf_key.split("#", 2)
+            if len(parts) >= 3:
+                # Format: lat#lng#timestamp
+                loc_id = f"{parts[0]}#{parts[1]}"
+                ts = parts[2]
+                return loc_id, ts
+            elif len(parts) == 2:
+                return parts[0], parts[1]
+        if location_id and surf_timestamp:
+            return location_id, surf_timestamp
+        raise ValueError("Either location_surf_key or both location_id and surf_timestamp must be provided")
+
+    @classmethod
     async def save_item(
         cls,
         user_id: str,
@@ -87,7 +103,6 @@ class DynamoDBService:
         surfer_level: str,
         surf_score: float,
         surf_grade: str,
-        surf_safety_grade: str,
         address: Optional[str] = None,
         region: Optional[str] = None,
         country: Optional[str] = None,
@@ -109,7 +124,6 @@ class DynamoDBService:
             "SurferLevel": {"S": surfer_level},
             "surfScore": {"N": str(surf_score)},
             "surfGrade": {"S": surf_grade},
-            "surfSafetyGrade": {"S": surf_safety_grade},
             "flagChange": {"BOOL": False},
         }
 
@@ -162,9 +176,16 @@ class DynamoDBService:
             return []
 
     @classmethod
-    async def get_saved_item(cls, user_id: str, location_id: str, surf_timestamp: str) -> Optional[dict]:
+    async def get_saved_item(
+        cls,
+        user_id: str,
+        location_id: Optional[str] = None,
+        surf_timestamp: Optional[str] = None,
+        location_surf_key: Optional[str] = None,
+    ) -> Optional[dict]:
         """Get a specific saved item."""
-        sort_key = f"{location_id}#{surf_timestamp}"
+        loc_id, ts = cls._parse_location_surf_key(location_surf_key, location_id, surf_timestamp)
+        sort_key = f"{loc_id}#{ts}"
 
         try:
             async with await cls.get_client() as client:
@@ -182,9 +203,16 @@ class DynamoDBService:
             return None
 
     @classmethod
-    async def delete_item(cls, user_id: str, location_id: str, surf_timestamp: str) -> bool:
+    async def delete_item(
+        cls,
+        user_id: str,
+        location_id: Optional[str] = None,
+        surf_timestamp: Optional[str] = None,
+        location_surf_key: Optional[str] = None,
+    ) -> bool:
         """Delete a saved item."""
-        sort_key = f"{location_id}#{surf_timestamp}"
+        loc_id, ts = cls._parse_location_surf_key(location_surf_key, location_id, surf_timestamp)
+        sort_key = f"{loc_id}#{ts}"
 
         try:
             async with await cls.get_client() as client:
@@ -201,9 +229,16 @@ class DynamoDBService:
             return False
 
     @classmethod
-    async def acknowledge_change(cls, user_id: str, location_id: str, surf_timestamp: str) -> bool:
+    async def acknowledge_change(
+        cls,
+        user_id: str,
+        location_id: Optional[str] = None,
+        surf_timestamp: Optional[str] = None,
+        location_surf_key: Optional[str] = None,
+    ) -> bool:
         """Acknowledge a change notification (set flagChange to false)."""
-        sort_key = f"{location_id}#{surf_timestamp}"
+        loc_id, ts = cls._parse_location_surf_key(location_surf_key, location_id, surf_timestamp)
+        sort_key = f"{loc_id}#{ts}"
 
         try:
             async with await cls.get_client() as client:

@@ -61,16 +61,6 @@ export interface SavedSpot {
   notes?: string;
 }
 
-// Feedback Types
-export interface Feedback {
-  id: string;
-  userId: string;
-  spotId?: string;
-  type: 'bug' | 'feature' | 'data_correction' | 'general';
-  message: string;
-  createdAt: string;
-}
-
 // API Response Types
 export interface ApiResponse<T> {
   success: boolean;
@@ -164,19 +154,18 @@ export interface SavedItemRequest {
   surfer_level: string;
   surf_score: number;
   surf_grade: string;
-  surf_safety_grade: string;
 }
 
 export interface SavedItemResponse {
   user_id: string;
-  sort_key: string;
+  location_surf_key: string; // Format: {locationId}#{surfTimestamp}
   location_id: string;
   surf_timestamp: string;
   saved_at: string;
+  departure_date?: string;
   address?: string;
   region?: string;
   country?: string;
-  departure_date?: string;
   wave_height?: number;
   wave_period?: number;
   wind_speed?: number;
@@ -184,7 +173,6 @@ export interface SavedItemResponse {
   surfer_level: string;
   surf_score: number;
   surf_grade: string;
-  surf_safety_grade: string;
   flag_change: boolean;
   change_message?: string;
 }
@@ -195,31 +183,32 @@ export interface SavedListResponse {
 }
 
 export interface DeleteSavedItemRequest {
-  location_id: string;
-  surf_timestamp: string;
+  location_surf_key?: string;
+  location_id?: string;
+  surf_timestamp?: string;
 }
 
 export interface AcknowledgeChangeRequest {
-  location_id: string;
-  surf_timestamp: string;
+  location_surf_key?: string;
+  location_id?: string;
+  surf_timestamp?: string;
 }
 
-// Saved Item Feedback Types
+// Feedback Types
 export type FeedbackStatus = 'POSITIVE' | 'NEGATIVE' | 'DEFERRED';
 
-export interface SavedItemFeedbackRequest {
+export interface FeedbackRequest {
   location_id: string;
   surf_timestamp: string;
-  feedback_result?: number;
   feedback_status: FeedbackStatus;
 }
 
-export interface SavedItemFeedbackResponse {
-  id: string;
-  user_id: string;
+export interface FeedbackResponse {
+  id: number;
+  user_id: number;
   location_id: string;
   surf_timestamp: string;
-  feedback_result?: number;
+  feedback_result?: boolean; // true = good, false = not good, null = deferred
   feedback_status: FeedbackStatus;
   created_at: string;
 }

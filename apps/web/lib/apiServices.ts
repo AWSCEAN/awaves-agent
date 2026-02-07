@@ -3,7 +3,6 @@ import type {
   SearchFilters,
   User,
   SavedSpot,
-  Feedback,
   ApiResponse,
   PaginatedResponse,
   AuthTokens,
@@ -18,8 +17,8 @@ import type {
   SavedListResponse,
   DeleteSavedItemRequest,
   AcknowledgeChangeRequest,
-  SavedItemFeedbackRequest,
-  SavedItemFeedbackResponse,
+  FeedbackRequest,
+  FeedbackResponse,
 } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
@@ -337,17 +336,10 @@ export const savedService = {
 
 // Feedback Services
 export const feedbackService = {
-  async submitFeedback(feedback: Omit<Feedback, 'id' | 'createdAt'>): Promise<ApiResponse<Feedback>> {
-    return apiRequest<Feedback>('/feedback', {
-      method: 'POST',
-      body: JSON.stringify(feedback),
-    });
-  },
-
   async submitSavedItemFeedback(
-    feedback: SavedItemFeedbackRequest
-  ): Promise<ApiResponse<CommonApiResponse<SavedItemFeedbackResponse>>> {
-    return apiRequest<CommonApiResponse<SavedItemFeedbackResponse>>('/feedback/saved-item', {
+    feedback: FeedbackRequest
+  ): Promise<ApiResponse<CommonApiResponse<FeedbackResponse>>> {
+    return apiRequest<CommonApiResponse<FeedbackResponse>>('/feedback/saved-item', {
       method: 'POST',
       body: JSON.stringify(feedback),
     });
@@ -356,8 +348,8 @@ export const feedbackService = {
   async getSavedItemFeedback(
     locationId: string,
     surfTimestamp: string
-  ): Promise<ApiResponse<CommonApiResponse<SavedItemFeedbackResponse>>> {
-    return apiRequest<CommonApiResponse<SavedItemFeedbackResponse>>(
+  ): Promise<ApiResponse<CommonApiResponse<FeedbackResponse>>> {
+    return apiRequest<CommonApiResponse<FeedbackResponse>>(
       `/feedback/saved-item/${encodeURIComponent(locationId)}/${encodeURIComponent(surfTimestamp)}`
     );
   },

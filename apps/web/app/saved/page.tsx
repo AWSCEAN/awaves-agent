@@ -69,29 +69,25 @@ export default function SavedPage() {
 
   const handleRemove = async (item: SavedItemResponse) => {
     const response = await savedService.removeSavedItem({
-      location_id: item.location_id,
-      surf_timestamp: item.surf_timestamp,
+      location_surf_key: item.location_surf_key,
     });
 
     if (response.success && response.data?.result === 'success') {
       setSavedItems((prev) =>
-        prev.filter(
-          (i) => !(i.location_id === item.location_id && i.surf_timestamp === item.surf_timestamp)
-        )
+        prev.filter((i) => i.location_surf_key !== item.location_surf_key)
       );
     }
   };
 
   const handleAcknowledgeChange = async (item: SavedItemResponse) => {
     const response = await savedService.acknowledgeChange({
-      location_id: item.location_id,
-      surf_timestamp: item.surf_timestamp,
+      location_surf_key: item.location_surf_key,
     });
 
-    if (response.success && response.data?.result === 'success' && response.data.data) {
+    if (response.success && response.data?.result === 'success') {
       setSavedItems((prev) =>
         prev.map((i) =>
-          i.location_id === item.location_id && i.surf_timestamp === item.surf_timestamp
+          i.location_surf_key === item.location_surf_key
             ? { ...i, flag_change: false, change_message: undefined }
             : i
         )
@@ -101,15 +97,13 @@ export default function SavedPage() {
 
   const handleFeedback = async (
     item: SavedItemResponse,
-    status: FeedbackStatus,
-    result?: number
+    status: FeedbackStatus
   ) => {
-    const feedbackKey = `${item.location_id}:${item.surf_timestamp}`;
+    const feedbackKey = item.location_surf_key;
 
     const response = await feedbackService.submitSavedItemFeedback({
       location_id: item.location_id,
       surf_timestamp: item.surf_timestamp,
-      feedback_result: result,
       feedback_status: status,
     });
 
@@ -198,15 +192,15 @@ export default function SavedPage() {
           {!isLoading && !error && savedItems.length > 0 && (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {savedItems.map((item) => {
-                const feedbackKey = `${item.location_id}:${item.surf_timestamp}`;
+                const feedbackKey = item.location_surf_key;
                 return (
                   <SavedItemCard
-                    key={item.sort_key}
+                    key={item.location_surf_key}
                     item={item}
                     lang={lang}
                     onRemove={() => handleRemove(item)}
                     onAcknowledgeChange={() => handleAcknowledgeChange(item)}
-                    onFeedback={(status, result) => handleFeedback(item, status, result)}
+                    onFeedback={(status) => handleFeedback(item, status)}
                     feedbackStatus={feedbackMap[feedbackKey]}
                   />
                 );
