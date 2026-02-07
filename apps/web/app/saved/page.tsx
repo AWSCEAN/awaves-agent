@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import LogoOverlay from '@/components/LogoOverlay';
 import SavedItemCard from '@/components/SavedItemCard';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
-import { savedService, feedbackService } from '@/lib/apiServices';
+import { useSavedItems } from '@/hooks/useSavedItems';
 import type { SavedItemResponse, FeedbackStatus, Language } from '@/types';
 
 const translations = {
@@ -41,57 +41,45 @@ export default function SavedPage() {
   const router = useRouter();
   const { logout } = useAuth();
   const [lang, setLang] = useState<Language>('en');
-  const [savedItems, setSavedItems] = useState<SavedItemResponse[]>([]);
   const [feedbackMap, setFeedbackMap] = useState<Record<string, FeedbackStatus>>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const t = translations[lang];
 
-  const fetchSavedItems = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  // Use GraphQL hook
+  const {
+    items: savedItems,
+    loading: isLoading,
+    error: queryError,
+    refetch,
+    deleteItem,
+    acknowledgeChange,
+    submitFeedback,
+  } = useSavedItems();
 
-    const response = await savedService.getSavedItems();
+  const error = queryError?.message || null;
 
-    if (response.success && response.data?.result === 'success' && response.data.data) {
-      setSavedItems(response.data.data.items);
-    } else {
-      setError(response.error || t.error);
-    }
-
-    setIsLoading(false);
-  }, [t.error]);
-
+  // Initialize feedbackMap from GraphQL response
   useEffect(() => {
-    fetchSavedItems();
-  }, [fetchSavedItems]);
+    const initialFeedbackMap: Record<string, FeedbackStatus> = {};
+    for (const item of savedItems) {
+      if (item.feedback_status) {
+        initialFeedbackMap[item.location_surf_key] = item.feedback_status;
+      }
+    }
+    setFeedbackMap(initialFeedbackMap);
+  }, [savedItems]);
 
   const handleRemove = async (item: SavedItemResponse) => {
-    const response = await savedService.removeSavedItem({
-      location_surf_key: item.location_surf_key,
-    });
-
-    if (response.success && response.data?.result === 'success') {
-      setSavedItems((prev) =>
-        prev.filter((i) => i.location_surf_key !== item.location_surf_key)
-      );
+    const success = await deleteItem(item.location_surf_key);
+    if (!success) {
+      console.error('Failed to delete item');
     }
   };
 
   const handleAcknowledgeChange = async (item: SavedItemResponse) => {
-    const response = await savedService.acknowledgeChange({
-      location_surf_key: item.location_surf_key,
-    });
-
-    if (response.success && response.data?.result === 'success') {
-      setSavedItems((prev) =>
-        prev.map((i) =>
-          i.location_surf_key === item.location_surf_key
-            ? { ...i, flag_change: false, change_message: undefined }
-            : i
-        )
-      );
+    const success = await acknowledgeChange(item.location_surf_key);
+    if (!success) {
+      console.error('Failed to acknowledge change');
     }
   };
 
@@ -101,13 +89,13 @@ export default function SavedPage() {
   ) => {
     const feedbackKey = item.location_surf_key;
 
-    const response = await feedbackService.submitSavedItemFeedback({
-      location_id: item.location_id,
-      surf_timestamp: item.surf_timestamp,
-      feedback_status: status,
-    });
+    const result = await submitFeedback(
+      item.location_id,
+      item.surf_timestamp,
+      status
+    );
 
-    if (response.success && response.data?.result === 'success') {
+    if (result?.success) {
       setFeedbackMap((prev) => ({
         ...prev,
         [feedbackKey]: status,
@@ -171,7 +159,7 @@ export default function SavedPage() {
             <div className="text-center py-16">
               <div className="text-6xl mb-4">😕</div>
               <p className="text-ocean-600 mb-6">{error}</p>
-              <button onClick={fetchSavedItems} className="btn-primary">
+              <button onClick={() => refetch()} className="btn-primary">
                 {t.retry}
               </button>
             </div>

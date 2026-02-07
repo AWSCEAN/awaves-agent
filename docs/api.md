@@ -219,12 +219,18 @@ Authorization: Bearer {access_token}
         "surf_score": 85.5,
         "surf_grade": "A",
         "flag_change": false,
-        "change_message": null
+        "change_message": null,
+        "feedback_status": "POSITIVE"
       }
     ],
     "total": 1
   }
 }
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| feedback_status | string \| null | 피드백 상태 (POSITIVE / NEGATIVE / DEFERRED / null). 피드백을 제출한 경우 해당 값이 반환됨. |
 ```
 
 ---

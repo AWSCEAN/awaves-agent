@@ -175,6 +175,7 @@ export interface SavedItemResponse {
   surf_grade: string;
   flag_change: boolean;
   change_message?: string;
+  feedback_status?: FeedbackStatus;
 }
 
 export interface SavedListResponse {

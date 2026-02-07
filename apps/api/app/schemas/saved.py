@@ -1,8 +1,11 @@
 """Saved list Pydantic schemas."""
 
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
+
+
+FeedbackStatus = Literal["POSITIVE", "NEGATIVE", "DEFERRED"]
 
 
 class SavedItemRequest(BaseModel):
@@ -59,12 +62,19 @@ class SavedItemResponse(BaseModel):
     flag_change: bool = False
     change_message: Optional[str] = None
 
+    # Feedback status (from PostgreSQL)
+    feedback_status: Optional[FeedbackStatus] = None
+
     class Config:
         from_attributes = True
         populate_by_name = True
 
     @classmethod
-    def from_dynamodb(cls, item: dict) -> "SavedItemResponse":
+    def from_dynamodb(
+        cls,
+        item: dict,
+        feedback_status: Optional["FeedbackStatus"] = None,
+    ) -> "SavedItemResponse":
         """Create response from DynamoDB item."""
         location_id = item.get("LocationId", "")
         surf_timestamp = item.get("SurfTimestamp", "")
@@ -89,6 +99,7 @@ class SavedItemResponse(BaseModel):
             surf_grade=item.get("surfGrade", ""),
             flag_change=item.get("flagChange", False),
             change_message=item.get("changeMessage"),
+            feedback_status=feedback_status,
         )
 
 
