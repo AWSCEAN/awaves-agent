@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { GET_SAVED_ITEMS } from '@/lib/graphql/queries';
 import {
@@ -154,7 +155,11 @@ export function useSavedItems() {
   };
 
   // Transform GraphQL camelCase items to snake_case for backward compatibility
-  const items: SavedItemResponse[] = (data?.savedItems?.items || []).map(transformToSnakeCase);
+  const rawItems = data?.savedItems?.items;
+  const items: SavedItemResponse[] = useMemo(
+    () => (rawItems || []).map(transformToSnakeCase),
+    [rawItems]
+  );
 
   return {
     items,
