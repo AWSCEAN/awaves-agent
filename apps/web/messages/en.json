@@ -17,7 +17,8 @@
     "mypage": "My Page",
     "map": "Map",
     "windParticles": "Wind",
-    "surfScore": "Surf"
+    "surfScore": "Surf",
+    "logout": "Logout"
   },
   "search": {
     "location": "Location",

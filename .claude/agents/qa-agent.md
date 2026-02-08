@@ -228,11 +228,11 @@ Provide users with:
 
 ### How to Test Independently
 
-1. **Base URL**: `http://localhost:8000`
+1. **Base URL**: `http://localhost:8001`
 
 2. **Test Login**:
    ```bash
-   curl -X POST http://localhost:8000/auth/login \
+   curl -X POST http://localhost:8001/auth/login \
      -H "Content-Type: application/json" \
      -d '{"email": "test@example.com", "password": "password123"}'
    ```
@@ -313,7 +313,7 @@ QA Agent Response:
 
 **Date**: 2024-01-15
 **Environment**: Development
-**Endpoint Base**: http://localhost:8000
+**Endpoint Base**: http://localhost:8001
 
 ---
 
@@ -360,12 +360,12 @@ Test credentials:
 
 ```bash
 # Register
-curl -X POST http://localhost:8000/auth/register \
+curl -X POST http://localhost:8001/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"new@test.com","password":"test1234","nickname":"tester"}'
 
 # Login
-curl -X POST http://localhost:8000/auth/login \
+curl -X POST http://localhost:8001/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"password123"}'
 ```

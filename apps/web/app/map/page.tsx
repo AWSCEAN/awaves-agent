@@ -12,6 +12,7 @@ import LocationAutocomplete from '@/components/LocationAutocomplete';
 import SearchResultsList from '@/components/SearchResultsList';
 import type { SearchResult } from '@/components/SearchResultsList';
 import SpotDetailPanel from '@/components/SpotDetailPanel';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import LocaleProvider, { useLocale as useAppLocale } from '@/components/LocaleProvider';
 import type { SurfInfo, SavedListItem, SurferLevel } from '@/types';
 import type { OverlayMode, SpotSelectionData } from '@/components/EnhancedMapboxMap';
@@ -217,6 +218,7 @@ function MapPageContent() {
   const displaySpots = (hasSearched && showResults) ? visibleSpots : [];
 
   return (
+    <ProtectedRoute>
     <div className="h-screen flex flex-col">
       {/* Header with Search Bar */}
       <header className="glass z-50 px-4 py-2">
@@ -549,6 +551,7 @@ function MapPageContent() {
         )}
       </div>
     </div>
+    </ProtectedRoute>
   );
 }
 

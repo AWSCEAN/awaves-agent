@@ -7,17 +7,23 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Ocean Sunset Theme
         ocean: {
-          50: '#e6f4f9',
-          100: '#cce9f3',
-          200: '#99d3e7',
-          300: '#66bddb',
-          400: '#33a7cf',
-          500: '#0091c3',
-          600: '#00749c',
-          700: '#005775',
-          800: '#003a4e',
-          900: '#001d27',
+          50: '#e8eef4',
+          100: '#d1dde9',
+          200: '#a3bbd3',
+          300: '#7599bd',
+          400: '#5ADBFF', // Light cyan (accent)
+          500: '#3C6997', // Medium blue
+          600: '#094074', // Deep blue (primary)
+          700: '#073359',
+          800: '#05263f',
+          900: '#021924',
+        },
+        sunset: {
+          400: '#FFDD4A', // Yellow (accent)
+          500: '#FE9000', // Orange (accent)
+          600: '#e58200',
         },
         sand: {
           50: '#fdfbf7',
@@ -31,14 +37,9 @@ module.exports = {
           800: '#5c5446',
           900: '#2e2a23',
         },
-        coral: {
-          500: '#ff6b6b',
-          600: '#ee5a5a',
-        },
       },
       fontFamily: {
-        sans: ['Outfit', 'sans-serif'],
-        mono: ['Space Mono', 'monospace'],
+        sans: ['IBM Plex Sans KR', 'sans-serif'],
       },
       backdropBlur: {
         xs: '2px',

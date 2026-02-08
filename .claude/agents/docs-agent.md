@@ -162,7 +162,7 @@ You are a **Principal Technical Writer** who believes documentation is the soul 
 # API 명세서
 
 ## Base URL
-- Development: `http://localhost:8000`
+- Development: `http://localhost:8001`
 - Production: `https://api.example.com`
 
 ## 인증
@@ -242,7 +242,7 @@ Authorization: Bearer {access_token}
 ❌ "API를 호출합니다"
 ✅
 ```bash
-curl -X POST http://localhost:8000/auth/login \
+curl -X POST http://localhost:8001/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "password": "password123"}'
 ```

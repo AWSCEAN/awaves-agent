@@ -1,8 +1,11 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import AwavesLogo from '@/components/AwavesLogo';
+import { useAuth } from '@/contexts/AuthContext';
+import LogoOverlay from '@/components/LogoOverlay';
 
 type Language = 'ko' | 'en';
 
@@ -12,6 +15,7 @@ const translations = {
     subtitle: 'AI 기반 서핑 스팟 탐색 플랫폼',
     cta: '지금 시작하기',
     login: '로그인',
+    logout: '로그아웃',
     features: {
       title: '주요 기능',
       realtime: '실시간 파도 데이터',
@@ -27,6 +31,7 @@ const translations = {
     subtitle: 'AI-powered surf spot discovery platform',
     cta: 'Get Started',
     login: 'Login',
+    logout: 'Logout',
     features: {
       title: 'Key Features',
       realtime: 'Real-time Wave Data',
@@ -40,15 +45,30 @@ const translations = {
 };
 
 export default function LandingPage() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading, logout } = useAuth();
   const [lang, setLang] = useState<Language>('en');
   const t = translations[lang];
 
+  const handleGetStarted = () => {
+    if (isAuthenticated) {
+      router.push('/map');
+    } else {
+      router.push('/login');
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+  };
+
   return (
-    <main className="min-h-screen bg-sand-gradient">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 glass">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <AwavesLogo size="md" />
+    <>
+      <LogoOverlay />
+      <main className="min-h-screen bg-sand-gradient">
+        {/* Header */}
+      <header className="fixed top-0 left-0 right-0 z-40 glass">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-end">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
@@ -56,24 +76,44 @@ export default function LandingPage() {
             >
               {lang === 'ko' ? 'EN' : '한국어'}
             </button>
-            <Link href="/login" className="btn-outline text-sm">
-              {t.login}
-            </Link>
+            {isLoading ? (
+              <span className="text-sm text-ocean-500">...</span>
+            ) : isAuthenticated ? (
+              <button onClick={handleLogout} className="btn-outline text-sm">
+                {t.logout}
+              </button>
+            ) : (
+              <Link href="/login" className="btn-outline text-sm">
+                {t.login}
+              </Link>
+            )}
           </div>
         </div>
       </header>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4">
+      <section className="pt-24 pb-20 px-4">
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-5xl md:text-6xl font-bold text-ocean-800 mb-6">
+          <div className="flex justify-center mb-6">
+            <Image
+              src="/awaves_main.svg"
+              alt="AWAVES"
+              width={280}
+              height={280}
+              className="animate-ripple"
+              style={{ width: 'auto', height: 'auto', maxWidth: '280px' }}
+            />
+          </div>
+          <h1 className="text-5xl font-bold text-ocean-800 mb-6">
             {t.tagline}
           </h1>
           <p className="text-xl text-ocean-600 mb-10">
             {t.subtitle}
           </p>
-          <Link href="/map" className="btn-primary text-lg px-8 py-3 inline-block">
-            {t.cta}
+          <Link href="/map" className="btn-primary text-base px-10 py-3 inline-block whitespace-nowrap">
+            <button onClick={handleGetStarted} className="btn-primary text-lg px-8 py-3">
+              {t.cta}
+            </button>
           </Link>
         </div>
 
@@ -119,7 +159,8 @@ export default function LandingPage() {
           </p>
         </div>
       </footer>
-    </main>
+      </main>
+    </>
   );
 }
 

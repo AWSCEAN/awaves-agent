@@ -35,14 +35,14 @@ class Settings(BaseSettings):
     )
 
     # Environment
-    env: Literal["local", "development", "staging", "production"] = "development"
+    env: Literal["local", "dev", "development", "staging", "production"] = "development"
     debug: bool = True
 
     # Database
     database_url: str = "postgresql+asyncpg://user:password@localhost:5432/awaves"
 
-    # Redis
-    redis_url: str = ""
+    # Redis/Cache (Valkey in production, Redis in local)
+    cache_url: str = ""
 
     # AWS
     aws_region: str = "ap-northeast-2"

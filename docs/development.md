@@ -40,21 +40,6 @@ NEXT_PUBLIC_MAPBOX_TOKEN=pk.your-mapbox-token
 NEXT_PUBLIC_API_URL=http://localhost:8001
 ```
 
-**Mapbox 토큰 발급 방법**:
-1. https://www.mapbox.com/ 가입
-2. Account → Tokens → "Create a token"
-3. 기본 Public 스코프로 생성
-4. 토큰을 `.env.local`에 추가
-5. ⚠️ 보안: `.env.local`은 절대 Git에 커밋하지 마세요
-
-**환경 변수 검증**:
-```bash
-cd apps/web
-pnpm dev
-# 브라우저 콘솔에서 확인:
-# console.log(process.env.NEXT_PUBLIC_MAPBOX_TOKEN)
-```
-
 #### Backend (.env)
 `apps/api/.env` 파일 생성:
 
@@ -178,15 +163,15 @@ ruff check app
 
 ```bash
 # 헬스 체크
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 
 # 로그인
-curl -X POST http://localhost:8000/auth/login \
+curl -X POST http://localhost:8001/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "password": "password123"}'
 
 # 인증이 필요한 API (토큰 사용)
-curl http://localhost:8000/auth/me \
+curl http://localhost:8001/auth/me \
   -H "Authorization: Bearer {your-token}"
 ```
 

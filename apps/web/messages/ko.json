@@ -17,7 +17,8 @@
     "mypage": "마이페이지",
     "map": "지도",
     "windParticles": "바람",
-    "surfScore": "서핑"
+    "surfScore": "서핑",
+    "logout": "로그아웃"
   },
   "search": {
     "location": "위치",

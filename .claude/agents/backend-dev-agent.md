@@ -238,7 +238,7 @@ if not user:
 
 ### How to Test
 ```bash
-curl -X POST http://localhost:8000/api/example \
+curl -X POST http://localhost:8001/api/example \
   -H "Content-Type: application/json" \
   -d '{"field": "value"}'
 ```

@@ -268,3 +268,104 @@ Frontend 작업 → @frontend-dev-agent → @review-agent → @qa-agent → @doc
 Backend 작업  → @backend-dev-agent  → @review-agent → @qa-agent → @docs-agent
 Full-Stack    → 양쪽 Dev Agent 협업 → @review-agent → @qa-agent → @docs-agent
 ```
+
+---
+
+## Task Execution Rules (필수)
+
+`task_id.md` 파일을 통해 Agent에게 작업을 할당할 때, 아래 규칙을 **반드시** 적용합니다.
+
+### 1. Task 파일 생성
+
+작업 시작 시 `docs/tasks/active/{task-id}.md` 파일을 생성합니다.
+
+```markdown
+# {task-id}: [작업 제목]
+
+## Status: IN_PROGRESS
+
+## 담당 Agent
+- Primary: @{agent-name}
+- Support: @{agent-name} (해당 시)
+
+## 작업 내용
+[구체적인 작업 설명]
+
+## 변경 예정 파일
+- [ ] file1
+- [ ] file2
+```
+
+### 2. Contract 기록 (작업 중)
+
+각 Agent는 작업 중 발생하는 **주요 변경사항, 결정사항, 가정(assumptions)**을 `docs/contracts/` 디렉토리에 기록합니다.
+
+| 상황 | 기록 대상 | 목적 |
+|------|----------|------|
+| API 인터페이스 결정 | 엔드포인트, 스키마, 에러 코드 | Frontend-Backend 간 계약 |
+| 아키텍처 결정 | 기술 선택, 패턴 변경 이유 | 다른 Agent의 맥락 이해 |
+| Breaking Change | 영향 범위, 마이그레이션 방법 | 병렬 작업 시 충돌 방지 |
+| 가정/제약사항 | 선행 조건, 외부 의존성 | 리뷰/QA 시 판단 근거 |
+
+**왜 필요한가:**
+- 여러 Agent가 **병렬 브랜치**에서 작업할 때 서로의 결정을 이해할 수 있어야 함
+- **머지 충돌** 해결 시 각 변경의 의도를 파악할 수 있어야 함
+- Review/QA Agent가 맥락 없이 코드만 보고 판단하지 않도록 함
+
+### 3. 완료 요약 (Task Summary)
+
+모든 Agent 작업이 완료되면, 통합 요약을 `docs/tasks/completed/{task-id}.md`에 저장합니다.
+
+```markdown
+# {task-id}: [작업 제목]
+
+## Status: COMPLETED
+## 완료일: YYYY-MM-DD
+
+## 구현 요약
+[무엇을 구현/수정/결정했는지 명확하게 기술]
+
+## 변경된 파일
+| 파일 | 변경 유형 | 설명 |
+|------|----------|------|
+| `apps/api/routers/xxx.py` | 신규 | API 엔드포인트 추가 |
+| `apps/web/components/xxx.tsx` | 수정 | UI 컴포넌트 업데이트 |
+
+## 주요 결정사항
+- [결정 1]: [이유]
+- [결정 2]: [이유]
+
+## 관련 Contract
+- `docs/contracts/{task-id}.md`
+
+## Agent Sign-off
+- [ ] @frontend-dev-agent (해당 시)
+- [ ] @backend-dev-agent (해당 시)
+- [ ] @review-agent
+- [ ] @qa-agent
+- [ ] @docs-agent
+```
+
+### 4. Task 라이프사이클 전체 흐름
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Task Execution Lifecycle                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. Task 수신                                                    │
+│     → docs/tasks/active/{task-id}.md 생성                        │
+│                                                                  │
+│  2. 작업 중 (Dev Agents)                                         │
+│     → docs/contracts/{task-id}.md에 변경/결정/가정 기록           │
+│     → 병렬 작업 시 다른 Agent가 참조할 수 있도록 수시 업데이트     │
+│                                                                  │
+│  3. Review & QA                                                  │
+│     → Contract 문서를 참조하여 맥락 있는 리뷰 수행                │
+│                                                                  │
+│  4. 완료                                                         │
+│     → docs/tasks/completed/{task-id}.md에 통합 요약 저장          │
+│     → docs/tasks/active/{task-id}.md 삭제                        │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```

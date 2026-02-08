@@ -2,105 +2,142 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import AwavesLogo from '@/components/AwavesLogo';
+import { useRouter } from 'next/navigation';
+import LogoOverlay from '@/components/LogoOverlay';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import { useAuth } from '@/contexts/AuthContext';
+import type { SurferLevel } from '@/types';
 
 type Language = 'ko' | 'en';
+
+const levelConfig = {
+  beginner: {
+    color: 'green',
+    borderColor: 'border-green-400',
+    bgColor: 'bg-green-50',
+    selectedBg: 'bg-green-100',
+    textColor: 'text-green-700',
+    icon: '🌊',
+  },
+  intermediate: {
+    color: 'orange',
+    borderColor: 'border-orange-400',
+    bgColor: 'bg-orange-50',
+    selectedBg: 'bg-orange-100',
+    textColor: 'text-orange-700',
+    icon: '🏄',
+  },
+  advanced: {
+    color: 'red',
+    borderColor: 'border-red-400',
+    bgColor: 'bg-red-50',
+    selectedBg: 'bg-red-100',
+    textColor: 'text-red-700',
+    icon: '🔥',
+  },
+};
 
 const translations = {
   ko: {
     title: '마이페이지',
     profile: '프로필',
-    email: '이메일',
-    nickname: '닉네임',
-    language: '선호 언어',
-    korean: '한국어',
-    english: 'English',
+    username: '사용자명',
+    password: '비밀번호',
+    surfingLevel: '서핑 레벨',
     save: '저장',
     logout: '로그아웃',
     savedSpots: '저장된 스팟',
     map: '지도',
-    feedback: '피드백 보내기',
-    feedbackPlaceholder: '의견이나 개선 사항을 알려주세요...',
-    send: '보내기',
-    feedbackSuccess: '피드백이 전송되었습니다. 감사합니다!',
+    levels: {
+      beginner: {
+        title: '초급 (Beginner)',
+        description: '서핑 입문자 또는 파도 위에 서기 어려운 분',
+      },
+      intermediate: {
+        title: '중급 (Intermediate)',
+        description: '보드 위 균형 유지 및 긴 라이딩 가능한 분',
+      },
+      advanced: {
+        title: '고급 (Advanced)',
+        description: '강한 파도와 다양한 기술 구사 가능한 분',
+      },
+    },
   },
   en: {
     title: 'My Page',
     profile: 'Profile',
-    email: 'Email',
-    nickname: 'Nickname',
-    language: 'Preferred Language',
-    korean: '한국어',
-    english: 'English',
+    username: 'Username',
+    password: 'Password',
+    surfingLevel: 'Surfing Level',
     save: 'Save',
     logout: 'Logout',
     savedSpots: 'Saved Spots',
     map: 'Map',
-    feedback: 'Send Feedback',
-    feedbackPlaceholder: 'Share your thoughts or suggestions...',
-    send: 'Send',
-    feedbackSuccess: 'Feedback sent. Thank you!',
+    levels: {
+      beginner: {
+        title: 'Beginner',
+        description: 'New to surfing or difficulty standing on waves',
+      },
+      intermediate: {
+        title: 'Intermediate',
+        description: 'Can maintain balance and perform long rides',
+      },
+      advanced: {
+        title: 'Advanced',
+        description: 'Can ride strong waves with various maneuvers',
+      },
+    },
   },
 };
 
 export default function MyPage() {
+  const router = useRouter();
+  const { user: authUser, logout } = useAuth();
   const [lang, setLang] = useState<Language>('en');
-  const [nickname, setNickname] = useState('Surfer123');
-  const [preferredLang, setPreferredLang] = useState<Language>('en');
-  const [feedback, setFeedback] = useState('');
-  const [feedbackSent, setFeedbackSent] = useState(false);
+  const [userLevel, setSurferLevel] = useState<SurferLevel>('beginner');
   const t = translations[lang];
-
-  // Mock user data
-  const user = {
-    email: 'surfer@example.com',
-  };
 
   const handleSaveProfile = () => {
     // TODO: Implement profile save
-    console.log('Save profile:', { nickname, preferredLang });
+    console.log('Save profile:', { userLevel });
   };
 
-  const handleSendFeedback = () => {
-    if (!feedback.trim()) return;
-    // TODO: Implement feedback submission
-    console.log('Send feedback:', feedback);
-    setFeedback('');
-    setFeedbackSent(true);
-    setTimeout(() => setFeedbackSent(false), 3000);
+  const handleLogout = async () => {
+    await logout();
+    router.push('/');
   };
 
-  const handleLogout = () => {
-    // TODO: Implement logout
-    console.log('Logout');
-  };
+  const levelOptions: SurferLevel[] = ['beginner', 'intermediate', 'advanced'];
 
   return (
+    <ProtectedRoute>
+    <LogoOverlay />
     <div className="min-h-screen bg-sand-gradient">
       {/* Header */}
-      <header className="glass sticky top-0 z-50 px-4 py-3 flex items-center justify-between">
-        <Link href="/">
-          <AwavesLogo size="sm" />
-        </Link>
-
-        <nav className="flex items-center gap-4">
-          <Link href="/map" className="text-ocean-700 hover:text-ocean-500 text-sm font-medium">
-            {t.map}
-          </Link>
-          <Link href="/saved" className="text-ocean-700 hover:text-ocean-500 text-sm font-medium">
-            {t.savedSpots}
-          </Link>
-          <button
-            onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
-            className="text-sm text-ocean-600 hover:text-ocean-500"
-          >
-            {lang === 'ko' ? 'EN' : '한국어'}
-          </button>
-        </nav>
+      <header className="fixed top-0 left-0 right-0 z-40 glass">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-end">
+          <div className="flex items-center gap-4">
+            <Link href="/map" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+              {t.map}
+            </Link>
+            <Link href="/saved" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+              {t.savedSpots}
+            </Link>
+            <button
+              onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
+              className="text-sm font-medium text-ocean-700 hover:text-ocean-500"
+            >
+              {lang === 'ko' ? 'EN' : '한국어'}
+            </button>
+            <button onClick={handleLogout} className="btn-outline text-sm">
+              {t.logout}
+            </button>
+          </div>
+        </div>
       </header>
 
       {/* Content */}
-      <main className="max-w-2xl mx-auto px-4 py-8">
+      <main className="max-w-2xl mx-auto px-4 pt-24 pb-8">
         <h1 className="text-3xl font-bold text-ocean-800 mb-8">{t.title}</h1>
 
         {/* Profile Section */}
@@ -110,11 +147,11 @@ export default function MyPage() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-ocean-700 mb-1">
-                {t.email}
+                {t.username}
               </label>
               <input
-                type="email"
-                value={user.email}
+                type="text"
+                value={authUser?.username || ''}
                 disabled
                 className="input-field bg-sand-100 cursor-not-allowed"
               />
@@ -122,68 +159,62 @@ export default function MyPage() {
 
             <div>
               <label className="block text-sm font-medium text-ocean-700 mb-1">
-                {t.nickname}
+                {t.password}
               </label>
               <input
-                type="text"
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-                className="input-field"
+                type="password"
+                value="••••••••"
+                disabled
+                className="input-field bg-sand-100 cursor-not-allowed"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-ocean-700 mb-1">
-                {t.language}
+                {t.surfingLevel}
               </label>
-              <select
-                value={preferredLang}
-                onChange={(e) => setPreferredLang(e.target.value as Language)}
-                className="input-field"
-              >
-                <option value="ko">{t.korean}</option>
-                <option value="en">{t.english}</option>
-              </select>
+              {/* Toggle-style level selector */}
+              <div className="flex rounded-lg border border-gray-200 overflow-hidden mt-2">
+                {levelOptions.map((level, index) => {
+                  const config = levelConfig[level];
+                  const isSelected = userLevel === level;
+
+                  return (
+                    <button
+                      key={level}
+                      type="button"
+                      onClick={() => setSurferLevel(level)}
+                      className={`flex-1 py-3 px-2 flex flex-col items-center gap-1 transition-all ${
+                        index > 0 ? 'border-l border-gray-200' : ''
+                      } ${
+                        isSelected
+                          ? `${config.selectedBg} ${config.borderColor} border-2 -m-[1px]`
+                          : 'bg-white hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className="text-xl">{config.icon}</span>
+                      <span className={`text-sm font-medium ${isSelected ? config.textColor : 'text-gray-600'}`}>
+                        {t.levels[level].title}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Selected level description */}
+              <p className="text-sm text-gray-600 mt-2">
+                {t.levels[userLevel].description}
+              </p>
             </div>
 
             <div className="flex gap-4 pt-4">
               <button onClick={handleSaveProfile} className="btn-primary">
                 {t.save}
               </button>
-              <button onClick={handleLogout} className="btn-outline">
-                {t.logout}
-              </button>
             </div>
-          </div>
-        </section>
-
-        {/* Feedback Section */}
-        <section className="card">
-          <h2 className="text-xl font-semibold text-ocean-800 mb-4">{t.feedback}</h2>
-
-          <div className="space-y-4">
-            <textarea
-              value={feedback}
-              onChange={(e) => setFeedback(e.target.value)}
-              placeholder={t.feedbackPlaceholder}
-              rows={4}
-              className="input-field resize-none"
-            />
-
-            {feedbackSent && (
-              <p className="text-green-600 text-sm">{t.feedbackSuccess}</p>
-            )}
-
-            <button
-              onClick={handleSendFeedback}
-              disabled={!feedback.trim()}
-              className="btn-primary disabled:opacity-50"
-            >
-              {t.send}
-            </button>
           </div>
         </section>
       </main>
     </div>
+    </ProtectedRoute>
   );
 }

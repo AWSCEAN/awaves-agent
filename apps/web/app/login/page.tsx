@@ -1,10 +1,12 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { authService } from '@/lib/apiServices';
 import AwavesLogo from '@/components/AwavesLogo';
-import { mockAuthService } from '@/lib/mockAuth';
+import { useAuth } from '@/contexts/AuthContext';
 
 type Language = 'ko' | 'en';
 
@@ -35,6 +37,7 @@ const translations = {
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [lang, setLang] = useState<Language>('en');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -47,13 +50,9 @@ export default function LoginPage() {
     setIsLoading(true);
     setError('');
 
-    const result = mockAuthService.login(username, password);
+    const success = await login(username, password);
 
-    if (result.success && result.data) {
-      localStorage.setItem('accessToken', result.data.accessToken);
-      if (result.data.refreshToken) {
-        localStorage.setItem('refreshToken', result.data.refreshToken);
-      }
+    if (success) {
       router.push('/map');
     } else {
       setError(t.errorInvalid);
@@ -63,14 +62,21 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen bg-sand-gradient flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
+      <div className="flex items-center gap-24">
+        <div className="flex-shrink-0">
           <Link href="/">
-            <AwavesLogo size="lg" />
+            <Image
+              src="/awaves_main.svg"
+              alt="AWAVES"
+              width={180}
+              height={180}
+              className="animate-ripple"
+              style={{ width: 'auto', height: 'auto', maxWidth: '180px' }}
+            />
           </Link>
         </div>
 
-        <div className="card">
+        <div className="w-[480px] card">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-ocean-800">{t.title}</h1>
             <button
@@ -120,7 +126,7 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <p className="text-coral-500 text-sm text-center">{error}</p>
+              <p className="text-sunset-500 text-sm text-center">{error}</p>
             )}
 
             <button

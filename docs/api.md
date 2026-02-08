@@ -4,7 +4,7 @@
 
 | 환경 | URL |
 |------|-----|
-| Development | `http://localhost:8000` |
+| Development | `http://localhost:8001` |
 | Production | `https://api.awaves.com` (예정) |
 
 ## 인증
@@ -90,7 +90,7 @@ Authorization: Bearer {access_token}
 
 **Example**
 ```bash
-curl -X POST http://localhost:8000/register \
+curl -X POST http://localhost:8001/register \
   -H "Content-Type: application/json" \
   -d '{
     "username": "surferlove",
@@ -179,7 +179,7 @@ curl -X POST http://localhost:8000/register \
 
 **Example**
 ```bash
-curl -X POST http://localhost:8000/auth/login \
+curl -X POST http://localhost:8001/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "password": "password123"}'
 ```

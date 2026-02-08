@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import AwavesLogo from '@/components/AwavesLogo';
 import SavedSpotCard from '@/components/SavedSpotCard';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import LocaleProvider, { useLocale } from '@/components/LocaleProvider';
+import { useAuth } from '@/contexts/AuthContext';
 import type { SavedListItem } from '@/types';
 import { getSavedList, removeFromSavedList } from '@/lib/services/savedListService';
 import { getUserId } from '@/lib/services/userService';
@@ -15,6 +18,8 @@ function SavedPageContent() {
   const t = useTranslations('saved');
   const tHeader = useTranslations('header');
 
+  const router = useRouter();
+  const { logout } = useAuth();
   const [savedSpots, setSavedSpots] = useState<SavedListItem[]>([]);
   const userId = getUserId();
 
@@ -31,7 +36,13 @@ function SavedPageContent() {
     setLocale(locale === 'ko' ? 'en' : 'ko');
   };
 
+  const handleLogout = async () => {
+    await logout();
+    router.push('/');
+  };
+
   return (
+    <ProtectedRoute>
     <div className="min-h-screen bg-sand-gradient">
       {/* Header */}
       <header className="glass sticky top-0 z-50 px-4 py-3 flex items-center justify-between">
@@ -51,6 +62,9 @@ function SavedPageContent() {
             className="text-sm text-ocean-600 hover:text-ocean-500 font-medium"
           >
             {locale === 'ko' ? 'EN' : '한국어'}
+          </button>
+          <button onClick={handleLogout} className="btn-outline text-sm">
+            {tHeader('logout')}
           </button>
         </nav>
       </header>
@@ -80,6 +94,7 @@ function SavedPageContent() {
         )}
       </main>
     </div>
+    </ProtectedRoute>
   );
 }
 
