@@ -17,8 +17,7 @@
     "mypage": "My Page",
     "map": "Map",
     "windParticles": "Wind",
-    "surfScore": "Surf",
-    "safetyScore": "Safety"
+    "surfScore": "Surf"
   },
   "search": {
     "location": "Location",
@@ -62,24 +61,16 @@
   },
   "forecast": {
     "surfScore": "Surf Score",
-    "safety": "Safety",
     "scoreLabels": {
       "good": "Good",
       "fair": "Fair",
       "poor": "Poor"
     },
-    "safetyLabels": {
-      "safe": "Safe",
-      "moderate": "Moderate",
-      "caution": "Caution"
-    },
     "dataLabels": {
       "waveHeight": "Wave Height",
       "wavePeriod": "Wave Period",
       "windSpeed": "Wind Speed",
-      "swellHeight": "Swell Height",
-      "waterTemp": "Water Temp",
-      "airTemp": "Air Temp"
+      "waterTemp": "Water Temp"
     },
     "saveSpot": "Save Spot",
     "saved": "Saved"

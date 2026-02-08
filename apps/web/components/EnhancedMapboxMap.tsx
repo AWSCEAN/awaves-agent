@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import MapboxGeocoder from '@mapbox/mapbox-gl-geocoder';
 import { lineString } from '@turf/helpers';
@@ -8,71 +8,41 @@ import length from '@turf/length';
 import { format } from 'date-fns';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css';
-import type {
-  SurfSpot,
-  SurfForecast,
-  SavedSpotMarker,
-  LocationForecast,
-  MeasureDistancePoint
-} from '@/types';
-import ForecastPopup from './ForecastPopup';
-import { getMockForecastForLocation, mockLocationForecasts } from '@/lib/mockForecastData';
+import type { SurfInfo, SavedListItem } from '@/types';
+import { getBestSurfInfoForDate } from '@/lib/services/surfInfoService';
+import { getCachedForecast, setCachedForecast, surfInfoToCache } from '@/lib/coordinateCache';
+import { mockSpots, calculateDistance } from '@/lib/data';
 
-export type OverlayMode = 'surf' | 'safety' | 'none';
+export interface SpotSelectionData {
+  surfInfo: SurfInfo;
+  coordinates: { latitude: number; longitude: number };
+}
+
+export type OverlayMode = 'surf' | 'none';
+
+interface MeasureDistancePoint {
+  id: string;
+  latitude: number;
+  longitude: number;
+  order: number;
+}
 
 interface EnhancedMapboxMapProps {
-  spots: SurfSpot[];
-  savedSpots: SavedSpotMarker[];
+  spots: SurfInfo[];
+  savedSpots: SavedListItem[];
   selectedDate: Date;
   showWindParticles: boolean;
   overlayMode?: OverlayMode;
-  onSaveSpot?: (spot: { name: string; latitude: number; longitude: number; id?: string }) => void;
+  onSpotSelect?: (data: SpotSelectionData) => void;
   locale?: 'en' | 'ko';
   center?: { lat: number; lng: number } | null;
   showGeocoder?: boolean;
   showMeasureDistance?: boolean;
 }
 
-/**
- * Generate a grid of regional overlay data points across Korea
- * for visualizing surf/safety scores on the map.
- */
-function generateRegionalOverlayPoints(): LocationForecast[] {
-  const points: LocationForecast[] = [...mockLocationForecasts];
-  const existingCoords = new Set(
-    mockLocationForecasts.map(
-      (f) => `${f.latitude.toFixed(1)},${f.longitude.toFixed(1)}`
-    )
-  );
-
-  // Generate grid points across the world (lat -60 to 70, lng -180 to 180)
-  for (let lat = -60; lat <= 70; lat += 10) {
-    for (let lng = -180; lng <= 170; lng += 10) {
-      const key = `${lat.toFixed(1)},${lng.toFixed(1)}`;
-      if (existingCoords.has(key)) continue;
-
-      const forecast = getMockForecastForLocation(
-        lat,
-        lng,
-        `Region ${Math.abs(lat).toFixed(0)}°${lat >= 0 ? 'N' : 'S'} ${Math.abs(lng).toFixed(0)}°${lng >= 0 ? 'E' : 'W'}`
-      );
-      points.push(forecast);
-      existingCoords.add(key);
-    }
-  }
-
-  return points;
-}
-
 function getSurfScoreColor(score: number): string {
-  if (score >= 4) return '#22c55e'; // green
-  if (score >= 3) return '#eab308'; // yellow
-  return '#ef4444'; // red
-}
-
-function getSafetyScoreColor(score: number): string {
-  if (score >= 4) return '#22c55e'; // green
-  if (score >= 3) return '#f97316'; // orange
+  if (score >= 70) return '#22c55e'; // green
+  if (score >= 40) return '#eab308'; // yellow
   return '#ef4444'; // red
 }
 
@@ -82,7 +52,7 @@ export default function EnhancedMapboxMap({
   selectedDate,
   showWindParticles,
   overlayMode = 'none',
-  onSaveSpot,
+  onSpotSelect,
   locale = 'en',
   center,
   showGeocoder = true,
@@ -92,26 +62,18 @@ export default function EnhancedMapboxMap({
   const map = useRef<mapboxgl.Map | null>(null);
   const geocoderRef = useRef<MapboxGeocoder | null>(null);
   const markersRef = useRef<{ [key: string]: mapboxgl.Marker }>({});
-  const [forecastPopup, setForecastPopup] = useState<{
-    name: string;
-    forecast: SurfForecast;
-    position: { x: number; y: number };
-    coordinates: { latitude: number; longitude: number };
-  } | null>(null);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [measuring, setMeasuring] = useState(false);
-  const [measurePoints, setMeasurePoints] = useState<
-    MeasureDistancePoint[]
-  >([]);
+  const [measurePoints, setMeasurePoints] = useState<MeasureDistancePoint[]>([]);
   const measureMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const measureLineRef = useRef<string | null>(null);
-
-  // Bug 3: Cache for regional overlay data
-  const overlayPointsRef = useRef<LocationForecast[]>([]);
+  const selectedDateRef = useRef<Date>(selectedDate);
+  const noInfoPopupRef = useRef<mapboxgl.Popup | null>(null);
+  const nearbyMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    // Initialize Mapbox access token with proper type checking
     const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
     if (!token) {
       console.error('NEXT_PUBLIC_MAPBOX_TOKEN is not configured');
@@ -131,7 +93,6 @@ export default function EnhancedMapboxMap({
       'top-right'
     );
 
-    // Only add geocoder if showGeocoder is true
     if (showGeocoder) {
       const geocoder = new MapboxGeocoder({
         accessToken: mapboxgl.accessToken,
@@ -141,8 +102,6 @@ export default function EnhancedMapboxMap({
         language: locale,
       });
       geocoderRef.current = geocoder;
-
-      // Type assertion for MapboxGeocoder compatibility with IControl
       map.current.addControl(
         geocoder as unknown as mapboxgl.IControl,
         'top-left'
@@ -158,62 +117,96 @@ export default function EnhancedMapboxMap({
       'top-right'
     );
 
-    // Pre-generate regional overlay data points
-    overlayPointsRef.current = generateRegionalOverlayPoints();
+    map.current.on('load', () => {
+      setIsMapLoaded(true);
+      map.current?.resize();
+    });
+
+    const resizeTimers = [
+      setTimeout(() => map.current?.resize(), 0),
+      setTimeout(() => map.current?.resize(), 100),
+      setTimeout(() => map.current?.resize(), 500),
+    ];
+
+    const resizeObserver = new ResizeObserver(() => {
+      map.current?.resize();
+    });
+    if (mapContainer.current) {
+      resizeObserver.observe(mapContainer.current);
+    }
 
     return () => {
+      resizeTimers.forEach(clearTimeout);
+      resizeObserver.disconnect();
       map.current?.remove();
       map.current = null;
     };
   }, []);
 
+  // Keep selectedDateRef in sync
   useEffect(() => {
-    if (!map.current) return;
+    selectedDateRef.current = selectedDate;
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (!map.current || !isMapLoaded) return;
 
     Object.values(markersRef.current).forEach((marker) =>
       marker.remove()
     );
     markersRef.current = {};
 
+    const savedLocationIds = new Set(savedSpots.map((s) => s.locationId));
+
     spots.forEach((spot) => {
+      // Skip surfer marker if spot is saved (heart marker will be shown instead)
+      if (savedLocationIds.has(spot.LocationId)) return;
+
       const el = createMarkerElement(
         '\u{1F3C4}',
         '#0091c3',
         () => {
-          showForecastAtCoords(
-            spot.longitude,
-            spot.latitude,
-            spot.name,
-            selectedDate
+          showSurfInfoAtCoords(
+            spot.geo.lng,
+            spot.geo.lat,
+            spot,
+            selectedDateRef.current
           );
         }
       );
 
       const marker = new mapboxgl.Marker(el)
-        .setLngLat([spot.longitude, spot.latitude])
+        .setLngLat([spot.geo.lng, spot.geo.lat])
         .addTo(map.current!);
 
-      markersRef.current[spot.id] = marker;
+      markersRef.current[spot.LocationId] = marker;
     });
 
     savedSpots.forEach((savedSpot) => {
+      const [latStr, lngStr] = savedSpot.locationId.split('#');
+      const lat = Number(latStr);
+      const lng = Number(lngStr);
+
       const el = createMarkerElement(
         '\u2764\uFE0F',
         '#e74c3c',
         () => {
-          showSavedSpotInfo(savedSpot);
+          const matchingSpot = spots.find(s => s.LocationId === savedSpot.locationId)
+            || mockSpots.find(s => s.LocationId === savedSpot.locationId);
+          if (matchingSpot) {
+            showSurfInfoAtCoords(lng, lat, matchingSpot, selectedDateRef.current);
+          }
         }
       );
 
       const marker = new mapboxgl.Marker(el)
-        .setLngLat([savedSpot.longitude, savedSpot.latitude])
+        .setLngLat([lng, lat])
         .addTo(map.current!);
 
-      markersRef.current[`saved-${savedSpot.id}`] = marker;
+      markersRef.current[`saved-${savedSpot.locationId}`] = marker;
     });
-  }, [spots, savedSpots, selectedDate]);
+  }, [spots, savedSpots, isMapLoaded]);
 
-  // Update geocoder language when locale changes
   useEffect(() => {
     if (geocoderRef.current) {
       geocoderRef.current.setLanguage(locale);
@@ -223,7 +216,6 @@ export default function EnhancedMapboxMap({
     }
   }, [locale]);
 
-  // Fly to center when it changes
   useEffect(() => {
     if (!map.current || !center) return;
     map.current.flyTo({
@@ -233,7 +225,6 @@ export default function EnhancedMapboxMap({
     });
   }, [center]);
 
-  // Click handler that uses selectedDate and locale
   useEffect(() => {
     if (!map.current) return;
 
@@ -241,7 +232,6 @@ export default function EnhancedMapboxMap({
       if (measuring) {
         addMeasurePoint(e.lngLat);
       } else {
-        setForecastPopup(null);
         showLocationForecast(e.lngLat, selectedDate);
       }
     };
@@ -253,14 +243,13 @@ export default function EnhancedMapboxMap({
     };
   }, [measuring, selectedDate, locale]);
 
-  // Bug 3: Update overlay when selectedDate or overlayMode changes
+  // Overlay for surf scores
   useEffect(() => {
     if (!map.current) return;
 
     const mapInstance = map.current;
 
     const updateOverlay = () => {
-      // Remove existing overlay layer and source
       try {
         if (mapInstance.getStyle() && mapInstance.getLayer('score-overlay-layer')) {
           mapInstance.removeLayer('score-overlay-layer');
@@ -269,45 +258,28 @@ export default function EnhancedMapboxMap({
           mapInstance.removeSource('score-overlay-source');
         }
       } catch {
-        return; // Map may be destroyed
+        return;
       }
 
       if (overlayMode === 'none') return;
 
-      const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
-      const points = overlayPointsRef.current;
+      const overlaySpots = spots.length > 0 ? spots : mockSpots;
+      const features = overlaySpots.map((spot) => {
+        const score = spot.derivedMetrics.surfScore;
+        const color = getSurfScoreColor(score);
 
-      const features = points
-        .map((point) => {
-          const dayForecast = point.forecasts.find(
-            (f) => f.date === selectedDateStr
-          );
-          if (!dayForecast) return null;
-
-          const score =
-            overlayMode === 'surf'
-              ? dayForecast.surfScore
-              : dayForecast.safetyScore;
-          const color =
-            overlayMode === 'surf'
-              ? getSurfScoreColor(score)
-              : getSafetyScoreColor(score);
-
-          return {
-            type: 'Feature' as const,
-            geometry: {
-              type: 'Point' as const,
-              coordinates: [point.longitude, point.latitude],
-            },
-            properties: {
-              score,
-              color,
-            },
-          };
-        })
-        .filter(
-          (f): f is NonNullable<typeof f> => f !== null
-        );
+        return {
+          type: 'Feature' as const,
+          geometry: {
+            type: 'Point' as const,
+            coordinates: [spot.geo.lng, spot.geo.lat],
+          },
+          properties: {
+            score,
+            color,
+          },
+        };
+      });
 
       const geojsonData: GeoJSON.FeatureCollection = {
         type: 'FeatureCollection',
@@ -341,7 +313,6 @@ export default function EnhancedMapboxMap({
       });
     };
 
-    // If style is already loaded, update immediately; otherwise wait
     if (mapInstance.isStyleLoaded()) {
       updateOverlay();
     } else {
@@ -360,9 +331,9 @@ export default function EnhancedMapboxMap({
         // Map may already be destroyed during cleanup
       }
     };
-  }, [selectedDate, overlayMode]);
+  }, [spots, selectedDate, overlayMode]);
 
-  // Bug 4: Add native Mapbox raster-particle wind layer
+  // Wind layer
   useEffect(() => {
     if (!map.current) return;
 
@@ -448,7 +419,6 @@ export default function EnhancedMapboxMap({
     };
   }, [showWindParticles]);
 
-  // Bug 2: Fixed createMarkerElement - use inner span for scale transform
   const createMarkerElement = (
     emoji: string,
     color: string,
@@ -497,95 +467,144 @@ export default function EnhancedMapboxMap({
     return el;
   };
 
-  const showForecastAtCoords = (
+  const showSurfInfoAtCoords = (
     lng: number,
     lat: number,
-    name: string,
+    spot: SurfInfo,
     currentSelectedDate: Date
   ) => {
-    if (!map.current) return;
+    if (!map.current || !onSpotSelect) return;
 
-    const forecast = getMockForecastForLocation(lat, lng, name);
     const dateStr = format(currentSelectedDate, 'yyyy-MM-dd');
-    const dayForecast = forecast.forecasts.find(
-      (f) => f.date === dateStr
-    );
-    if (!dayForecast) return;
 
-    const point = map.current.project([lng, lat]);
-    setForecastPopup({
-      name,
-      forecast: dayForecast,
-      position: { x: point.x, y: point.y },
+    // Check cache first
+    const cached = getCachedForecast(lat, lng, dateStr);
+    if (cached) {
+      const cachedSurfInfo: SurfInfo = {
+        ...spot,
+        conditions: {
+          waveHeight: cached.waveHeight,
+          wavePeriod: cached.wavePeriod,
+          windSpeed: cached.windSpeed,
+          waterTemperature: cached.waterTemperature,
+        },
+        derivedMetrics: {
+          surfScore: cached.surfScore,
+          surfGrade: cached.surfGrade,
+          surfingLevel: cached.surfingLevel,
+        },
+      };
+
+      onSpotSelect({
+        surfInfo: cachedSurfInfo,
+        coordinates: { latitude: lat, longitude: lng },
+      });
+      return;
+    }
+
+    // Generate fresh data via surfInfoService
+    const surfInfo = getBestSurfInfoForDate(spot, dateStr);
+
+    // Cache it
+    setCachedForecast(lat, lng, dateStr, surfInfoToCache(surfInfo));
+
+    onSpotSelect({
+      surfInfo,
       coordinates: { latitude: lat, longitude: lng },
     });
   };
 
-  const showSavedSpotInfo = (
-    savedSpot: SavedSpotMarker
-  ) => {
-    showForecastAtCoords(
-      savedSpot.longitude,
-      savedSpot.latitude,
-      savedSpot.name,
-      selectedDate
-    );
-  };
-
-  const reverseGeocode = useCallback(async (lng: number, lat: number): Promise<string> => {
-    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-    if (!token) return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-
-    try {
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&types=locality,place,region,country&limit=1&language=${locale}`
-      );
-
-      if (!response.ok) {
-        return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-      }
-
-      const data = await response.json();
-
-      if (data.features && data.features.length > 0) {
-        const feature = data.features[0];
-        // Get place name and context (region/country)
-        const placeName = feature.text || feature.place_name;
-        const context = feature.context;
-
-        if (context && context.length > 0) {
-          // Find region and country from context
-          const region = context.find((c: any) => c.id.startsWith('region'));
-          const country = context.find((c: any) => c.id.startsWith('country'));
-
-          if (region && country) {
-            return `${placeName}, ${region.text}, ${country.text}`;
-          } else if (country) {
-            return `${placeName}, ${country.text}`;
-          }
-        }
-
-        return feature.place_name || placeName;
-      }
-
-      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-    } catch (error) {
-      console.error('Reverse geocoding failed:', error);
-      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-    }
-  }, [locale]);
-
-  const showLocationForecast = async (
+  const showLocationForecast = (
     lngLat: mapboxgl.LngLat,
     currentSelectedDate: Date
   ) => {
-    const locationName = await reverseGeocode(lngLat.lng, lngLat.lat);
-    showForecastAtCoords(
-      lngLat.lng,
-      lngLat.lat,
-      locationName,
-      currentSelectedDate
-    );
+    if (!onSpotSelect || !map.current) return;
+
+    // Remove any existing temporary marker/popup before processing
+    if (nearbyMarkerRef.current) {
+      nearbyMarkerRef.current.remove();
+      nearbyMarkerRef.current = null;
+    }
+    if (noInfoPopupRef.current) {
+      noInfoPopupRef.current.remove();
+      noInfoPopupRef.current = null;
+    }
+
+    // 1. Check if clicked coordinate matches an existing spot (exact LocationId match)
+    const clickedLocationId = `${lngLat.lat.toFixed(4)}#${lngLat.lng.toFixed(4)}`;
+    const exactMatch = mockSpots.find(s => s.LocationId === clickedLocationId);
+
+    if (exactMatch) {
+      showSurfInfoAtCoords(lngLat.lng, lngLat.lat, exactMatch, currentSelectedDate);
+      return;
+    }
+
+    // 2. Find the best spot within 200km (highest surfScore, alphabetical tiebreaker)
+    let bestNearby: { spot: SurfInfo; distance: number } | null = null;
+
+    for (const spot of mockSpots) {
+      const distance = calculateDistance(lngLat.lat, lngLat.lng, spot.geo.lat, spot.geo.lng);
+      if (distance > 200) continue;
+
+      if (
+        !bestNearby ||
+        spot.derivedMetrics.surfScore > bestNearby.spot.derivedMetrics.surfScore ||
+        (spot.derivedMetrics.surfScore === bestNearby.spot.derivedMetrics.surfScore &&
+          spot.name.localeCompare(bestNearby.spot.name) < 0)
+      ) {
+        bestNearby = { spot, distance };
+      }
+    }
+
+    if (bestNearby) {
+      const { spot } = bestNearby;
+
+      map.current.flyTo({
+        center: [spot.geo.lng, spot.geo.lat],
+        zoom: 12,
+        duration: 1500,
+      });
+
+      // Add a temporary marker at the nearby spot if it doesn't already have one
+      if (!markersRef.current[spot.LocationId]) {
+        const el = createMarkerElement(
+          '\u{1F3C4}',
+          '#0091c3',
+          () => {
+            showSurfInfoAtCoords(spot.geo.lng, spot.geo.lat, spot, selectedDateRef.current);
+          }
+        );
+        nearbyMarkerRef.current = new mapboxgl.Marker(el)
+          .setLngLat([spot.geo.lng, spot.geo.lat])
+          .addTo(map.current!);
+      }
+
+      showSurfInfoAtCoords(spot.geo.lng, spot.geo.lat, spot, currentSelectedDate);
+      return;
+    }
+
+    // 3. No spot within 200km - show temporary popup
+    const noInfoMessage = locale === 'ko'
+      ? '주변 200km 이내에 서핑 정보가 없습니다.'
+      : 'No surf information available within 200km.';
+
+    noInfoPopupRef.current = new mapboxgl.Popup({
+      closeOnClick: true,
+      closeButton: true,
+      maxWidth: '240px',
+    })
+      .setLngLat([lngLat.lng, lngLat.lat])
+      .setHTML(
+        `<div style="padding:8px;text-align:center;">` +
+        `<p style="margin:0;font-size:14px;color:#1e3a5f;">${noInfoMessage}</p>` +
+        `</div>`
+      )
+      .addTo(map.current);
+
+    setTimeout(() => {
+      noInfoPopupRef.current?.remove();
+      noInfoPopupRef.current = null;
+    }, 4000);
   };
 
   const toggleMeasure = () => {
@@ -685,7 +704,7 @@ export default function EnhancedMapboxMap({
   };
 
   return (
-    <div className="relative w-full h-full">
+    <div className="absolute inset-0">
       <div ref={mapContainer} className="w-full h-full" />
 
       {showMeasureDistance && (
@@ -710,32 +729,6 @@ export default function EnhancedMapboxMap({
         </div>
       )}
 
-      {forecastPopup && (
-        <ForecastPopup
-          locationName={forecastPopup.name}
-          forecast={forecastPopup.forecast}
-          position={forecastPopup.position}
-          coordinates={forecastPopup.coordinates}
-          isSaved={savedSpots.some(
-            (s) =>
-              Math.abs(s.latitude - forecastPopup.coordinates.latitude) < 0.001 &&
-              Math.abs(s.longitude - forecastPopup.coordinates.longitude) < 0.001
-          )}
-          onClose={() => setForecastPopup(null)}
-          onSave={
-            onSaveSpot
-              ? () => {
-                  onSaveSpot({
-                    name: forecastPopup.name,
-                    latitude: forecastPopup.coordinates.latitude,
-                    longitude: forecastPopup.coordinates.longitude,
-                  });
-                  setForecastPopup(null);
-                }
-              : undefined
-          }
-        />
-      )}
     </div>
   );
 }

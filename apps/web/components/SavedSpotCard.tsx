@@ -4,29 +4,38 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { ko, enUS } from 'date-fns/locale';
 import { useTranslations, useLocale } from 'next-intl';
-import type { SavedSpotMarker } from '@/types';
+import type { SavedListItem } from '@/types';
+import { getGradeBgColor } from '@/lib/services/surfInfoService';
 
 interface SavedSpotCardProps {
-  spot: SavedSpotMarker;
+  item: SavedListItem;
   onRemove: () => void;
 }
 
-export default function SavedSpotCard({ spot, onRemove }: SavedSpotCardProps) {
+export default function SavedSpotCard({ item, onRemove }: SavedSpotCardProps) {
   const t = useTranslations('saved');
   const locale = useLocale();
   const dateLocale = locale === 'ko' ? ko : enUS;
 
+  const displayName = locale === 'ko' && item.nameKo ? item.nameKo : item.name;
+  const [latStr, lngStr] = item.locationId.split('#');
+
   return (
     <div className="card relative">
-      {/* Header with heart icon */}
-      <div className="aspect-video bg-gradient-to-br from-coral-400 to-coral-600 rounded-lg mb-3 flex items-center justify-center text-4xl">
-        ❤️
+      {/* Header with grade badge */}
+      <div className="aspect-video bg-gradient-to-br from-ocean-400 to-ocean-600 rounded-lg mb-3 flex items-center justify-center gap-3">
+        <span className={`px-3 py-1.5 rounded-lg text-white text-2xl font-bold ${getGradeBgColor(item.surfGrade)}`}>
+          {item.surfGrade}
+        </span>
+        <span className="text-white text-3xl font-bold">
+          {Math.round(item.surfScore)}
+        </span>
       </div>
 
       {/* Content */}
       <div className="space-y-2">
         <div className="flex items-start justify-between">
-          <h3 className="font-semibold text-ocean-800 text-lg line-clamp-2">{spot.name}</h3>
+          <h3 className="font-semibold text-ocean-800 text-lg line-clamp-2">{displayName}</h3>
           <button
             onClick={onRemove}
             className="text-coral-500 hover:text-coral-600 text-sm ml-2 flex-shrink-0"
@@ -39,20 +48,28 @@ export default function SavedSpotCard({ spot, onRemove }: SavedSpotCardProps) {
         <div className="text-sm text-ocean-600">
           <div className="flex items-center gap-1">
             <span>📍</span>
-            <span>{spot.latitude.toFixed(4)}, {spot.longitude.toFixed(4)}</span>
+            <span>{item.region}, {item.country}</span>
           </div>
         </div>
 
-        <div className="text-xs text-ocean-500">
-          {t('savedOn')} {format(new Date(spot.savedAt), 'PPP', { locale: dateLocale })}
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="px-2 py-0.5 bg-sand-100 rounded text-ocean-600">
+            🌊 {item.waveHeight.toFixed(1)}m
+          </span>
+          <span className="px-2 py-0.5 bg-sand-100 rounded text-ocean-600">
+            💨 {item.windSpeed.toFixed(0)} km/h
+          </span>
+          <span className="px-2 py-0.5 bg-sand-100 rounded text-ocean-600">
+            🌡️ {item.waterTemperature.toFixed(0)}°C
+          </span>
         </div>
 
-        {spot.notes && (
-          <p className="text-sm text-ocean-600 italic">{spot.notes}</p>
-        )}
+        <div className="text-xs text-ocean-500">
+          {t('savedOn')} {format(new Date(item.savedAt), 'PPP', { locale: dateLocale })}
+        </div>
 
         <Link
-          href={`/map?lat=${spot.latitude}&lng=${spot.longitude}`}
+          href={`/map?lat=${latStr}&lng=${lngStr}`}
           className="btn-primary w-full text-center block mt-3 text-sm"
         >
           {t('viewOnMap')}

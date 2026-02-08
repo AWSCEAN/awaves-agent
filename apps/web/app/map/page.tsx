@@ -1,37 +1,34 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { format, addDays } from 'date-fns';
+import { format, addDays, differenceInDays, parseISO } from 'date-fns';
 import { ko, enUS } from 'date-fns/locale';
 import { useTranslations, useLocale } from 'next-intl';
 import AwavesLogo from '@/components/AwavesLogo';
 import LocationAutocomplete from '@/components/LocationAutocomplete';
 import SearchResultsList from '@/components/SearchResultsList';
+import type { SearchResult } from '@/components/SearchResultsList';
+import SpotDetailPanel from '@/components/SpotDetailPanel';
 import LocaleProvider, { useLocale as useAppLocale } from '@/components/LocaleProvider';
-import type { SavedSpotMarker, SurfSpot, SurferLevel } from '@/types';
-import type { OverlayMode } from '@/components/EnhancedMapboxMap';
-import { searchSpotsWithFilters, availableTimeSlots, mockSpots } from '@/lib/data';
-import { getSavedSpotsFromStorage, saveSpotsToStorage } from '@/lib/mockForecastData';
+import type { SurfInfo, SavedListItem, SurferLevel } from '@/types';
+import type { OverlayMode, SpotSelectionData } from '@/components/EnhancedMapboxMap';
+import { searchSpotsWithFilters, availableTimeSlots, getNearbySpots, DEMO_USER_LOCATION } from '@/lib/data';
+import { getSavedList, addToSavedList, removeFromSavedList } from '@/lib/services/savedListService';
+import { getUserId } from '@/lib/services/userService';
+import { getBestSurfInfoForDate } from '@/lib/services/surfInfoService';
 
 const EnhancedMapboxMap = dynamic(
   () => import('@/components/EnhancedMapboxMap'),
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-full bg-ocean-100 flex items-center justify-center">
-        <div className="text-ocean-500">Loading map...</div>
-      </div>
+      <div className="absolute inset-0 bg-[#e8e4da]" />
     ),
   }
 );
-
-interface SearchResult extends SurfSpot {
-  surfScore: number;
-  safetyScore: number;
-  distance?: number;
-}
 
 function MapPageContent() {
   const { locale, setLocale } = useAppLocale();
@@ -39,7 +36,7 @@ function MapPageContent() {
   const dateLocale = intlLocale === 'ko' ? ko : enUS;
   const t = useTranslations('header');
   const tSearch = useTranslations('search');
-  const tDate = useTranslations('date');
+  const searchParams = useSearchParams();
 
   // Search state
   const [locationQuery, setLocationQuery] = useState('');
@@ -54,33 +51,69 @@ function MapPageContent() {
 
   // Results state
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [visibleSpots, setVisibleSpots] = useState<SearchResult[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
   // Map state
   const [showWindParticles, setShowWindParticles] = useState(false);
-  const [savedSpots, setSavedSpots] = useState<SavedSpotMarker[]>([]);
+  const [savedSpots, setSavedSpots] = useState<SavedListItem[]>([]);
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('none');
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
 
+  // Selected spot detail panel state
+  const [selectedSpotDetail, setSelectedSpotDetail] = useState<SpotSelectionData | null>(null);
+
+  // Quick date selector state
+  const [showQuickDateSelect, setShowQuickDateSelect] = useState(true);
+
+  const userId = getUserId();
+
   // Load saved spots
   useEffect(() => {
-    setSavedSpots(getSavedSpotsFromStorage());
-  }, []);
+    setSavedSpots(getSavedList(userId));
+  }, [userId]);
+
+  // Center map from query params (e.g. /map?lat=38.0765&lng=128.6234)
+  useEffect(() => {
+    const lat = searchParams.get('lat');
+    const lng = searchParams.get('lng');
+    if (lat && lng) {
+      const latNum = Number(lat);
+      const lngNum = Number(lng);
+      if (!isNaN(latNum) && !isNaN(lngNum)) {
+        setMapCenter({ lat: latNum, lng: lngNum });
+      }
+    }
+  }, [searchParams]);
 
   // Generate date options (10 days)
-  const dateOptions = Array.from({ length: 10 }, (_, i) => addDays(new Date(), i));
+  const dateOptions = useMemo(() =>
+    Array.from({ length: 10 }, (_, i) => addDays(new Date(), i)),
+    []
+  );
+
+  // Check if selected date is beyond 10 days (weekly estimate)
+  const { daysFromToday, isWeeklyEstimate, weekRange } = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days = differenceInDays(selectedDate, today);
+    const isWeekly = days > 9;
+    return {
+      daysFromToday: days,
+      isWeeklyEstimate: isWeekly,
+      weekRange: isWeekly ? { start: selectedDate, end: addDays(selectedDate, 6) } : undefined,
+    };
+  }, [selectedDate]);
 
   const handleOverlayToggle = (mode: OverlayMode) => {
     setOverlayMode((prev) => (prev === mode ? 'none' : mode));
   };
 
   const handleSearch = useCallback(() => {
-    // Ask for location permission on first search if not already asked
     if (!locationPermissionAsked && !userLocation) {
       setShowLocationPrompt(true);
       setLocationPermissionAsked(true);
-      // Continue with search even without location
     }
 
     const results = searchSpotsWithFilters({
@@ -95,6 +128,7 @@ function MapPageContent() {
     setSearchResults(results);
     setShowResults(true);
     setHasSearched(true);
+    setSelectedSpotDetail(null);
   }, [locationQuery, selectedDate, selectedTime, surferLevel, userLocation, locationPermissionAsked]);
 
   const handleAllowLocation = () => {
@@ -106,7 +140,6 @@ function MapPageContent() {
             lng: position.coords.longitude,
           });
           setShowLocationPrompt(false);
-          // Re-run search with location
           const results = searchSpotsWithFilters({
             location: locationQuery || undefined,
             date: format(selectedDate, 'yyyy-MM-dd'),
@@ -126,32 +159,62 @@ function MapPageContent() {
     }
   };
 
-  const handleSaveSpot = (spot: { name: string; latitude: number; longitude: number; id?: string }) => {
-    const newSpot: SavedSpotMarker = {
-      id: spot.id || `saved-${Date.now()}`,
-      spotId: spot.id,
-      name: spot.name,
-      latitude: spot.latitude,
-      longitude: spot.longitude,
-      savedAt: new Date().toISOString(),
-    };
-    const updatedSpots = [...savedSpots, newSpot];
-    setSavedSpots(updatedSpots);
-    saveSpotsToStorage(updatedSpots);
+  const handleSaveSpot = (surfInfo: SurfInfo) => {
+    const item = addToSavedList(userId, surfInfo);
+    setSavedSpots((prev) => [...prev, item]);
+  };
+
+  const handleRemoveSpot = (locationId: string) => {
+    removeFromSavedList(userId, locationId);
+    setSavedSpots((prev) => prev.filter((s) => s.locationId !== locationId));
   };
 
   const handleSpotClick = (spot: SearchResult) => {
-    setMapCenter({ lat: spot.latitude, lng: spot.longitude });
+    setMapCenter({ lat: spot.geo.lat, lng: spot.geo.lng });
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    const surfInfo = getBestSurfInfoForDate(spot, dateStr);
+    setSelectedSpotDetail({
+      surfInfo,
+      coordinates: { latitude: spot.geo.lat, longitude: spot.geo.lng },
+    });
   };
+
+  const handleMapSpotSelect = (data: SpotSelectionData) => {
+    setSelectedSpotDetail(data);
+  };
+
+  // Get effective user location (real or demo)
+  const effectiveUserLocation = userLocation || DEMO_USER_LOCATION;
+
+  const handleSuggestByDistance = useCallback(() => {
+    const nearbySpots = getNearbySpots(
+      effectiveUserLocation.lat,
+      effectiveUserLocation.lng,
+      25,
+      {
+        date: format(selectedDate, 'yyyy-MM-dd'),
+        time: selectedTime || undefined,
+      }
+    );
+
+    setSearchResults(nearbySpots);
+    setShowResults(true);
+    setHasSearched(true);
+    setSelectedSpotDetail(null);
+  }, [effectiveUserLocation, selectedDate, selectedTime]);
 
   const toggleLocale = () => {
     setLocale(locale === 'ko' ? 'en' : 'ko');
   };
 
-  const savedSpotIds = new Set(savedSpots.map((s) => s.spotId).filter(Boolean) as string[]);
+  // Memoize savedSpotIds using LocationId
+  const savedSpotIds = useMemo(() =>
+    new Set(savedSpots.map((s) => s.locationId)),
+    [savedSpots]
+  );
 
-  // Get spots to display on map (search results if searched, otherwise all spots)
-  const displaySpots = hasSearched ? searchResults : mockSpots;
+  // Map shows only visible page spots after search, nothing before search (saved markers handled separately)
+  const displaySpots = (hasSearched && showResults) ? visibleSpots : [];
 
   return (
     <div className="h-screen flex flex-col">
@@ -175,32 +238,19 @@ function MapPageContent() {
             />
 
             {/* Date */}
-            <select
+            <input
+              type="date"
               value={format(selectedDate, 'yyyy-MM-dd')}
+              min={format(new Date(), 'yyyy-MM-dd')}
               onChange={(e) => {
-                const date = dateOptions.find(
-                  (d) => format(d, 'yyyy-MM-dd') === e.target.value
-                );
-                if (date) setSelectedDate(date);
+                if (e.target.value) {
+                  setSelectedDate(parseISO(e.target.value));
+                }
               }}
               className="px-3 py-2 text-sm border border-sand-200 rounded-lg
                 focus:outline-none focus:ring-2 focus:ring-ocean-500/50 focus:border-ocean-500
-                bg-white text-ocean-800 w-36"
-            >
-              {dateOptions.map((date, index) => {
-                const label =
-                  index === 0
-                    ? tDate('today')
-                    : index === 1
-                      ? tDate('tomorrow')
-                      : format(date, 'MMM d', { locale: dateLocale });
-                return (
-                  <option key={date.toISOString()} value={format(date, 'yyyy-MM-dd')}>
-                    {label}
-                  </option>
-                );
-              })}
-            </select>
+                bg-white text-ocean-800 w-40"
+            />
 
             {/* Time */}
             <select
@@ -230,7 +280,6 @@ function MapPageContent() {
               <option value="beginner">{tSearch('difficulty.beginner')}</option>
               <option value="intermediate">{tSearch('difficulty.intermediate')}</option>
               <option value="advanced">{tSearch('difficulty.advanced')}</option>
-              <option value="expert">{tSearch('difficulty.expert')}</option>
             </select>
 
             {/* Search Button */}
@@ -248,6 +297,25 @@ function MapPageContent() {
                 />
               </svg>
               {tSearch('searchButton')}
+            </button>
+
+            {/* Nearby Spots Button */}
+            <button
+              onClick={handleSuggestByDistance}
+              className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg
+                hover:bg-blue-600 transition-colors flex items-center gap-1"
+              title={locale === 'ko' ? '내 주변 25개 스팟 추천' : 'Suggest 25 Nearby Spots'}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              {locale === 'ko' ? '주변' : 'Nearby'}
             </button>
           </div>
 
@@ -272,15 +340,6 @@ function MapPageContent() {
             >
               {t('surfScore')}
             </button>
-            <button
-              onClick={() => handleOverlayToggle('safety')}
-              className={`px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                overlayMode === 'safety' ? 'bg-orange-500 text-white' : 'bg-sand-100 text-ocean-700 hover:bg-sand-200'
-              }`}
-              title={t('safetyScore')}
-            >
-              {t('safetyScore')}
-            </button>
 
             {/* Divider */}
             <div className="w-px h-6 bg-sand-200" />
@@ -292,6 +351,9 @@ function MapPageContent() {
             >
               {t('saved')}
             </Link>
+
+            {/* Divider */}
+            <div className="w-px h-6 bg-sand-200" />
 
             {/* Language Toggle */}
             <button
@@ -358,17 +420,26 @@ function MapPageContent() {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative min-h-0">
         {/* Search Results Panel */}
         <SearchResultsList
           results={searchResults}
           isOpen={showResults && hasSearched}
-          onClose={() => setShowResults(false)}
+          onClose={() => {
+            setShowResults(false);
+            setVisibleSpots([]);
+          }}
           onSpotClick={handleSpotClick}
           onSaveSpot={handleSaveSpot}
+          onRemoveSpot={handleRemoveSpot}
           savedSpotIds={savedSpotIds}
           selectedDate={selectedDate}
           selectedTime={selectedTime}
+          onSuggestByDistance={handleSuggestByDistance}
+          userLocation={effectiveUserLocation}
+          isWeeklyEstimate={isWeeklyEstimate}
+          weekRange={weekRange}
+          onVisibleItemsChange={setVisibleSpots}
         />
 
         {/* Map */}
@@ -378,18 +449,202 @@ function MapPageContent() {
           selectedDate={selectedDate}
           showWindParticles={showWindParticles}
           overlayMode={overlayMode}
-          onSaveSpot={handleSaveSpot}
+          onSpotSelect={handleMapSpotSelect}
           locale={locale}
           center={mapCenter}
           showGeocoder={false}
           showMeasureDistance={false}
         />
+
+        {/* 10-Day Quick Date Selector - Bottom Center */}
+        <div className={`absolute bottom-3 left-1/2 -translate-x-1/2 z-30 transition-all duration-300
+          ${showResults && hasSearched ? 'ml-48' : ''}
+          ${selectedSpotDetail ? 'mr-40' : ''}`}
+        >
+          {showQuickDateSelect ? (
+            <>
+              {/* Expanded View - All dates */}
+              <button
+                onClick={() => setShowQuickDateSelect(false)}
+                className="absolute -top-2 left-1/2 -translate-x-1/2 z-10 px-2 py-0.5 bg-white rounded-full shadow-md
+                  hover:bg-sand-50 transition-colors border border-sand-200 text-[10px] text-ocean-600 font-medium
+                  flex items-center gap-1"
+                title={locale === 'ko' ? '접기' : 'Minimize'}
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 15l-7-7-7 7" />
+                </svg>
+                {locale === 'ko' ? '접기' : 'Hide'}
+              </button>
+
+              <div className="glass rounded-full shadow-lg px-2 py-1">
+                <div className="flex items-center gap-0.5">
+                  {dateOptions.map((date, index) => {
+                    const isSelected = format(date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
+                    const dayLabel = index === 0
+                      ? (locale === 'ko' ? '오늘' : 'Today')
+                      : index === 1
+                        ? (locale === 'ko' ? '내일' : 'Tmrw')
+                        : format(date, 'EEE', { locale: dateLocale });
+                    const dateLabel = format(date, 'd', { locale: dateLocale });
+
+                    return (
+                      <button
+                        key={date.toISOString()}
+                        onClick={() => setSelectedDate(date)}
+                        className={`flex-shrink-0 px-2.5 py-1.5 rounded-full
+                          transition-all duration-200 ${
+                          isSelected
+                            ? 'bg-ocean-500 text-white shadow-sm'
+                            : 'text-ocean-700 hover:bg-white/80'
+                        }`}
+                        title={format(date, 'PPP', { locale: dateLocale })}
+                      >
+                        <span className="text-xs font-semibold whitespace-nowrap">{dayLabel} {dateLabel}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          ) : (
+            /* Minimized View - Only selected date */
+            <button
+              onClick={() => setShowQuickDateSelect(true)}
+              className="glass rounded-full shadow-lg px-3 py-1.5 flex items-center gap-2
+                hover:bg-white/90 transition-colors cursor-pointer"
+              title={locale === 'ko' ? '10일 예보 펼치기' : 'Expand 10-Day Forecast'}
+            >
+              <span className="text-xs font-semibold text-ocean-700 whitespace-nowrap">
+                {daysFromToday === 0
+                  ? (locale === 'ko' ? '오늘' : 'Today')
+                  : daysFromToday === 1
+                    ? (locale === 'ko' ? '내일' : 'Tmrw')
+                    : format(selectedDate, 'EEE', { locale: dateLocale })}{' '}
+                {format(selectedDate, 'd', { locale: dateLocale })}
+              </span>
+              <svg className="w-3 h-3 text-ocean-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* Spot Detail Panel - Right Side */}
+        {selectedSpotDetail && (
+          <SpotDetailPanel
+            surfInfo={selectedSpotDetail.surfInfo}
+            coordinates={selectedSpotDetail.coordinates}
+            isSaved={savedSpots.some(
+              (s) => s.locationId === selectedSpotDetail.surfInfo.LocationId
+            )}
+            onClose={() => setSelectedSpotDetail(null)}
+            onSave={() => {
+              handleSaveSpot(selectedSpotDetail.surfInfo);
+            }}
+            onRemove={() => {
+              handleRemoveSpot(selectedSpotDetail.surfInfo.LocationId);
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SurfLoadingScreen() {
+  return (
+    <div className="h-screen flex flex-col items-center justify-center bg-sand-gradient overflow-hidden">
+      {/* 3D Scene Container */}
+      <div className="surf-scene">
+        {/* Ocean waves behind */}
+        <div className="surf-ocean">
+          <div className="surf-wave surf-wave-1" />
+          <div className="surf-wave surf-wave-2" />
+          <div className="surf-wave surf-wave-3" />
+        </div>
+
+        {/* 3D Surfer Character */}
+        <div className="surf-character">
+          {/* Shadow on water */}
+          <div className="surf-shadow" />
+
+          {/* Surfboard with 3D tilt */}
+          <div className="surf-board">
+            <div className="surf-board-top" />
+            <div className="surf-board-stripe" />
+          </div>
+
+          {/* Character body */}
+          <div className="surf-body">
+            {/* Head */}
+            <div className="surf-head">
+              <div className="surf-hair" />
+              <div className="surf-face">
+                <div className="surf-eye surf-eye-l" />
+                <div className="surf-eye surf-eye-r" />
+                <div className="surf-mouth" />
+              </div>
+            </div>
+            {/* Torso */}
+            <div className="surf-torso" />
+            {/* Arms */}
+            <div className="surf-arm surf-arm-l" />
+            <div className="surf-arm surf-arm-r" />
+            {/* Legs */}
+            <div className="surf-leg surf-leg-l" />
+            <div className="surf-leg surf-leg-r" />
+          </div>
+        </div>
+
+        {/* Splash particles */}
+        <div className="surf-splash">
+          <div className="surf-drop" style={{ animationDelay: '0s' }} />
+          <div className="surf-drop" style={{ animationDelay: '0.3s' }} />
+          <div className="surf-drop" style={{ animationDelay: '0.6s' }} />
+          <div className="surf-drop" style={{ animationDelay: '0.15s' }} />
+          <div className="surf-drop" style={{ animationDelay: '0.45s' }} />
+        </div>
+      </div>
+
+      {/* Loading text */}
+      <div className="text-center mt-8">
+        <h2 className="text-xl font-semibold text-ocean-700 mb-2">Loading your waves...</h2>
+        <div className="flex items-center justify-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-ocean-400 animate-loading-dot" style={{ animationDelay: '0ms' }} />
+          <span className="w-2 h-2 rounded-full bg-ocean-500 animate-loading-dot" style={{ animationDelay: '150ms' }} />
+          <span className="w-2 h-2 rounded-full bg-ocean-600 animate-loading-dot" style={{ animationDelay: '300ms' }} />
+        </div>
       </div>
     </div>
   );
 }
 
 export default function MapPageEnhanced() {
+  const router = useRouter();
+  const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
+  const [showLoading, setShowLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      setAuthState('unauthenticated');
+      router.replace('/login');
+    } else {
+      setAuthState('authenticated');
+      const timer = setTimeout(() => setShowLoading(false), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [router]);
+
+  if (authState === 'checking' || authState === 'unauthenticated') {
+    return <SurfLoadingScreen />;
+  }
+
+  if (showLoading) {
+    return <SurfLoadingScreen />;
+  }
+
   return (
     <LocaleProvider>
       <MapPageContent />

@@ -17,8 +17,7 @@
     "mypage": "마이페이지",
     "map": "지도",
     "windParticles": "바람",
-    "surfScore": "서핑",
-    "safetyScore": "안전"
+    "surfScore": "서핑"
   },
   "search": {
     "location": "위치",
@@ -62,24 +61,16 @@
   },
   "forecast": {
     "surfScore": "서핑 점수",
-    "safety": "안전도",
     "scoreLabels": {
       "good": "좋음",
       "fair": "보통",
       "poor": "나쁨"
     },
-    "safetyLabels": {
-      "safe": "안전",
-      "moderate": "주의",
-      "caution": "위험"
-    },
     "dataLabels": {
       "waveHeight": "파고",
       "wavePeriod": "파주기",
       "windSpeed": "풍속",
-      "swellHeight": "너울",
-      "waterTemp": "수온",
-      "airTemp": "기온"
+      "waterTemp": "수온"
     },
     "saveSpot": "스팟 저장",
     "saved": "저장됨"

@@ -6,24 +6,25 @@ import { useTranslations } from 'next-intl';
 import AwavesLogo from '@/components/AwavesLogo';
 import SavedSpotCard from '@/components/SavedSpotCard';
 import LocaleProvider, { useLocale } from '@/components/LocaleProvider';
-import type { SavedSpotMarker } from '@/types';
-import { getSavedSpotsFromStorage, saveSpotsToStorage } from '@/lib/mockForecastData';
+import type { SavedListItem } from '@/types';
+import { getSavedList, removeFromSavedList } from '@/lib/services/savedListService';
+import { getUserId } from '@/lib/services/userService';
 
 function SavedPageContent() {
   const { locale, setLocale } = useLocale();
   const t = useTranslations('saved');
   const tHeader = useTranslations('header');
 
-  const [savedSpots, setSavedSpots] = useState<SavedSpotMarker[]>([]);
+  const [savedSpots, setSavedSpots] = useState<SavedListItem[]>([]);
+  const userId = getUserId();
 
   useEffect(() => {
-    setSavedSpots(getSavedSpotsFromStorage());
-  }, []);
+    setSavedSpots(getSavedList(userId));
+  }, [userId]);
 
-  const handleRemove = (spotId: string) => {
-    const updatedSpots = savedSpots.filter((spot) => spot.id !== spotId);
-    setSavedSpots(updatedSpots);
-    saveSpotsToStorage(updatedSpots);
+  const handleRemove = (locationId: string) => {
+    removeFromSavedList(userId, locationId);
+    setSavedSpots((prev) => prev.filter((item) => item.locationId !== locationId));
   };
 
   const toggleLocale = () => {
@@ -68,11 +69,11 @@ function SavedPageContent() {
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {savedSpots.map((spot) => (
+            {savedSpots.map((item) => (
               <SavedSpotCard
-                key={spot.id}
-                spot={spot}
-                onRemove={() => handleRemove(spot.id)}
+                key={item.locationSurfKey}
+                item={item}
+                onRemove={() => handleRemove(item.locationId)}
               />
             ))}
           </div>

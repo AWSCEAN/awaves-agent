@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { getUniqueLocations } from '@/lib/data';
 
@@ -33,8 +33,8 @@ export default function LocationAutocomplete({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Get all unique locations for autocomplete
-  const allLocations = getUniqueLocations();
+  // Get all unique locations for autocomplete - memoize to avoid new reference each render
+  const allLocations = useMemo(() => getUniqueLocations(), []);
 
   useEffect(() => {
     if (value.length < 1) {
