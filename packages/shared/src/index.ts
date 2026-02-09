@@ -92,14 +92,39 @@ export interface UserRDB {
 }
 
 // --- feedback RDB table ---
+export type FeedbackStatus = 'POSITIVE' | 'NEGATIVE' | 'DEFERRED';
+
 export interface FeedbackRDB {
   id: number;
   user_id: number;
   location_id: string;          // "{lat}#{lng}"
   surf_timestamp: string;
   feedback_result: boolean;
-  feedback_status: string;
+  feedback_status: FeedbackStatus;
   created_at: string;
+}
+
+// --- Saved item API response (snake_case, used by frontend) ---
+export interface SavedItemResponse {
+  user_id: string;
+  location_surf_key: string;
+  location_id: string;
+  surf_timestamp: string;
+  saved_at: string;
+  departure_date?: string;
+  address?: string;
+  region?: string;
+  country?: string;
+  wave_height?: number;
+  wave_period?: number;
+  wind_speed?: number;
+  water_temperature?: number;
+  surfer_level: string;
+  surf_score: number;
+  surf_grade: string;
+  flag_change: boolean;
+  change_message?: string;
+  feedback_status?: FeedbackStatus;
 }
 
 // ============================================================
