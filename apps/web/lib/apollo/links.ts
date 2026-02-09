@@ -25,10 +25,10 @@ export const authLink = new ApolloLink((operation, forward) => {
 });
 
 export const errorLink = new ErrorLink(({ error }) => {
-  // Handle authentication errors - redirect to login
+  console.error(`[GraphQL/Network error]: ${error.message}`);
+
+  // Handle authentication errors
   if (error.message === 'Not authenticated') {
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login';
-    }
+    console.warn('Authentication required');
   }
 });

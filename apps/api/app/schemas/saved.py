@@ -1,10 +1,11 @@
 """Saved list Pydantic schemas."""
 
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from app.schemas.feedback import FeedbackStatus
+
+FeedbackStatus = Literal["POSITIVE", "NEGATIVE", "DEFERRED"]
 
 
 class SavedItemRequest(BaseModel):

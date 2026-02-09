@@ -1,4 +1,3 @@
-import { memo } from 'react';
 import Link from 'next/link';
 import type { SurfSpot, Language } from '@/types';
 
@@ -31,7 +30,7 @@ const difficultyColors = {
   expert: 'bg-red-100 text-red-700',
 };
 
-export default memo(function SpotCard({ spot, lang, onRemove, showRemove }: SpotCardProps) {
+export default function SpotCard({ spot, lang, onRemove, showRemove }: SpotCardProps) {
   const name = lang === 'ko' && spot.nameKo ? spot.nameKo : spot.name;
   const conditions = spot.currentConditions;
 
@@ -106,4 +105,4 @@ export default memo(function SpotCard({ spot, lang, onRemove, showRemove }: Spot
       </div>
     </div>
   );
-});
+}

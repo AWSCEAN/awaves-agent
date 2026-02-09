@@ -1,6 +1,7 @@
 """DataLoaders for batching and caching GraphQL queries."""
 
 from typing import Optional
+from collections import defaultdict
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession

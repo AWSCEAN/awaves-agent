@@ -15,6 +15,7 @@ class DynamoDBService:
     """Service for DynamoDB operations on saved_list table."""
 
     _session: Optional[aioboto3.Session] = None
+    _available: bool = True
     TABLE_NAME = settings.dynamodb_saved_list_table
 
     @classmethod
@@ -73,6 +74,7 @@ class DynamoDBService:
                     return True
         except Exception as e:
             logger.error(f"Failed to create DynamoDB table: {e}")
+            cls._available = False
             return False
 
     @classmethod

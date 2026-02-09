@@ -1,11 +1,10 @@
-import { memo } from 'react';
 import type { SurfConditions } from '@/types';
 
 interface SurfDataPopupProps {
   conditions: SurfConditions;
 }
 
-export default memo(function SurfDataPopup({ conditions }: SurfDataPopupProps) {
+export default function SurfDataPopup({ conditions }: SurfDataPopupProps) {
   const {
     waveHeight,
     waveHeightMax,
@@ -90,4 +89,4 @@ export default memo(function SurfDataPopup({ conditions }: SurfDataPopupProps) {
       </div>
     </div>
   );
-});
+}

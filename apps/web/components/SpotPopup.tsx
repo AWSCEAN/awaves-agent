@@ -1,4 +1,3 @@
-import { memo } from 'react';
 import type { SurfSpot } from '@/types';
 import SurfDataPopup from './SurfDataPopup';
 
@@ -8,7 +7,7 @@ interface SpotPopupProps {
   onClose: () => void;
 }
 
-export default memo(function SpotPopup({ spot, position, onClose }: SpotPopupProps) {
+export default function SpotPopup({ spot, position, onClose }: SpotPopupProps) {
   return (
     <div
       className="absolute z-50 pointer-events-auto"
@@ -68,4 +67,4 @@ export default memo(function SpotPopup({ spot, position, onClose }: SpotPopupPro
       />
     </div>
   );
-});
+}
