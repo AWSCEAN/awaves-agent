@@ -1,67 +1,111 @@
-// Surf Spot Types
-export interface SurfSpot {
-  id: string;
+// ============================================================
+// NEW SCHEMA TYPES (Backend-aligned)
+// ============================================================
+
+// --- Enums / Literals ---
+export type SurfGrade = 'A' | 'B' | 'C' | 'D';
+export type SurfingLevel = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+export type SurferLevel = 'beginner' | 'intermediate' | 'advanced';
+
+// --- surf_info DynamoDB table ---
+export interface SurfInfoGeo {
+  lat: number;
+  lng: number;
+}
+
+export interface SurfInfoConditions {
+  waveHeight: number;
+  wavePeriod: number;
+  windSpeed: number;
+  waterTemperature: number;
+}
+
+export interface SurfInfoDerivedMetrics {
+  surfScore: number;          // 0-100
+  surfGrade: SurfGrade;       // A/B/C/D
+  surfingLevel: SurfingLevel; // BEGINNER/INTERMEDIATE/ADVANCED
+}
+
+export interface SurfInfoMetadata {
+  modelVersion: string;
+  dataSource: string;
+  predictionType: 'FORECAST' | 'REALTIME';
+  createdAt: string;
+}
+
+export interface SurfInfo {
+  // DynamoDB Keys
+  LocationId: string;           // PK: "{lat}#{lng}"
+  SurfTimestamp: string;        // SK: ISO 8601
+
+  // DynamoDB Data
+  geo: SurfInfoGeo;
+  conditions: SurfInfoConditions;
+  derivedMetrics: SurfInfoDerivedMetrics;
+  metadata: SurfInfoMetadata;
+
+  // Spot metadata (frontend convenience, not in DynamoDB)
   name: string;
   nameKo?: string;
-  latitude: number;
-  longitude: number;
   region: string;
   country: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  address?: string;
+  difficulty: SurferLevel;
   waveType: string;
   bestSeason: string[];
   description?: string;
   descriptionKo?: string;
-  imageUrl?: string;
-  currentConditions?: SurfConditions;
 }
 
-export interface SurfConditions {
-  waveHeight: number; // meters
-  waveHeightMax?: number;
-  wavePeriod: number; // seconds
-  waveDirection: number; // degrees
-  windSpeed: number; // km/h
-  windDirection: number; // degrees
-  waterTemperature: number; // celsius
-  airTemperature: number; // celsius
-  tide: 'low' | 'mid' | 'high';
-  rating: number; // 1-5
-  updatedAt: string;
-}
-
-export interface SearchFilters {
-  region?: string;
-  difficulty?: SurfSpot['difficulty'];
-  minWaveHeight?: number;
-  maxWaveHeight?: number;
-  dateRange?: {
-    start: string;
-    end: string;
-  };
-  windSpeedMax?: number;
-  waterTempMin?: number;
-}
-
-// User Types
-export interface User {
-  id: string;
-  email: string;
-  nickname: string;
-  profileImageUrl?: string;
-  preferredLanguage: 'ko' | 'en';
-  createdAt: string;
-}
-
-export interface SavedSpot {
-  id: string;
+// --- saved_list DynamoDB table (flattened) ---
+export interface SavedListItem {
   userId: string;
-  spotId: string;
+  locationSurfKey: string;      // "{lat}#{lng}#{timestamp}"
+  locationId: string;           // "{lat}#{lng}"
+  surfTimestamp: string;
   savedAt: string;
-  notes?: string;
+  address: string;
+  region: string;
+  country: string;
+  departureDate: string;
+  waveHeight: number;
+  wavePeriod: number;
+  windSpeed: number;
+  waterTemperature: number;
+  surfingLevel: SurfingLevel;
+  surfScore: number;
+  surfGrade: SurfGrade;
+  // Spot display metadata
+  name: string;
+  nameKo?: string;
 }
 
-// API Response Types
+// --- user RDB table ---
+export interface UserRDB {
+  id: number;
+  username: string;
+  password_hash: string;
+  user_level: SurferLevel;
+  privacy_consent_yn: boolean;
+  last_login_dt: string | null;
+  created_at: string;
+}
+
+// --- feedback RDB table ---
+export interface FeedbackRDB {
+  id: number;
+  user_id: number;
+  location_id: string;          // "{lat}#{lng}"
+  surf_timestamp: string;
+  feedback_result: boolean;
+  feedback_status: string;
+  created_at: string;
+}
+
+// ============================================================
+// API & AUTH TYPES (kept for API layer)
+// ============================================================
+
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -77,7 +121,17 @@ export interface PaginatedResponse<T> {
   hasMore: boolean;
 }
 
-// Auth Types
+export interface CommonApiResponse<T> {
+  result: 'success' | 'error';
+  error?: ErrorDetail;
+  data?: T;
+}
+
+export interface ErrorDetail {
+  code?: string;
+  message?: string;
+}
+
 export interface AuthTokens {
   accessToken: string;
   refreshToken?: string;
@@ -108,108 +162,50 @@ export interface RegisterRequest {
   preferredLanguage?: 'ko' | 'en';
 }
 
-// V2 Registration Types (Username-based)
-export type UserLevel = 'beginner' | 'intermediate' | 'advanced';
-
 export interface RegisterV2Request {
   username: string;
   password: string;
   confirm_password: string;
-  user_level: UserLevel;
+  user_level: SurferLevel;
   privacy_consent_yn: boolean;
 }
 
 export interface UserV2 {
   user_id: number;
   username: string;
-  user_level: UserLevel;
+  user_level: SurferLevel;
   privacy_consent_yn: boolean;
   last_login_dt?: string;
   created_at: string;
 }
 
-export interface ErrorDetail {
-  code?: string;
-  message?: string;
+export interface User {
+  id: string;
+  email: string;
+  nickname: string;
+  profileImageUrl?: string;
+  preferredLanguage: 'ko' | 'en';
+  createdAt: string;
 }
 
-export interface CommonApiResponse<T> {
-  result: 'success' | 'error';
-  error?: ErrorDetail;
-  data?: T;
-}
-
-// Saved Item Types (DynamoDB)
-export interface SavedItemRequest {
-  location_id: string;
-  surf_timestamp: string;
-  departure_date?: string;
-  address?: string;
+export interface SearchFilters {
   region?: string;
-  country?: string;
-  wave_height?: number;
-  wave_period?: number;
-  wind_speed?: number;
-  water_temperature?: number;
-  surfer_level: string;
-  surf_score: number;
-  surf_grade: string;
+  difficulty?: SurferLevel;
+  minWaveHeight?: number;
+  maxWaveHeight?: number;
+  dateRange?: {
+    start: string;
+    end: string;
+  };
+  windSpeedMax?: number;
+  waterTempMin?: number;
 }
 
-export interface SavedItemResponse {
-  user_id: string;
-  location_surf_key: string; // Format: {locationId}#{surfTimestamp}
-  location_id: string;
-  surf_timestamp: string;
-  saved_at: string;
-  departure_date?: string;
-  address?: string;
-  region?: string;
-  country?: string;
-  wave_height?: number;
-  wave_period?: number;
-  wind_speed?: number;
-  water_temperature?: number;
-  surfer_level: string;
-  surf_score: number;
-  surf_grade: string;
-  flag_change: boolean;
-  change_message?: string;
-  feedback_status?: FeedbackStatus;
-}
-
-export interface SavedListResponse {
-  items: SavedItemResponse[];
-  total: number;
-}
-
-export interface DeleteSavedItemRequest {
-  location_surf_key?: string;
-  location_id?: string;
-  surf_timestamp?: string;
-}
-
-export interface AcknowledgeChangeRequest {
-  location_surf_key?: string;
-  location_id?: string;
-  surf_timestamp?: string;
-}
-
-// Feedback Types
-export type FeedbackStatus = 'POSITIVE' | 'NEGATIVE' | 'DEFERRED';
-
-export interface FeedbackRequest {
-  location_id: string;
-  surf_timestamp: string;
-  feedback_status: FeedbackStatus;
-}
-
-export interface FeedbackResponse {
-  id: number;
-  user_id: number;
-  location_id: string;
-  surf_timestamp: string;
-  feedback_result?: boolean; // true = good, false = not good, null = deferred
-  feedback_status: FeedbackStatus;
-  created_at: string;
+export interface Feedback {
+  id: string;
+  userId: string;
+  spotId?: string;
+  type: 'bug' | 'feature' | 'data_correction' | 'general';
+  message: string;
+  createdAt: string;
 }

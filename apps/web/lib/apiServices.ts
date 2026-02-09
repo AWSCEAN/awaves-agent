@@ -1,8 +1,9 @@
 import type {
-  SurfSpot,
+  SurfInfo,
+  SavedListItem,
   SearchFilters,
   User,
-  SavedSpot,
+  Feedback,
   ApiResponse,
   PaginatedResponse,
   AuthTokens,
@@ -12,13 +13,6 @@ import type {
   UserV2,
   CommonApiResponse,
   LoginV2Response,
-  SavedItemRequest,
-  SavedItemResponse,
-  SavedListResponse,
-  DeleteSavedItemRequest,
-  AcknowledgeChangeRequest,
-  FeedbackRequest,
-  FeedbackResponse,
 } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
@@ -253,7 +247,7 @@ export const authService = {
 
 // Surf Data Services
 export const surfService = {
-  async getSpots(filters?: SearchFilters): Promise<ApiResponse<PaginatedResponse<SurfSpot>>> {
+  async getSpots(filters?: SearchFilters): Promise<ApiResponse<PaginatedResponse<SurfInfo>>> {
     const params = new URLSearchParams();
 
     if (filters?.region) params.set('region', filters.region);
@@ -266,92 +260,56 @@ export const surfService = {
     const queryString = params.toString();
     const endpoint = queryString ? `/surf/spots?${queryString}` : '/surf/spots';
 
-    return apiRequest<PaginatedResponse<SurfSpot>>(endpoint);
+    return apiRequest<PaginatedResponse<SurfInfo>>(endpoint);
   },
 
-  async getSpotById(id: string): Promise<ApiResponse<SurfSpot>> {
-    return apiRequest<SurfSpot>(`/surf/spots/${id}`);
+  async getSpotById(id: string): Promise<ApiResponse<SurfInfo>> {
+    return apiRequest<SurfInfo>(`/surf/spots/${id}`);
   },
 
-  async searchSpots(query: string): Promise<ApiResponse<SurfSpot[]>> {
-    return apiRequest<SurfSpot[]>(`/surf/search?q=${encodeURIComponent(query)}`);
+  async searchSpots(query: string): Promise<ApiResponse<SurfInfo[]>> {
+    return apiRequest<SurfInfo[]>(`/surf/search?q=${encodeURIComponent(query)}`);
   },
 
-  async getRecommendations(userId: string): Promise<ApiResponse<SurfSpot[]>> {
-    return apiRequest<SurfSpot[]>(`/surf/recommendations?user_id=${userId}`);
+  async getRecommendations(userId: string): Promise<ApiResponse<SurfInfo[]>> {
+    return apiRequest<SurfInfo[]>(`/surf/recommendations?user_id=${userId}`);
   },
 };
 
-// Saved Spots Services (DynamoDB)
+// Saved Spots Services
 export const savedService = {
-  async getSavedItems(): Promise<ApiResponse<CommonApiResponse<SavedListResponse>>> {
-    return apiRequest<CommonApiResponse<SavedListResponse>>('/saved');
+  async getSavedListItems(): Promise<ApiResponse<SavedListItem[]>> {
+    return apiRequest<SavedListItem[]>('/saved');
   },
 
-  async saveItem(item: SavedItemRequest): Promise<ApiResponse<CommonApiResponse<SavedItemResponse>>> {
-    return apiRequest<CommonApiResponse<SavedItemResponse>>('/saved', {
-      method: 'POST',
-      body: JSON.stringify(item),
-    });
-  },
-
-  async getSavedItem(locationId: string, surfTimestamp: string): Promise<ApiResponse<CommonApiResponse<SavedItemResponse>>> {
-    return apiRequest<CommonApiResponse<SavedItemResponse>>(
-      `/saved/${encodeURIComponent(locationId)}/${encodeURIComponent(surfTimestamp)}`
-    );
-  },
-
-  async removeSavedItem(request: DeleteSavedItemRequest): Promise<ApiResponse<CommonApiResponse<{ message: string }>>> {
-    return apiRequest<CommonApiResponse<{ message: string }>>('/saved', {
-      method: 'DELETE',
-      body: JSON.stringify(request),
-    });
-  },
-
-  async acknowledgeChange(request: AcknowledgeChangeRequest): Promise<ApiResponse<CommonApiResponse<SavedItemResponse>>> {
-    return apiRequest<CommonApiResponse<SavedItemResponse>>('/saved/acknowledge-change', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    });
-  },
-
-  // Legacy methods for backward compatibility
-  async getSavedSpots(): Promise<ApiResponse<SavedSpot[]>> {
-    return apiRequest<SavedSpot[]>('/saved');
-  },
-
-  async saveSpot(spotId: string, notes?: string): Promise<ApiResponse<SavedSpot>> {
-    return apiRequest<SavedSpot>('/saved', {
+  async saveSpot(spotId: string, notes?: string): Promise<ApiResponse<SavedListItem>> {
+    return apiRequest<SavedListItem>('/saved', {
       method: 'POST',
       body: JSON.stringify({ spotId, notes }),
     });
   },
 
-  async removeSavedSpot(savedId: string): Promise<ApiResponse<void>> {
+  async removeSavedListItem(savedId: string): Promise<ApiResponse<void>> {
     return apiRequest<void>(`/saved/${savedId}`, {
       method: 'DELETE',
+    });
+  },
+
+  async updateSavedListItem(savedId: string, notes: string): Promise<ApiResponse<SavedListItem>> {
+    return apiRequest<SavedListItem>(`/saved/${savedId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ notes }),
     });
   },
 };
 
 // Feedback Services
 export const feedbackService = {
-  async submitSavedItemFeedback(
-    feedback: FeedbackRequest
-  ): Promise<ApiResponse<CommonApiResponse<FeedbackResponse>>> {
-    return apiRequest<CommonApiResponse<FeedbackResponse>>('/feedback/saved-item', {
+  async submitFeedback(feedback: Omit<Feedback, 'id' | 'createdAt'>): Promise<ApiResponse<Feedback>> {
+    return apiRequest<Feedback>('/feedback', {
       method: 'POST',
       body: JSON.stringify(feedback),
     });
-  },
-
-  async getSavedItemFeedback(
-    locationId: string,
-    surfTimestamp: string
-  ): Promise<ApiResponse<CommonApiResponse<FeedbackResponse>>> {
-    return apiRequest<CommonApiResponse<FeedbackResponse>>(
-      `/feedback/saved-item/${encodeURIComponent(locationId)}/${encodeURIComponent(surfTimestamp)}`
-    );
   },
 };
 

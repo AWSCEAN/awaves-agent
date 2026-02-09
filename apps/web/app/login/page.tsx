@@ -53,8 +53,6 @@ export default function LoginPage() {
     const success = await login(username, password);
 
     if (success) {
-      // AuthContext user state is now updated
-      // Redirect to map
       router.push('/map');
     } else {
       setError(t.errorInvalid);
