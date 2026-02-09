@@ -2,7 +2,7 @@
 
 import strawberry
 from typing import Optional
-from fastapi import Depends, Request
+from fastapi import Request
 from strawberry.fastapi import GraphQLRouter
 from sqlalchemy.ext.asyncio import AsyncSession
 

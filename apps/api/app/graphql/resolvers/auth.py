@@ -1,6 +1,6 @@
 """Auth resolvers for GraphQL."""
 
-import strawberry
+from graphql import GraphQLError
 from strawberry.types import Info
 
 from app.graphql.context import GraphQLContext
@@ -65,7 +65,7 @@ async def refresh_token(
                 refresh_token=token_pair.refresh_token,
                 expires_in=token_pair.expires_in,
             ),
-            user=None,  # type: ignore
+            user=None,  # type: ignore[arg-type]  # user is optional for refresh
         ),
     )
 
@@ -111,7 +111,7 @@ async def register(
 async def get_current_user(info: Info[GraphQLContext, None]) -> User:
     """Get current user query resolver."""
     if not info.context.is_authenticated:
-        raise Exception("Not authenticated")
+        raise GraphQLError("Not authenticated", extensions={"code": "UNAUTHENTICATED"})
 
     from app.repositories.user_repository import UserRepository
 
@@ -119,6 +119,6 @@ async def get_current_user(info: Info[GraphQLContext, None]) -> User:
     user = await user_repo.get_by_id(info.context.user_id)
 
     if not user:
-        raise Exception("User not found")
+        raise GraphQLError("User not found", extensions={"code": "NOT_FOUND"})
 
     return User.from_model(user)

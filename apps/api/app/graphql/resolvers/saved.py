@@ -1,6 +1,7 @@
 """Saved items resolvers for GraphQL."""
 
 from datetime import datetime
+from graphql import GraphQLError
 from strawberry.types import Info
 
 from app.graphql.context import GraphQLContext
@@ -19,7 +20,7 @@ from app.services.cache import CacheService
 async def get_saved_items(info: Info[GraphQLContext, None]) -> SavedListResult:
     """Get all saved items for the current user."""
     if not info.context.is_authenticated:
-        raise Exception("Not authenticated")
+        raise GraphQLError("Not authenticated", extensions={"code": "UNAUTHENTICATED"})
 
     user_id = str(info.context.user_id)
 
@@ -57,7 +58,7 @@ async def get_saved_item(
 ) -> SavedItem:
     """Get a specific saved item."""
     if not info.context.is_authenticated:
-        raise Exception("Not authenticated")
+        raise GraphQLError("Not authenticated", extensions={"code": "UNAUTHENTICATED"})
 
     user_id = str(info.context.user_id)
 
@@ -68,7 +69,7 @@ async def get_saved_item(
     )
 
     if not item:
-        raise Exception("Saved item not found")
+        raise GraphQLError("Saved item not found", extensions={"code": "NOT_FOUND"})
 
     return SavedItem.from_dynamodb(item)
 
@@ -79,7 +80,7 @@ async def save_item(
 ) -> SavedItemResponse:
     """Save a surf location."""
     if not info.context.is_authenticated:
-        raise Exception("Not authenticated")
+        raise GraphQLError("Not authenticated", extensions={"code": "UNAUTHENTICATED"})
 
     user_id = str(info.context.user_id)
     saved_at = datetime.utcnow().isoformat() + "Z"
@@ -122,7 +123,7 @@ async def delete_saved_item(
 ) -> bool:
     """Delete a saved item."""
     if not info.context.is_authenticated:
-        raise Exception("Not authenticated")
+        raise GraphQLError("Not authenticated", extensions={"code": "UNAUTHENTICATED"})
 
     user_id = str(info.context.user_id)
 
@@ -145,7 +146,7 @@ async def acknowledge_change(
 ) -> bool:
     """Acknowledge a change notification."""
     if not info.context.is_authenticated:
-        raise Exception("Not authenticated")
+        raise GraphQLError("Not authenticated", extensions={"code": "UNAUTHENTICATED"})
 
     user_id = str(info.context.user_id)
 

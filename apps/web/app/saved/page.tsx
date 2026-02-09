@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
+
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import LogoOverlay from '@/components/LogoOverlay';
@@ -41,7 +42,7 @@ export default function SavedPage() {
   const router = useRouter();
   const { logout } = useAuth();
   const [lang, setLang] = useState<Language>('en');
-  const [feedbackMap, setFeedbackMap] = useState<Record<string, FeedbackStatus>>({});
+  const [feedbackOverrides, setFeedbackOverrides] = useState<Record<string, FeedbackStatus>>({});
 
   const t = translations[lang];
 
@@ -58,37 +59,29 @@ export default function SavedPage() {
 
   const error = queryError?.message || null;
 
-  // Initialize feedbackMap from GraphQL response
-  useEffect(() => {
-    const initialFeedbackMap: Record<string, FeedbackStatus> = {};
+  // Derive feedbackMap from GraphQL response + local overrides
+  const feedbackMap = useMemo(() => {
+    const map: Record<string, FeedbackStatus> = {};
     for (const item of savedItems) {
       if (item.feedback_status) {
-        initialFeedbackMap[item.location_surf_key] = item.feedback_status;
+        map[item.location_surf_key] = item.feedback_status;
       }
     }
-    setFeedbackMap(initialFeedbackMap);
-  }, [savedItems]);
+    return { ...map, ...feedbackOverrides };
+  }, [savedItems, feedbackOverrides]);
 
-  const handleRemove = async (item: SavedItemResponse) => {
-    const success = await deleteItem(item.location_surf_key);
-    if (!success) {
-      console.error('Failed to delete item');
-    }
-  };
+  const handleRemove = useCallback(async (item: SavedItemResponse) => {
+    await deleteItem(item.location_surf_key);
+  }, [deleteItem]);
 
-  const handleAcknowledgeChange = async (item: SavedItemResponse) => {
-    const success = await acknowledgeChange(item.location_surf_key);
-    if (!success) {
-      console.error('Failed to acknowledge change');
-    }
-  };
+  const handleAcknowledgeChange = useCallback(async (item: SavedItemResponse) => {
+    await acknowledgeChange(item.location_surf_key);
+  }, [acknowledgeChange]);
 
-  const handleFeedback = async (
+  const handleFeedback = useCallback(async (
     item: SavedItemResponse,
     status: FeedbackStatus
   ) => {
-    const feedbackKey = item.location_surf_key;
-
     const result = await submitFeedback(
       item.location_id,
       item.surf_timestamp,
@@ -96,17 +89,17 @@ export default function SavedPage() {
     );
 
     if (result?.success) {
-      setFeedbackMap((prev) => ({
+      setFeedbackOverrides((prev) => ({
         ...prev,
-        [feedbackKey]: status,
+        [item.location_surf_key]: status,
       }));
     }
-  };
+  }, [submitFeedback]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await logout();
     router.push('/');
-  };
+  }, [logout, router]);
 
   return (
     <ProtectedRoute>

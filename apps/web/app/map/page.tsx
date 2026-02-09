@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import LogoOverlay from '@/components/LogoOverlay';
@@ -58,20 +58,20 @@ export default function MapPage() {
   const [showFilters, setShowFilters] = useState(false);
   const t = translations[lang];
 
-  const handleSpotClick = (spot: SurfSpot) => {
+  const handleSpotClick = useCallback((spot: SurfSpot) => {
     setSelectedSpot(spot);
     setIsPanelOpen(true);
-  };
+  }, []);
 
-  const handleDateRangeChange = (start: Date, end: Date) => {
-    setFilters({
-      ...filters,
+  const handleDateRangeChange = useCallback((start: Date, end: Date) => {
+    setFilters((prev) => ({
+      ...prev,
       dateRange: {
         start: start.toISOString(),
         end: end.toISOString(),
       },
-    });
-  };
+    }));
+  }, []);
 
   return (
     <ProtectedRoute>
@@ -135,7 +135,7 @@ export default function MapPage() {
 
           <select
             value={filters.difficulty || ''}
-            onChange={(e) => setFilters({ ...filters, difficulty: e.target.value as any || undefined })}
+            onChange={(e) => setFilters({ ...filters, difficulty: (e.target.value as SurfSpot['difficulty']) || undefined })}
             className="input-field w-auto"
           >
             <option value="">All Levels</option>

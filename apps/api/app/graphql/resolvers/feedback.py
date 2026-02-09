@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from typing import Optional
+from graphql import GraphQLError
 from strawberry.types import Info
 from sqlalchemy import select
 
@@ -17,7 +18,7 @@ async def submit_feedback(
 ) -> FeedbackResponse:
     """Submit feedback for a saved item."""
     if not info.context.is_authenticated:
-        raise Exception("Not authenticated")
+        raise GraphQLError("Not authenticated", extensions={"code": "UNAUTHENTICATED"})
 
     user_id = info.context.user_id
     session = info.context.db
@@ -69,7 +70,7 @@ async def get_feedback(
 ) -> Optional[FeedbackResult]:
     """Get feedback for a saved item."""
     if not info.context.is_authenticated:
-        raise Exception("Not authenticated")
+        raise GraphQLError("Not authenticated", extensions={"code": "UNAUTHENTICATED"})
 
     user_id = info.context.user_id
     session = info.context.db
