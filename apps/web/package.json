@@ -10,14 +10,12 @@
     "clean": "rimraf .next .turbo"
   },
   "dependencies": {
-    "@apollo/client": "^4.1.4",
     "@mapbox/mapbox-gl-geocoder": "^5.0.2",
     "@shared/types": "workspace:*",
     "@turf/helpers": "^7.1.0",
     "@turf/length": "^7.1.0",
     "clsx": "^2.1.0",
     "date-fns": "^3.6.0",
-    "graphql": "^16.12.0",
     "mapbox-gl": "^3.3.0",
     "next": "^14.2.0",
     "next-intl": "^4.8.2",
