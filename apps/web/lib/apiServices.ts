@@ -1,8 +1,8 @@
 import type {
-  SurfSpot,
+  SurfInfo,
+  SavedListItem,
   SearchFilters,
   User,
-  SavedSpot,
   Feedback,
   ApiResponse,
   PaginatedResponse,
@@ -247,7 +247,7 @@ export const authService = {
 
 // Surf Data Services
 export const surfService = {
-  async getSpots(filters?: SearchFilters): Promise<ApiResponse<PaginatedResponse<SurfSpot>>> {
+  async getSpots(filters?: SearchFilters): Promise<ApiResponse<PaginatedResponse<SurfInfo>>> {
     const params = new URLSearchParams();
 
     if (filters?.region) params.set('region', filters.region);
@@ -260,43 +260,43 @@ export const surfService = {
     const queryString = params.toString();
     const endpoint = queryString ? `/surf/spots?${queryString}` : '/surf/spots';
 
-    return apiRequest<PaginatedResponse<SurfSpot>>(endpoint);
+    return apiRequest<PaginatedResponse<SurfInfo>>(endpoint);
   },
 
-  async getSpotById(id: string): Promise<ApiResponse<SurfSpot>> {
-    return apiRequest<SurfSpot>(`/surf/spots/${id}`);
+  async getSpotById(id: string): Promise<ApiResponse<SurfInfo>> {
+    return apiRequest<SurfInfo>(`/surf/spots/${id}`);
   },
 
-  async searchSpots(query: string): Promise<ApiResponse<SurfSpot[]>> {
-    return apiRequest<SurfSpot[]>(`/surf/search?q=${encodeURIComponent(query)}`);
+  async searchSpots(query: string): Promise<ApiResponse<SurfInfo[]>> {
+    return apiRequest<SurfInfo[]>(`/surf/search?q=${encodeURIComponent(query)}`);
   },
 
-  async getRecommendations(userId: string): Promise<ApiResponse<SurfSpot[]>> {
-    return apiRequest<SurfSpot[]>(`/surf/recommendations?user_id=${userId}`);
+  async getRecommendations(userId: string): Promise<ApiResponse<SurfInfo[]>> {
+    return apiRequest<SurfInfo[]>(`/surf/recommendations?user_id=${userId}`);
   },
 };
 
 // Saved Spots Services
 export const savedService = {
-  async getSavedSpots(): Promise<ApiResponse<SavedSpot[]>> {
-    return apiRequest<SavedSpot[]>('/saved');
+  async getSavedListItems(): Promise<ApiResponse<SavedListItem[]>> {
+    return apiRequest<SavedListItem[]>('/saved');
   },
 
-  async saveSpot(spotId: string, notes?: string): Promise<ApiResponse<SavedSpot>> {
-    return apiRequest<SavedSpot>('/saved', {
+  async saveSpot(spotId: string, notes?: string): Promise<ApiResponse<SavedListItem>> {
+    return apiRequest<SavedListItem>('/saved', {
       method: 'POST',
       body: JSON.stringify({ spotId, notes }),
     });
   },
 
-  async removeSavedSpot(savedId: string): Promise<ApiResponse<void>> {
+  async removeSavedListItem(savedId: string): Promise<ApiResponse<void>> {
     return apiRequest<void>(`/saved/${savedId}`, {
       method: 'DELETE',
     });
   },
 
-  async updateSavedSpot(savedId: string, notes: string): Promise<ApiResponse<SavedSpot>> {
-    return apiRequest<SavedSpot>(`/saved/${savedId}`, {
+  async updateSavedListItem(savedId: string, notes: string): Promise<ApiResponse<SavedListItem>> {
+    return apiRequest<SavedListItem>(`/saved/${savedId}`, {
       method: 'PATCH',
       body: JSON.stringify({ notes }),
     });

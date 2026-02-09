@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { authService } from '@/lib/apiServices';
-import type { UserLevel } from '@/types';
+import type { SurferLevel } from '@/types';
 
 type Language = 'ko' | 'en';
 
@@ -152,7 +152,7 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   // Step 2 fields
-  const [userLevel, setUserLevel] = useState<UserLevel | ''>('');
+  const [userLevel, setSurferLevel] = useState<SurferLevel | ''>('');
   const [privacyConsent, setPrivacyConsent] = useState(false);
   const [showPrivacyPopup, setShowPrivacyPopup] = useState(false);
 
@@ -216,7 +216,7 @@ export default function RegisterPage() {
     }
   };
 
-  const levelOptions: UserLevel[] = ['beginner', 'intermediate', 'advanced'];
+  const levelOptions: SurferLevel[] = ['beginner', 'intermediate', 'advanced'];
 
   return (
     <main className="min-h-screen bg-sand-gradient flex items-center justify-center px-4 py-8">
@@ -333,7 +333,7 @@ export default function RegisterPage() {
                           name="userLevel"
                           value={level}
                           checked={isSelected}
-                          onChange={(e) => setUserLevel(e.target.value as UserLevel)}
+                          onChange={(e) => setSurferLevel(e.target.value as SurferLevel)}
                           className={`w-5 h-5 flex-shrink-0 accent-current ${config.textColor}`}
                         />
                         {/* Level icon */}

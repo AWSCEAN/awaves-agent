@@ -1,16 +1,18 @@
 # 프로젝트 진행 상황
 
 ## 현재 상태
-- **마일스톤**: M2 - 사용자 인증 완성
-- **상태**: ✅ 완료
-- **마지막 업데이트**: 2026-02-05 12:00
+- **마일스톤**: M3 - 지도 & 스팟 기능
+- **상태**: 🟡 진행중
+- **마지막 업데이트**: 2026-02-07
 
 ## 다음 작업
 1. [x] 사용자명 기반 회원가입 V2 구현 (t01_user-registration01)
 2. [x] 회원가입 UI/DB 개선 (t02_user-registration02)
 3. [x] 인증 기반 UI 동작 및 접근 제어 (t04_user-login02)
-4. [ ] 지도 페이지 Mapbox 통합 테스트
-5. [ ] 저장된 스팟 기능 구현
+4. [x] 지도 페이지 Mapbox 통합 (t06_map01)
+5. [x] 프론트엔드 DB 스키마 정렬 및 3-tier 지도 클릭 (t06_map03)
+6. [ ] 프론트엔드-백엔드 API 연동 완성
+7. [ ] 저장된 스팟 기능 백엔드 연동
 
 ## 블로커
 - 없음
@@ -38,6 +40,23 @@
 ---
 
 ### 2026-02-04
+#### 완료
+- 지도 페이지 Mapbox 통합 (Task: t06_map01)
+  - Frontend: 4개 신규 컴포넌트 생성 (EnhancedMapboxMap, DateSelector, WindParticles, ForecastPopup)
+  - Frontend: 3개 신규 서비스 생성 (mockAuth, openMeteoService, mockForecastData)
+  - Frontend: Mapbox GL JS 3.3.0 통합 (지도 표시, 지오코더, 컨트롤)
+  - Frontend: 저장된 스팟 기능 (localStorage, 하트 마커, 3개 기본 스팟)
+  - Frontend: 클릭 상호작용 (임의 위치 클릭 시 예보 표시)
+  - Frontend: 날짜 선택기 (10일 예보, Today/Tomorrow 라벨)
+  - Frontend: 바람 파티클 애니메이션 (Canvas 기반, 토글 가능)
+  - Frontend: 거리 측정 도구 (Turf.js 사용, 다중 포인트, km 단위)
+  - Frontend: Open-Meteo API 통합 (해양 예보, 날씨 예보)
+  - Frontend: Mock 인증 시스템 (testuser/testuser)
+  - Tests: Review Agent 통과 (0 critical issues)
+  - Tests: QA Agent 통과 (50/50 tests passed, 100% coverage)
+  - Docs: API 명세서, 아키텍처, 개발 가이드 업데이트
+  - Dependencies: mapbox-gl, mapbox-gl-geocoder, @turf/length, @turf/helpers 추가
+
 #### 완료
 - 회원가입 UI/DB 개선 (Task: t02_user-registration02)
   - Backend: `.env.local` 생성 (Neon PostgreSQL 연결)
@@ -95,7 +114,7 @@
 | # | 마일스톤 | 상태 | 완료일 |
 |---|---------|------|--------|
 | M1 | 프로젝트 초기 설정 | ✅ | 2024-02-04 |
-| M2 | 사용자 인증 완성 | 🟡 | - |
-| M3 | 지도 & 스팟 기능 | ⬜ | - |
+| M2 | 사용자 인증 완성 | ✅ | 2026-02-04 |
+| M3 | 지도 & 스팟 기능 | 🟡 | - |
 | M4 | 저장 & 피드백 기능 | ⬜ | - |
 | M5 | 배포 & 최적화 | ⬜ | - |
