@@ -11,7 +11,7 @@ export default function LogoOverlay() {
         position: 'fixed',
         top: '4px',
         left: 0,
-        zIndex: 41,
+        zIndex: 9999,
         display: 'flex',
         alignItems: 'center',
         gap: '6px',

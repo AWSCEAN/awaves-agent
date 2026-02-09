@@ -52,8 +52,6 @@ class Settings(BaseSettings):
     # DynamoDB
     dynamodb_surf_data_table: str = "awaves-surf-data"
     dynamodb_saved_spots_table: str = "awaves-saved-spots"
-    dynamodb_saved_list_table: str = "saved_list"
-    ddb_endpoint_url: str = ""  # Local DynamoDB endpoint (e.g., http://localhost:8000)
 
     # JWT
     jwt_secret_key: str = "your-super-secret-jwt-key-change-in-production"
