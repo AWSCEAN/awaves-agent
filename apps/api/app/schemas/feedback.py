@@ -6,22 +6,28 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
-class FeedbackRequest(BaseModel):
-    """Feedback submission request."""
+FeedbackStatus = Literal["POSITIVE", "NEGATIVE", "DEFERRED"]
 
-    spot_id: Optional[str] = None
-    type: Literal["bug", "feature", "data_correction", "general"]
-    message: str = Field(..., min_length=10, max_length=2000)
+
+class FeedbackRequest(BaseModel):
+    """Request to submit feedback for a saved item."""
+
+    location_id: str = Field(..., description="Location ID of the saved item")
+    surf_timestamp: str = Field(..., description="Surf timestamp of the saved item")
+    feedback_status: FeedbackStatus = Field(
+        ..., description="POSITIVE (good), NEGATIVE (not good), or DEFERRED (later)"
+    )
 
 
 class FeedbackResponse(BaseModel):
-    """Feedback response schema."""
+    """Response for feedback."""
 
-    id: str
-    user_id: str
-    spot_id: Optional[str] = None
-    type: Literal["bug", "feature", "data_correction", "general"]
-    message: str
+    id: int
+    user_id: int
+    location_id: str
+    surf_timestamp: str
+    feedback_result: Optional[bool] = None  # True = good, False = not good, None = deferred
+    feedback_status: FeedbackStatus
     created_at: datetime
 
     class Config:

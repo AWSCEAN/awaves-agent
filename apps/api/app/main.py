@@ -9,6 +9,7 @@ from app.config import settings
 from app.db.session import close_db, init_db
 from app.routers import auth, feedback, register, saved, surf
 from app.services.cache import CacheService
+from app.graphql.schema import graphql_app
 
 
 @asynccontextmanager
@@ -40,12 +41,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
+# Include REST routers
 app.include_router(register.router, tags=["Registration"])  # /register at root level
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(surf.router, prefix="/surf", tags=["Surf Data"])
 app.include_router(saved.router, prefix="/saved", tags=["Saved Spots"])
 app.include_router(feedback.router, prefix="/feedback", tags=["Feedback"])
+
+# Include GraphQL router
+app.include_router(graphql_app, prefix="/graphql", tags=["GraphQL"])
 
 
 @app.get("/")

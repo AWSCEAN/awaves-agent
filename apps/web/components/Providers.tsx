@@ -1,5 +1,7 @@
 'use client';
 
+import { ApolloProvider } from '@apollo/client/react';
+import { apolloClient } from '@/lib/apollo';
 import { AuthProvider } from '@/contexts/AuthContext';
 
 interface ProvidersProps {
@@ -7,5 +9,9 @@ interface ProvidersProps {
 }
 
 export default function Providers({ children }: ProvidersProps) {
-  return <AuthProvider>{children}</AuthProvider>;
+  return (
+    <ApolloProvider client={apolloClient}>
+      <AuthProvider>{children}</AuthProvider>
+    </ApolloProvider>
+  );
 }

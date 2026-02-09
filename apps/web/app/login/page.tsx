@@ -4,8 +4,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { authService } from '@/lib/apiServices';
-import AwavesLogo from '@/components/AwavesLogo';
 import { useAuth } from '@/contexts/AuthContext';
 
 type Language = 'ko' | 'en';
