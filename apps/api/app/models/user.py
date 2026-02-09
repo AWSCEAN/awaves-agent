@@ -26,7 +26,3 @@ class User(Base):
 
     def __repr__(self) -> str:
         return f"<User {self.username}>"
-
-
-# Alias for backward compatibility
-UserV2 = User
