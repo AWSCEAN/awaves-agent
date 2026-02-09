@@ -90,8 +90,11 @@ interface SubmitFeedbackResult {
 }
 
 export function useSavedItems() {
+  const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
+
   const { data, loading, error, refetch } = useQuery<SavedItemsResult>(GET_SAVED_ITEMS, {
     fetchPolicy: 'cache-and-network',
+    skip: !hasToken,
   });
 
   const [saveItemMutation] = useMutation<SaveItemResult>(SAVE_ITEM_MUTATION, {

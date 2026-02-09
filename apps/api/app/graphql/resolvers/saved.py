@@ -30,8 +30,8 @@ async def get_saved_items(info: Info[GraphQLContext, None]) -> SavedListResult:
     else:
         # Fallback to DynamoDB
         db_items = await DynamoDBService.get_saved_list(user_id)
-        if db_items:
-            await CacheService.store_saved_items(user_id, db_items)
+        # Cache even empty lists to avoid repeated DynamoDB hits
+        await CacheService.store_saved_items(user_id, db_items)
 
     # Get feedback status using DataLoader (batched query)
     feedback_map = await info.context.feedback_loader.load_feedback_map(

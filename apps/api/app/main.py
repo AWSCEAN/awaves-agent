@@ -8,15 +8,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.db.session import close_db, init_db
 from app.routers import auth, feedback, register, saved, surf
-from app.services.cache import CacheService
 from app.graphql.schema import graphql_app
+from app.services.cache import CacheService
+from app.services.dynamodb import DynamoDBService
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager for startup and shutdown."""
-    # Startup: Initialize database tables
+    # Startup: Initialize database tables and DynamoDB
     await init_db()
+    await DynamoDBService.create_table_if_not_exists()
     yield
     # Shutdown: Close database and cache connections
     await close_db()
@@ -41,14 +43,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include REST routers
+# Include routers
 app.include_router(register.router, tags=["Registration"])  # /register at root level
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(surf.router, prefix="/surf", tags=["Surf Data"])
 app.include_router(saved.router, prefix="/saved", tags=["Saved Spots"])
 app.include_router(feedback.router, prefix="/feedback", tags=["Feedback"])
-
-# Include GraphQL router
 app.include_router(graphql_app, prefix="/graphql", tags=["GraphQL"])
 
 

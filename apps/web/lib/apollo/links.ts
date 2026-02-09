@@ -27,7 +27,6 @@ export const authLink = new ApolloLink((operation, forward) => {
 export const errorLink = new ErrorLink(({ error }) => {
   console.error(`[GraphQL/Network error]: ${error.message}`);
 
-  // Handle authentication errors
   if (error.message === 'Not authenticated') {
     console.warn('Authentication required');
   }

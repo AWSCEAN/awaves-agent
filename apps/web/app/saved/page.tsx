@@ -69,6 +69,10 @@ export default function SavedPage() {
     setFeedbackMap(initialFeedbackMap);
   }, [savedItems]);
 
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
   const handleRemove = async (item: SavedItemResponse) => {
     const success = await deleteItem(item.location_surf_key);
     if (!success) {

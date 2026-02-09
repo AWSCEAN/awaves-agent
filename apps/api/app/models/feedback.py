@@ -10,7 +10,7 @@ from app.db.session import Base
 
 
 class Feedback(Base):
-    """Feedback model for saved item experience (good/bad/deferred)."""
+    """Feedback model for Aurora PostgreSQL (refactored schema)."""
 
     __tablename__ = "feedback"
 
@@ -18,12 +18,8 @@ class Feedback(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     location_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     surf_timestamp: Mapped[str] = mapped_column(String(50), nullable=False)
-
-    # feedback_result: True = good, False = not good, None = deferred
     feedback_result: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
-    # feedback_status: POSITIVE, NEGATIVE, DEFERRED
     feedback_status: Mapped[str] = mapped_column(String(20), nullable=False)
-
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
     )

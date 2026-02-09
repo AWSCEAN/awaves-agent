@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import LogoOverlay from '@/components/LogoOverlay';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
-import type { UserLevel } from '@/types';
+import type { SurferLevel } from '@/types';
 
 type Language = 'ko' | 'en';
 
@@ -94,7 +94,7 @@ export default function MyPage() {
   const router = useRouter();
   const { user: authUser, logout } = useAuth();
   const [lang, setLang] = useState<Language>('en');
-  const [userLevel, setUserLevel] = useState<UserLevel>('beginner');
+  const [userLevel, setSurferLevel] = useState<SurferLevel>('beginner');
   const t = translations[lang];
 
   const handleSaveProfile = () => {
@@ -107,7 +107,7 @@ export default function MyPage() {
     router.push('/');
   };
 
-  const levelOptions: UserLevel[] = ['beginner', 'intermediate', 'advanced'];
+  const levelOptions: SurferLevel[] = ['beginner', 'intermediate', 'advanced'];
 
   return (
     <ProtectedRoute>
@@ -183,7 +183,7 @@ export default function MyPage() {
                     <button
                       key={level}
                       type="button"
-                      onClick={() => setUserLevel(level)}
+                      onClick={() => setSurferLevel(level)}
                       className={`flex-1 py-3 px-2 flex flex-col items-center gap-1 transition-all ${
                         index > 0 ? 'border-l border-gray-200' : ''
                       } ${
