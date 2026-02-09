@@ -14,12 +14,13 @@ import type { SearchResult } from '@/components/SearchResultsList';
 import SpotDetailPanel from '@/components/SpotDetailPanel';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import LocaleProvider, { useLocale as useAppLocale } from '@/components/LocaleProvider';
-import type { SurfInfo, SavedListItem, SurferLevel } from '@/types';
+import type { SurfInfo, SavedListItem, SurferLevel, SurfingLevel, SurfGrade } from '@/types';
 import type { OverlayMode, SpotSelectionData } from '@/components/EnhancedMapboxMap';
-import { searchSpotsWithFilters, availableTimeSlots, getNearbySpots, DEMO_USER_LOCATION } from '@/lib/data';
-import { getSavedList, addToSavedList, removeFromSavedList } from '@/lib/services/savedListService';
-import { getUserId } from '@/lib/services/userService';
-import { getBestSurfInfoForDate } from '@/lib/services/surfInfoService';
+import { TIME_SLOTS } from '@/lib/services/surfInfoService';
+import { surfService } from '@/lib/apiServices';
+import { useSavedItems } from '@/hooks/useSavedItems';
+
+const DEMO_USER_LOCATION = { lat: 37.5665, lng: 126.9780 };
 
 const EnhancedMapboxMap = dynamic(
   () => import('@/components/EnhancedMapboxMap'),
@@ -58,7 +59,6 @@ function MapPageContent() {
 
   // Map state
   const [showWindParticles, setShowWindParticles] = useState(false);
-  const [savedSpots, setSavedSpots] = useState<SavedListItem[]>([]);
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('none');
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
 
@@ -68,12 +68,37 @@ function MapPageContent() {
   // Quick date selector state
   const [showQuickDateSelect, setShowQuickDateSelect] = useState(true);
 
-  const userId = getUserId();
+  // Saved items from GraphQL (BE DynamoDB)
+  const { items: savedItems, saveItem, deleteItem, refetch } = useSavedItems();
 
-  // Load saved spots
   useEffect(() => {
-    setSavedSpots(getSavedList(userId));
-  }, [userId]);
+    refetch();
+  }, [refetch]);
+
+  // Transform SavedItemResponse (snake_case) → SavedListItem (camelCase) for EnhancedMapboxMap
+  const savedSpots: SavedListItem[] = useMemo(() =>
+    savedItems.map(item => ({
+      userId: item.user_id,
+      locationSurfKey: item.location_surf_key,
+      locationId: item.location_id,
+      surfTimestamp: item.surf_timestamp,
+      savedAt: item.saved_at,
+      address: item.address || '',
+      region: item.region || '',
+      country: item.country || '',
+      departureDate: item.departure_date || '',
+      waveHeight: item.wave_height || 0,
+      wavePeriod: item.wave_period || 0,
+      windSpeed: item.wind_speed || 0,
+      waterTemperature: item.water_temperature || 0,
+      surfingLevel: (item.surfer_level || 'BEGINNER') as SurfingLevel,
+      surfScore: item.surf_score,
+      surfGrade: (item.surf_grade || 'D') as SurfGrade,
+      name: item.location_id,
+      nameKo: undefined,
+    })),
+    [savedItems]
+  );
 
   // Center map from query params (e.g. /map?lat=38.0765&lng=128.6234)
   useEffect(() => {
@@ -111,26 +136,38 @@ function MapPageContent() {
     setOverlayMode((prev) => (prev === mode ? 'none' : mode));
   };
 
-  const handleSearch = useCallback(() => {
+  const fetchSpots = useCallback(async (query?: string) => {
+    try {
+      if (query) {
+        const response = await surfService.searchSpots(query);
+        if (response.success && response.data) {
+          setSearchResults(response.data as SearchResult[]);
+        }
+      } else {
+        const response = await surfService.getSpots({
+          minWaveHeight: undefined,
+          maxWaveHeight: undefined,
+        });
+        if (response.success && response.data) {
+          setSearchResults(response.data.items as SearchResult[]);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch spots:', err);
+    }
+  }, []);
+
+  const handleSearch = useCallback(async () => {
     if (!locationPermissionAsked && !userLocation) {
       setShowLocationPrompt(true);
       setLocationPermissionAsked(true);
     }
 
-    const results = searchSpotsWithFilters({
-      location: locationQuery || undefined,
-      date: format(selectedDate, 'yyyy-MM-dd'),
-      time: selectedTime || undefined,
-      surferLevel: surferLevel || undefined,
-      userLat: userLocation?.lat,
-      userLng: userLocation?.lng,
-    });
-
-    setSearchResults(results);
+    await fetchSpots(locationQuery || undefined);
     setShowResults(true);
     setHasSearched(true);
     setSelectedSpotDetail(null);
-  }, [locationQuery, selectedDate, selectedTime, surferLevel, userLocation, locationPermissionAsked]);
+  }, [locationQuery, userLocation, locationPermissionAsked, fetchSpots]);
 
   const handleAllowLocation = () => {
     if ('geolocation' in navigator) {
@@ -141,15 +178,7 @@ function MapPageContent() {
             lng: position.coords.longitude,
           });
           setShowLocationPrompt(false);
-          const results = searchSpotsWithFilters({
-            location: locationQuery || undefined,
-            date: format(selectedDate, 'yyyy-MM-dd'),
-            time: selectedTime || undefined,
-            surferLevel: surferLevel || undefined,
-            userLat: position.coords.latitude,
-            userLng: position.coords.longitude,
-          });
-          setSearchResults(results);
+          fetchSpots(locationQuery || undefined);
         },
         () => {
           setShowLocationPrompt(false);
@@ -160,22 +189,34 @@ function MapPageContent() {
     }
   };
 
-  const handleSaveSpot = (surfInfo: SurfInfo) => {
-    const item = addToSavedList(userId, surfInfo);
-    setSavedSpots((prev) => [...prev, item]);
+  const handleSaveSpot = async (surfInfo: SurfInfo) => {
+    await saveItem({
+      locationId: surfInfo.LocationId,
+      surfTimestamp: surfInfo.SurfTimestamp,
+      surferLevel: surfInfo.derivedMetrics.surfingLevel,
+      surfScore: surfInfo.derivedMetrics.surfScore,
+      surfGrade: surfInfo.derivedMetrics.surfGrade,
+      address: surfInfo.address,
+      region: surfInfo.region,
+      country: surfInfo.country,
+      waveHeight: surfInfo.conditions.waveHeight,
+      wavePeriod: surfInfo.conditions.wavePeriod,
+      windSpeed: surfInfo.conditions.windSpeed,
+      waterTemperature: surfInfo.conditions.waterTemperature,
+    });
   };
 
-  const handleRemoveSpot = (locationId: string) => {
-    removeFromSavedList(userId, locationId);
-    setSavedSpots((prev) => prev.filter((s) => s.locationId !== locationId));
+  const handleRemoveSpot = async (locationId: string) => {
+    const saved = savedSpots.find((s) => s.locationId === locationId);
+    if (saved) {
+      await deleteItem(saved.locationSurfKey);
+    }
   };
 
   const handleSpotClick = (spot: SearchResult) => {
     setMapCenter({ lat: spot.geo.lat, lng: spot.geo.lng });
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    const surfInfo = getBestSurfInfoForDate(spot, dateStr);
     setSelectedSpotDetail({
-      surfInfo,
+      surfInfo: spot,
       coordinates: { latitude: spot.geo.lat, longitude: spot.geo.lng },
     });
   };
@@ -187,22 +228,23 @@ function MapPageContent() {
   // Get effective user location (real or demo)
   const effectiveUserLocation = userLocation || DEMO_USER_LOCATION;
 
-  const handleSuggestByDistance = useCallback(() => {
-    const nearbySpots = getNearbySpots(
-      effectiveUserLocation.lat,
-      effectiveUserLocation.lng,
-      25,
-      {
-        date: format(selectedDate, 'yyyy-MM-dd'),
-        time: selectedTime || undefined,
+  const handleSuggestByDistance = useCallback(async () => {
+    try {
+      const response = await surfService.getNearbySpots(
+        effectiveUserLocation.lat,
+        effectiveUserLocation.lng,
+        25,
+      );
+      if (response.success && response.data) {
+        setSearchResults(response.data as SearchResult[]);
       }
-    );
-
-    setSearchResults(nearbySpots);
+    } catch (err) {
+      console.error('Failed to fetch nearby spots:', err);
+    }
     setShowResults(true);
     setHasSearched(true);
     setSelectedSpotDetail(null);
-  }, [effectiveUserLocation, selectedDate, selectedTime]);
+  }, [effectiveUserLocation]);
 
   const toggleLocale = () => {
     setLocale(locale === 'ko' ? 'en' : 'ko');
@@ -263,7 +305,7 @@ function MapPageContent() {
                 bg-white text-ocean-800 w-28"
             >
               <option value="">{tSearch('allTimes')}</option>
-              {availableTimeSlots.map((time) => (
+              {TIME_SLOTS.map((time) => (
                 <option key={time} value={time}>
                   {time}
                 </option>

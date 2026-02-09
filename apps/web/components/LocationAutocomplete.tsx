@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
-import { getUniqueLocations } from '@/lib/data';
+import { surfService } from '@/lib/apiServices';
 
 interface LocationOption {
   id: string;
@@ -30,11 +30,36 @@ export default function LocationAutocomplete({
   const locale = useLocale();
   const [isOpen, setIsOpen] = useState(false);
   const [options, setOptions] = useState<LocationOption[]>([]);
+  const [allLocations, setAllLocations] = useState<LocationOption[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Get all unique locations for autocomplete - memoize to avoid new reference each render
-  const allLocations = useMemo(() => getUniqueLocations(), []);
+  // Fetch all spots from BE on mount to build autocomplete options
+  useEffect(() => {
+    let cancelled = false;
+    surfService.getSpots().then((response) => {
+      if (cancelled || !response.success || !response.data) return;
+      const spots = response.data.items;
+      const locations: LocationOption[] = [];
+      const regionSet = new Set<string>();
+      const countrySet = new Set<string>();
+
+      spots.forEach((spot) => {
+        locations.push({ id: spot.LocationId, name: spot.name, type: 'spot' });
+        if (spot.region && !regionSet.has(spot.region)) {
+          regionSet.add(spot.region);
+          locations.push({ id: `region-${spot.region}`, name: spot.region, type: 'region' });
+        }
+        if (spot.country && !countrySet.has(spot.country)) {
+          countrySet.add(spot.country);
+          locations.push({ id: `country-${spot.country}`, name: spot.country, type: 'country' });
+        }
+      });
+
+      setAllLocations(locations);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (value.length < 1) {

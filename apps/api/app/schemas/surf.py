@@ -54,6 +54,63 @@ class PaginatedSpotsResponse(BaseModel):
     has_more: bool
 
 
+class GeoResponse(BaseModel):
+    lat: float
+    lng: float
+
+
+class ConditionsResponse(BaseModel):
+    waveHeight: float = 0
+    wavePeriod: float = 0
+    windSpeed: float = 0
+    waterTemperature: float = 0
+
+
+class DerivedMetricsResponse(BaseModel):
+    surfScore: float = 0
+    surfGrade: str = "D"
+    surfingLevel: str = "BEGINNER"
+
+
+class MetadataResponse(BaseModel):
+    modelVersion: str = ""
+    dataSource: str = ""
+    predictionType: str = "FORECAST"
+    createdAt: str = ""
+
+
+class SurfInfoResponse(BaseModel):
+    """SurfInfo response matching FE SurfInfo type."""
+
+    LocationId: str
+    SurfTimestamp: str
+    geo: GeoResponse
+    conditions: ConditionsResponse
+    derivedMetrics: DerivedMetricsResponse
+    metadata: MetadataResponse
+    name: str = ""
+    nameKo: Optional[str] = None
+    region: str = ""
+    country: str = ""
+    address: Optional[str] = None
+    difficulty: str = "intermediate"
+    waveType: str = "Beach Break"
+    bestSeason: list[str] = []
+    description: Optional[str] = None
+    descriptionKo: Optional[str] = None
+    distance: Optional[float] = None
+
+
+class PaginatedSurfInfoResponse(BaseModel):
+    """Paginated SurfInfo response."""
+
+    items: list[SurfInfoResponse]
+    total: int
+    page: int
+    page_size: int
+    has_more: bool
+
+
 class SavedSpotRequest(BaseModel):
     """Request to save a spot."""
 

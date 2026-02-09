@@ -9,9 +9,7 @@ import { format } from 'date-fns';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css';
 import type { SurfInfo, SavedListItem } from '@/types';
-import { getBestSurfInfoForDate } from '@/lib/services/surfInfoService';
 import { getCachedForecast, setCachedForecast, surfInfoToCache } from '@/lib/coordinateCache';
-import { mockSpots, calculateDistance } from '@/lib/data';
 
 export interface SpotSelectionData {
   surfInfo: SurfInfo;
@@ -183,16 +181,17 @@ export default function EnhancedMapboxMap({
     });
 
     savedSpots.forEach((savedSpot) => {
+      if (!savedSpot.locationId || !savedSpot.locationId.includes('#')) return;
       const [latStr, lngStr] = savedSpot.locationId.split('#');
       const lat = Number(latStr);
       const lng = Number(lngStr);
+      if (isNaN(lat) || isNaN(lng)) return;
 
       const el = createMarkerElement(
         '\u2764\uFE0F',
         '#e74c3c',
         () => {
-          const matchingSpot = spots.find(s => s.LocationId === savedSpot.locationId)
-            || mockSpots.find(s => s.LocationId === savedSpot.locationId);
+          const matchingSpot = spots.find(s => s.LocationId === savedSpot.locationId);
           if (matchingSpot) {
             showSurfInfoAtCoords(lng, lat, matchingSpot, selectedDateRef.current);
           }
@@ -263,7 +262,7 @@ export default function EnhancedMapboxMap({
 
       if (overlayMode === 'none') return;
 
-      const overlaySpots = spots.length > 0 ? spots : mockSpots;
+      const overlaySpots = spots;
       const features = overlaySpots.map((spot) => {
         const score = spot.derivedMetrics.surfScore;
         const color = getSurfScoreColor(score);
@@ -502,14 +501,11 @@ export default function EnhancedMapboxMap({
       return;
     }
 
-    // Generate fresh data via surfInfoService
-    const surfInfo = getBestSurfInfoForDate(spot, dateStr);
-
-    // Cache it
-    setCachedForecast(lat, lng, dateStr, surfInfoToCache(surfInfo));
+    // Use spot data directly (already has forecast from BE)
+    setCachedForecast(lat, lng, dateStr, surfInfoToCache(spot));
 
     onSpotSelect({
-      surfInfo,
+      surfInfo: spot,
       coordinates: { latitude: lat, longitude: lng },
     });
   };
@@ -532,7 +528,7 @@ export default function EnhancedMapboxMap({
 
     // 1. Check if clicked coordinate matches an existing spot (exact LocationId match)
     const clickedLocationId = `${lngLat.lat.toFixed(4)}#${lngLat.lng.toFixed(4)}`;
-    const exactMatch = mockSpots.find(s => s.LocationId === clickedLocationId);
+    const exactMatch = spots.find(s => s.LocationId === clickedLocationId);
 
     if (exactMatch) {
       showSurfInfoAtCoords(lngLat.lng, lngLat.lat, exactMatch, currentSelectedDate);
@@ -542,8 +538,14 @@ export default function EnhancedMapboxMap({
     // 2. Find the best spot within 200km (highest surfScore, alphabetical tiebreaker)
     let bestNearby: { spot: SurfInfo; distance: number } | null = null;
 
-    for (const spot of mockSpots) {
-      const distance = calculateDistance(lngLat.lat, lngLat.lng, spot.geo.lat, spot.geo.lng);
+    for (const spot of spots) {
+      const R = 6371;
+      const dLat = (spot.geo.lat - lngLat.lat) * Math.PI / 180;
+      const dLng = (spot.geo.lng - lngLat.lng) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(lngLat.lat * Math.PI / 180) * Math.cos(spot.geo.lat * Math.PI / 180) *
+        Math.sin(dLng / 2) ** 2;
+      const distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       if (distance > 200) continue;
 
       if (
