@@ -225,6 +225,13 @@ export const authService = {
     return apiRequest<CommonApiResponse<UserV2>>('/auth/me');
   },
 
+  async updateUserLevel(userLevel: string): Promise<ApiResponse<CommonApiResponse<UserV2>>> {
+    return apiRequest<CommonApiResponse<UserV2>>('/auth/me/level', {
+      method: 'PATCH',
+      body: JSON.stringify({ user_level: userLevel }),
+    });
+  },
+
   async refreshToken(): Promise<ApiResponse<AuthTokens>> {
     const refreshed = await synchronizedTokenRefresh();
     if (refreshed) {
@@ -277,6 +284,10 @@ export const surfService = {
 
   async getNearbySpots(lat: number, lng: number, limit: number = 25): Promise<ApiResponse<SurfInfo[]>> {
     return apiRequest<SurfInfo[]>(`/surf/nearby?lat=${lat}&lng=${lng}&limit=${limit}`);
+  },
+
+  async getAllSpots(): Promise<ApiResponse<SurfInfo[]>> {
+    return apiRequest<SurfInfo[]>('/surf/spots/all');
   },
 };
 

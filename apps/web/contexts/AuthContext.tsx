@@ -17,6 +17,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // Start with server-safe defaults to avoid hydration mismatch.
   const [user, setUser] = useState<UserV2 | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -42,6 +43,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // If a token exists, assume authenticated immediately so protected pages
+    // render without waiting for the network call. refreshAuth will verify
+    // and correct in the background.
+    if (authService.isLoggedIn()) {
+      setUser({} as UserV2);
+      setIsLoading(false);
+    }
     refreshAuth();
   }, [refreshAuth]);
 

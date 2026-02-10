@@ -108,3 +108,9 @@ class LoginV2Response(BaseModel):
     token_type: str = "bearer"
     expires_in: int  # seconds
     user: UserV2Response
+
+
+class UpdateUserLevelRequest(BaseModel):
+    """Request to update user's surfing level."""
+
+    user_level: Literal["beginner", "intermediate", "advanced"]

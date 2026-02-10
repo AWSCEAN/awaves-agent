@@ -19,6 +19,7 @@ import type { OverlayMode, SpotSelectionData } from '@/components/EnhancedMapbox
 import { TIME_SLOTS } from '@/lib/services/surfInfoService';
 import { surfService } from '@/lib/apiServices';
 import { useSavedItems } from '@/hooks/useSavedItems';
+import SurfLoadingScreen from '@/components/SurfLoadingScreen';
 
 const DEMO_USER_LOCATION = { lat: 37.5665, lng: 126.9780 };
 
@@ -40,17 +41,22 @@ function MapPageContent() {
   const tSearch = useTranslations('search');
   const searchParams = useSearchParams();
 
-  // Search state
+  // Search state - input values (what user is selecting)
   const [locationQuery, setLocationQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [surferLevel, setSurferLevel] = useState<SurferLevel | ''>('');
+
+  // Search state - active values (what was last searched, only update on search button click)
+  const [searchDate, setSearchDate] = useState<Date>(new Date());
+  const [searchTime, setSearchTime] = useState<string>('');
 
   // User location state
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [showLocationPrompt, setShowLocationPrompt] = useState(true);
 
   // Results state
+  const [allSpots, setAllSpots] = useState<SurfInfo[]>([]);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [visibleSpots, setVisibleSpots] = useState<SearchResult[]>([]);
   const [showResults, setShowResults] = useState(false);
@@ -73,6 +79,21 @@ function MapPageContent() {
   useEffect(() => {
     refetch();
   }, [refetch]);
+
+  // Fetch all spots on mount for default map markers
+  useEffect(() => {
+    const loadAllSpots = async () => {
+      try {
+        const response = await surfService.getAllSpots();
+        if (response.success && response.data) {
+          setAllSpots(response.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch all spots:', err);
+      }
+    };
+    loadAllSpots();
+  }, []);
 
   // Transform SavedItemResponse (snake_case) → SavedListItem (camelCase) for EnhancedMapboxMap
   const savedSpots: SavedListItem[] = useMemo(() =>
@@ -100,6 +121,7 @@ function MapPageContent() {
   );
 
   // Center map from query params (e.g. /map?lat=38.0765&lng=128.6234)
+  // If navigating from saved list, also open the detail panel
   useEffect(() => {
     const lat = searchParams.get('lat');
     const lng = searchParams.get('lng');
@@ -108,9 +130,44 @@ function MapPageContent() {
       const lngNum = Number(lng);
       if (!isNaN(latNum) && !isNaN(lngNum)) {
         setMapCenter({ lat: latNum, lng: lngNum });
+
+        // Find matching saved spot to open detail panel
+        const locationId = `${lat}#${lng}`;
+        const matchingSaved = savedSpots.find(s => s.locationId === locationId);
+        if (matchingSaved) {
+          const surfInfo: SurfInfo = {
+            LocationId: matchingSaved.locationId,
+            SurfTimestamp: matchingSaved.surfTimestamp,
+            geo: { lat: latNum, lng: lngNum },
+            conditions: {
+              waveHeight: matchingSaved.waveHeight,
+              wavePeriod: matchingSaved.wavePeriod,
+              windSpeed: matchingSaved.windSpeed,
+              waterTemperature: matchingSaved.waterTemperature,
+            },
+            derivedMetrics: {
+              surfScore: matchingSaved.surfScore,
+              surfGrade: matchingSaved.surfGrade,
+              surfingLevel: (matchingSaved.surfingLevel || 'BEGINNER') as SurfingLevel,
+            },
+            metadata: { modelVersion: '', dataSource: '', predictionType: 'FORECAST', createdAt: '' },
+            name: matchingSaved.name || matchingSaved.locationId,
+            nameKo: matchingSaved.nameKo,
+            region: matchingSaved.region,
+            country: matchingSaved.country,
+            address: matchingSaved.address,
+            difficulty: 'beginner',
+            waveType: '',
+            bestSeason: [],
+          };
+          setSelectedSpotDetail({
+            surfInfo,
+            coordinates: { latitude: latNum, longitude: lngNum },
+          });
+        }
       }
     }
-  }, [searchParams]);
+  }, [searchParams, savedSpots]);
 
   // Generate date options (10 days)
   const dateOptions = useMemo(() =>
@@ -157,11 +214,15 @@ function MapPageContent() {
   }, []);
 
   const handleSearch = useCallback(async () => {
-    await fetchSpots(locationQuery || undefined);
+    setVisibleSpots([]);
     setShowResults(true);
     setHasSearched(true);
     setSelectedSpotDetail(null);
-  }, [locationQuery, fetchSpots]);
+    // Update active search criteria only when search button is clicked
+    setSearchDate(selectedDate);
+    setSearchTime(selectedTime);
+    await fetchSpots(locationQuery || undefined);
+  }, [locationQuery, selectedDate, selectedTime, fetchSpots]);
 
   const handleAllowLocation = () => {
     if ('geolocation' in navigator) {
@@ -184,6 +245,13 @@ function MapPageContent() {
   };
 
   const handleSaveSpot = async (surfInfo: SurfInfo) => {
+    // Fly to the spot and open detail panel (same as clicking the spot)
+    setMapCenter({ lat: surfInfo.geo.lat, lng: surfInfo.geo.lng });
+    setSelectedSpotDetail({
+      surfInfo,
+      coordinates: { latitude: surfInfo.geo.lat, longitude: surfInfo.geo.lng },
+    });
+
     await saveItem({
       locationId: surfInfo.LocationId,
       surfTimestamp: surfInfo.SurfTimestamp,
@@ -238,7 +306,10 @@ function MapPageContent() {
     setShowResults(true);
     setHasSearched(true);
     setSelectedSpotDetail(null);
-  }, [effectiveUserLocation]);
+    // Update active search criteria
+    setSearchDate(selectedDate);
+    setSearchTime(selectedTime);
+  }, [effectiveUserLocation, selectedDate, selectedTime]);
 
   const toggleLocale = () => {
     setLocale(locale === 'ko' ? 'en' : 'ko');
@@ -250,8 +321,8 @@ function MapPageContent() {
     [savedSpots]
   );
 
-  // Map shows only visible page spots after search, nothing before search (saved markers handled separately)
-  const displaySpots = (hasSearched && showResults) ? visibleSpots : [];
+  // Show search results when searching, otherwise show all spots
+  const displaySpots = (hasSearched && showResults) ? visibleSpots : allSpots;
 
   return (
     <ProtectedRoute>
@@ -262,8 +333,8 @@ function MapPageContent() {
           {/* Logo */}
           <LogoOverlay />
 
-          {/* Search Inputs */}
-          <div className="flex-1 flex items-center gap-2 flex-wrap">
+          {/* Search Inputs - ml-48 to avoid LogoOverlay overlap */}
+          <div className="flex-1 flex items-center gap-2 flex-wrap ml-48">
             {/* Location */}
             <LocationAutocomplete
               value={locationQuery}
@@ -353,31 +424,51 @@ function MapPageContent() {
               </svg>
               {locale === 'ko' ? '주변' : 'Nearby'}
             </button>
+
+            {/* Surf Score Toggle */}
+            <button
+              onClick={() => handleOverlayToggle('surf')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-1 ${
+                overlayMode === 'surf' ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-sand-200 text-ocean-700 hover:bg-sand-300'
+              }`}
+              title={t('surfScore')}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              {t('surfScore')}
+            </button>
+
+            {/* Wind Particles Toggle */}
+            <button
+              onClick={() => setShowWindParticles(!showWindParticles)}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-1 ${
+                showWindParticles ? 'bg-ocean-500 text-white hover:bg-ocean-600' : 'bg-sand-200 text-ocean-700 hover:bg-sand-300'
+              }`}
+              title={t('windParticles')}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5c1.104 0 2 .896 2 2s-.896 2-2 2H3M17 11c1.104 0 2 .896 2 2s-.896 2-2 2H3M9 17c1.104 0 2 .896 2 2s-.896 2-2 2H3" />
+              </svg>
+              {t('windParticles')}
+            </button>
           </div>
 
           {/* Right side controls */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            {/* Toggle Buttons */}
+            {/* Language Toggle (icon + label) */}
             <button
-              onClick={() => setShowWindParticles(!showWindParticles)}
-              className={`px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                showWindParticles ? 'bg-ocean-500 text-white' : 'bg-sand-100 text-ocean-700 hover:bg-sand-200'
-              }`}
-              title={t('windParticles')}
+              onClick={toggleLocale}
+              className="flex items-center gap-1 px-2 py-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
+              title={locale === 'ko' ? 'English' : '한국어'}
             >
-              {t('windParticles')}
-            </button>
-            <button
-              onClick={() => handleOverlayToggle('surf')}
-              className={`px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                overlayMode === 'surf' ? 'bg-green-500 text-white' : 'bg-sand-100 text-ocean-700 hover:bg-sand-200'
-              }`}
-              title={t('surfScore')}
-            >
-              {t('surfScore')}
+              <svg className="w-4 h-4 text-ocean-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+              </svg>
+              <span className="text-xs font-semibold text-ocean-700">{locale === 'ko' ? 'KO' : 'EN'}</span>
             </button>
 
-            {/* Saved Link */}
+            {/* Saved Spots Link */}
             <Link
               href="/saved"
               className="text-sm font-medium text-ocean-700 hover:text-ocean-500"
@@ -385,7 +476,15 @@ function MapPageContent() {
               {t('saved')}
             </Link>
 
-            {/* Profile Icon */}
+            {/* Map Link */}
+            <Link
+              href="/map"
+              className="text-sm font-medium text-ocean-700 hover:text-ocean-500"
+            >
+              {t('map')}
+            </Link>
+
+            {/* My Page Icon */}
             <Link
               href="/mypage"
               className="p-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
@@ -400,17 +499,6 @@ function MapPageContent() {
                 />
               </svg>
             </Link>
-
-            {/* Language Toggle */}
-            <button
-              onClick={toggleLocale}
-              className="flex items-center gap-1 text-sm font-medium text-ocean-700 hover:text-ocean-500"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-              </svg>
-              {locale === 'ko' ? 'KO' : 'EN'}
-            </button>
           </div>
         </div>
       </header>
@@ -466,8 +554,8 @@ function MapPageContent() {
           onSaveSpot={handleSaveSpot}
           onRemoveSpot={handleRemoveSpot}
           savedSpotIds={savedSpotIds}
-          selectedDate={selectedDate}
-          selectedTime={selectedTime}
+          selectedDate={searchDate}
+          selectedTime={searchTime}
           onSuggestByDistance={handleSuggestByDistance}
           userLocation={effectiveUserLocation}
           isWeeklyEstimate={isWeeklyEstimate}
@@ -479,6 +567,7 @@ function MapPageContent() {
         {/* Map */}
         <EnhancedMapboxMap
           spots={displaySpots}
+          allSpots={allSpots}
           savedSpots={savedSpots}
           selectedDate={selectedDate}
           showWindParticles={showWindParticles}
@@ -588,74 +677,6 @@ function MapPageContent() {
   );
 }
 
-function SurfLoadingScreen() {
-  return (
-    <div className="h-screen flex flex-col items-center justify-center bg-sand-gradient overflow-hidden">
-      {/* 3D Scene Container */}
-      <div className="surf-scene">
-        {/* Ocean waves behind */}
-        <div className="surf-ocean">
-          <div className="surf-wave surf-wave-1" />
-          <div className="surf-wave surf-wave-2" />
-          <div className="surf-wave surf-wave-3" />
-        </div>
-
-        {/* 3D Surfer Character */}
-        <div className="surf-character">
-          {/* Shadow on water */}
-          <div className="surf-shadow" />
-
-          {/* Surfboard with 3D tilt */}
-          <div className="surf-board">
-            <div className="surf-board-top" />
-            <div className="surf-board-stripe" />
-          </div>
-
-          {/* Character body */}
-          <div className="surf-body">
-            {/* Head */}
-            <div className="surf-head">
-              <div className="surf-hair" />
-              <div className="surf-face">
-                <div className="surf-eye surf-eye-l" />
-                <div className="surf-eye surf-eye-r" />
-                <div className="surf-mouth" />
-              </div>
-            </div>
-            {/* Torso */}
-            <div className="surf-torso" />
-            {/* Arms */}
-            <div className="surf-arm surf-arm-l" />
-            <div className="surf-arm surf-arm-r" />
-            {/* Legs */}
-            <div className="surf-leg surf-leg-l" />
-            <div className="surf-leg surf-leg-r" />
-          </div>
-        </div>
-
-        {/* Splash particles */}
-        <div className="surf-splash">
-          <div className="surf-drop" style={{ animationDelay: '0s' }} />
-          <div className="surf-drop" style={{ animationDelay: '0.3s' }} />
-          <div className="surf-drop" style={{ animationDelay: '0.6s' }} />
-          <div className="surf-drop" style={{ animationDelay: '0.15s' }} />
-          <div className="surf-drop" style={{ animationDelay: '0.45s' }} />
-        </div>
-      </div>
-
-      {/* Loading text */}
-      <div className="text-center mt-8">
-        <h2 className="text-xl font-semibold text-ocean-700 mb-2">Loading your waves...</h2>
-        <div className="flex items-center justify-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-ocean-400 animate-loading-dot" style={{ animationDelay: '0ms' }} />
-          <span className="w-2 h-2 rounded-full bg-ocean-500 animate-loading-dot" style={{ animationDelay: '150ms' }} />
-          <span className="w-2 h-2 rounded-full bg-ocean-600 animate-loading-dot" style={{ animationDelay: '300ms' }} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function MapPageEnhanced() {
   const router = useRouter();
   const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
@@ -668,7 +689,7 @@ export default function MapPageEnhanced() {
       router.replace('/login');
     } else {
       setAuthState('authenticated');
-      const timer = setTimeout(() => setShowLoading(false), 1500);
+      const timer = setTimeout(() => setShowLoading(false), 500);
       return () => clearTimeout(timer);
     }
   }, [router]);

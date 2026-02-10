@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import LogoOverlay from '@/components/LogoOverlay';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
+import { getSavedLocale, saveLocale } from '@/lib/i18n';
+import { authService } from '@/lib/apiServices';
 import type { SurferLevel } from '@/types';
 
 type Language = 'ko' | 'en';
@@ -92,14 +94,47 @@ const translations = {
 
 export default function MyPage() {
   const router = useRouter();
-  const { user: authUser, logout } = useAuth();
-  const [lang, setLang] = useState<Language>('en');
+  const { user: authUser, logout, refreshAuth } = useAuth();
+  const [lang, setLangState] = useState<Language>('en');
   const [userLevel, setSurferLevel] = useState<SurferLevel>('beginner');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const t = translations[lang];
 
-  const handleSaveProfile = () => {
-    // TODO: Implement profile save
-    console.log('Save profile:', { userLevel });
+  // Hydrate from persisted locale after mount
+  useEffect(() => {
+    setLangState(getSavedLocale());
+  }, []);
+
+  // Initialize userLevel from authUser
+  useEffect(() => {
+    if (authUser?.user_level) {
+      setSurferLevel(authUser.user_level as SurferLevel);
+    }
+  }, [authUser]);
+
+  const setLang = (newLang: Language) => {
+    setLangState(newLang);
+    saveLocale(newLang);
+  };
+
+  const handleSaveProfile = async () => {
+    setIsSaving(true);
+    setSaveMessage(null);
+    try {
+      const response = await authService.updateUserLevel(userLevel);
+      if (response.success && response.data?.result === 'success') {
+        setSaveMessage(lang === 'ko' ? '저장되었습니다!' : 'Saved successfully!');
+        await refreshAuth();
+      } else {
+        setSaveMessage(lang === 'ko' ? '저장에 실패했습니다' : 'Failed to save');
+      }
+    } catch {
+      setSaveMessage(lang === 'ko' ? '오류가 발생했습니다' : 'An error occurred');
+    } finally {
+      setIsSaving(false);
+      setTimeout(() => setSaveMessage(null), 3000);
+    }
   };
 
   const handleLogout = async () => {
@@ -116,22 +151,36 @@ export default function MyPage() {
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-40 glass">
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-end">
-          <div className="flex items-center gap-4">
-            <Link href="/map" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
-              {t.map}
-            </Link>
+          <div className="flex items-center gap-3">
+            {/* Language Toggle (icon + label) */}
+            <button
+              onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
+              className="flex items-center gap-1 px-2 py-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
+              title={lang === 'ko' ? 'English' : '한국어'}
+            >
+              <svg className="w-4 h-4 text-ocean-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+              </svg>
+              <span className="text-xs font-semibold text-ocean-700">{lang === 'ko' ? 'KO' : 'EN'}</span>
+            </button>
+            {/* Saved Spots Link */}
             <Link href="/saved" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
               {t.savedSpots}
             </Link>
-            <button
-              onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
-              className="text-sm font-medium text-ocean-700 hover:text-ocean-500"
+            {/* Map Link */}
+            <Link href="/map" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+              {t.map}
+            </Link>
+            {/* My Page Icon */}
+            <Link
+              href="/mypage"
+              className="p-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
+              title={t.title}
             >
-              {lang === 'ko' ? 'EN' : '한국어'}
-            </button>
-            <button onClick={handleLogout} className="btn-outline text-sm">
-              {t.logout}
-            </button>
+              <svg className="w-5 h-5 text-ocean-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </Link>
           </div>
         </div>
       </header>
@@ -152,18 +201,6 @@ export default function MyPage() {
               <input
                 type="text"
                 value={authUser?.username || ''}
-                disabled
-                className="input-field bg-sand-100 cursor-not-allowed"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-ocean-700 mb-1">
-                {t.password}
-              </label>
-              <input
-                type="password"
-                value="••••••••"
                 disabled
                 className="input-field bg-sand-100 cursor-not-allowed"
               />
@@ -206,9 +243,21 @@ export default function MyPage() {
               </p>
             </div>
 
-            <div className="flex gap-4 pt-4">
-              <button onClick={handleSaveProfile} className="btn-primary">
-                {t.save}
+            <div className="flex justify-between items-center pt-4">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleSaveProfile}
+                  disabled={isSaving}
+                  className="btn-primary disabled:opacity-50"
+                >
+                  {isSaving ? '...' : t.save}
+                </button>
+                {saveMessage && (
+                  <span className="text-sm text-green-600">{saveMessage}</span>
+                )}
+              </div>
+              <button onClick={handleLogout} className="btn-outline text-sm text-red-500 border-red-300 hover:bg-red-50">
+                {t.logout}
               </button>
             </div>
           </div>

@@ -63,3 +63,12 @@ class UserRepository:
             await self.session.flush()
             await self.session.refresh(user)
         return user
+
+    async def update_user_level(self, user_id: int, user_level: str) -> Optional[User]:
+        """Update user's surfing level."""
+        user = await self.get_by_id(user_id)
+        if user:
+            user.user_level = user_level
+            await self.session.flush()
+            await self.session.refresh(user)
+        return user

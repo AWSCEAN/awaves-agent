@@ -100,3 +100,31 @@ class UserService:
         )
 
         return RegistrationResult(success=True, user=user_response)
+
+    async def update_user_level(
+        self,
+        user_id: int,
+        user_level: str,
+    ) -> Optional[UserV2Response]:
+        """
+        Update user's surfing level.
+
+        Args:
+            user_id: The user's ID
+            user_level: New surfing proficiency level
+
+        Returns:
+            Updated user data or None if user not found
+        """
+        user = await self.user_repository.update_user_level(user_id, user_level)
+        if not user:
+            return None
+
+        return UserV2Response(
+            user_id=user.user_id,
+            username=user.username,
+            user_level=user.user_level,
+            privacy_consent_yn=user.privacy_consent_yn,
+            last_login_dt=user.last_login_dt,
+            created_at=user.created_at,
+        )

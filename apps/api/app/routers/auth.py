@@ -12,9 +12,12 @@ from app.schemas.user import (
     LoginV2Response,
     RefreshTokenRequest,
     TokenResponse,
+    UpdateUserLevelRequest,
     UserV2Response,
 )
 from app.services.auth import AuthService
+from app.services.user_service import UserService
+from app.repositories.user_repository import UserRepository
 
 router = APIRouter()
 security = HTTPBearer()
@@ -138,4 +141,36 @@ async def get_current_user(
             last_login_dt=user.last_login_dt,
             created_at=user.created_at,
         ),
+    )
+
+
+@router.patch("/me/level", response_model=CommonResponse[UserV2Response])
+async def update_user_level(
+    request: UpdateUserLevelRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    auth_service: AuthService = Depends(get_auth_service),
+    session: AsyncSession = Depends(get_db),
+) -> CommonResponse[UserV2Response]:
+    """Update current user's surfing level."""
+    user_id = await auth_service.verify_access_token(credentials.credentials)
+
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
+
+    user_repo = UserRepository(session)
+    user_service = UserService(user_repo)
+    updated_user = await user_service.update_user_level(user_id, request.user_level)
+
+    if not updated_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    return CommonResponse(
+        result="success",
+        data=updated_user,
     )

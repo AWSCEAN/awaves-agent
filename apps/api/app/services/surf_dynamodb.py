@@ -8,6 +8,7 @@ import aioboto3
 from botocore.config import Config
 
 from app.config import settings
+from app.services.cache import CacheService
 
 logger = logging.getLogger(__name__)
 
@@ -54,13 +55,14 @@ class SurfDynamoDBService:
         return session.client("dynamodb", endpoint_url=endpoint_url, config=config)
 
     @classmethod
-    async def get_all_spots(
-        cls, page: int = 1, page_size: int = 20
-    ) -> tuple[list[dict], int]:
-        """Get all unique locations with their latest forecast data."""
+    async def _get_all_spots_raw(cls) -> list[dict]:
+        """Get all unique locations with latest forecast. Uses Redis cache."""
+        cached = await CacheService.get_all_surf_spots()
+        if cached is not None:
+            return cached
+
         try:
             async with await cls.get_client() as client:
-                # Scan all items
                 all_items: list[dict] = []
                 params: dict = {"TableName": cls.TABLE_NAME}
                 while True:
@@ -70,7 +72,6 @@ class SurfDynamoDBService:
                         break
                     params["ExclusiveStartKey"] = response["LastEvaluatedKey"]
 
-                # Group by LocationId, pick latest SurfTimestamp per location
                 location_map: dict[str, dict] = {}
                 for item in all_items:
                     loc_id = item["LocationId"]["S"]
@@ -83,13 +84,28 @@ class SurfDynamoDBService:
                     key=lambda s: s["derivedMetrics"]["surfScore"], reverse=True
                 )
 
-                total = len(spots)
-                start = (page - 1) * page_size
-                end = start + page_size
-                return spots[start:end], total
+                await CacheService.store_all_surf_spots(spots)
+
+                return spots
         except Exception as e:
-            logger.error(f"Failed to get all spots: {e}")
-            return [], 0
+            logger.error(f"Failed to get all spots raw: {e}")
+            return []
+
+    @classmethod
+    async def get_all_spots(
+        cls, page: int = 1, page_size: int = 20
+    ) -> tuple[list[dict], int]:
+        """Get all unique locations with their latest forecast data."""
+        spots = await cls._get_all_spots_raw()
+        total = len(spots)
+        start = (page - 1) * page_size
+        end = start + page_size
+        return spots[start:end], total
+
+    @classmethod
+    async def get_all_spots_unpaginated(cls) -> list[dict]:
+        """Return all spots without pagination, for map marker display."""
+        return await cls._get_all_spots_raw()
 
     @classmethod
     async def get_spot_data(
@@ -118,73 +134,27 @@ class SurfDynamoDBService:
     @classmethod
     async def search_spots(cls, query: str) -> list[dict]:
         """Search spots by coordinate substring in LocationId."""
-        try:
-            async with await cls.get_client() as client:
-                all_items: list[dict] = []
-                params: dict = {"TableName": cls.TABLE_NAME}
-                while True:
-                    response = await client.scan(**params)
-                    all_items.extend(response.get("Items", []))
-                    if "LastEvaluatedKey" not in response:
-                        break
-                    params["ExclusiveStartKey"] = response["LastEvaluatedKey"]
-
-                # Filter by query match in LocationId
-                query_lower = query.lower()
-                location_map: dict[str, dict] = {}
-                for item in all_items:
-                    loc_id = item["LocationId"]["S"]
-                    if query_lower not in loc_id.lower():
-                        continue
-                    ts = item["SurfTimestamp"]["S"]
-                    if loc_id not in location_map or ts > location_map[loc_id]["SurfTimestamp"]["S"]:
-                        location_map[loc_id] = item
-
-                return [cls._to_surf_info(item) for item in location_map.values()]
-        except Exception as e:
-            logger.error(f"Failed to search spots: {e}")
-            return []
+        spots = await cls._get_all_spots_raw()
+        query_lower = query.lower()
+        return [s for s in spots if query_lower in s["LocationId"].lower()]
 
     @classmethod
     async def get_nearby_spots(
         cls, lat: float, lng: float, limit: int = 25
     ) -> list[dict]:
         """Get spots sorted by distance from given coordinates."""
-        try:
-            async with await cls.get_client() as client:
-                all_items: list[dict] = []
-                params: dict = {"TableName": cls.TABLE_NAME}
-                while True:
-                    response = await client.scan(**params)
-                    all_items.extend(response.get("Items", []))
-                    if "LastEvaluatedKey" not in response:
-                        break
-                    params["ExclusiveStartKey"] = response["LastEvaluatedKey"]
+        spots = await cls._get_all_spots_raw()
 
-                # Group by LocationId, pick latest
-                location_map: dict[str, dict] = {}
-                for item in all_items:
-                    loc_id = item["LocationId"]["S"]
-                    ts = item["SurfTimestamp"]["S"]
-                    if loc_id not in location_map or ts > location_map[loc_id]["SurfTimestamp"]["S"]:
-                        location_map[loc_id] = item
+        spots_with_distance = []
+        for spot in spots:
+            spot_copy = {**spot}
+            spot_copy["distance"] = round(
+                _haversine(lat, lng, spot["geo"]["lat"], spot["geo"]["lng"]), 2
+            )
+            spots_with_distance.append(spot_copy)
 
-                # Calculate distances and sort
-                spots_with_distance = []
-                for item in location_map.values():
-                    spot = cls._to_surf_info(item)
-                    spot_lat = spot["geo"]["lat"]
-                    spot_lng = spot["geo"]["lng"]
-                    spot["distance"] = round(
-                        _haversine(lat, lng, spot_lat, spot_lng), 2
-                    )
-                    spots_with_distance.append(spot)
-
-                spots_with_distance.sort(key=lambda s: s["distance"])
-                return spots_with_distance[:limit]
-        except Exception as e:
-            logger.error(f"Failed to get nearby spots: {e}")
-            return []
+        spots_with_distance.sort(key=lambda s: s["distance"])
+        return spots_with_distance[:limit]
 
     @classmethod
     def _to_surf_info(cls, item: dict) -> dict:

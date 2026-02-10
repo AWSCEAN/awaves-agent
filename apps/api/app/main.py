@@ -11,6 +11,7 @@ from app.routers import auth, feedback, register, saved, surf
 from app.graphql.schema import graphql_app
 from app.services.cache import CacheService
 from app.services.dynamodb import DynamoDBService
+from app.services.surf_dynamodb import SurfDynamoDBService
 
 
 @asynccontextmanager
@@ -19,6 +20,8 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize database tables and DynamoDB
     await init_db()
     await DynamoDBService.create_table_if_not_exists()
+    # Pre-warm surf spots cache in Redis
+    await SurfDynamoDBService._get_all_spots_raw()
     yield
     # Shutdown: Close database and cache connections
     await close_db()

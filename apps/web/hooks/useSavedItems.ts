@@ -93,16 +93,47 @@ export function useSavedItems() {
   const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
 
   const { data, loading, error, refetch } = useQuery<SavedItemsResult>(GET_SAVED_ITEMS, {
-    fetchPolicy: 'cache-and-network',
+    fetchPolicy: 'cache-first',
+    nextFetchPolicy: 'cache-and-network',
     skip: !hasToken,
   });
 
   const [saveItemMutation] = useMutation<SaveItemResult>(SAVE_ITEM_MUTATION, {
-    refetchQueries: [{ query: GET_SAVED_ITEMS }],
+    update(cache, { data }) {
+      if (!data?.saveItem?.success || !data.saveItem.data) return;
+      const newItem = data.saveItem.data;
+      const existing = cache.readQuery<SavedItemsResult>({ query: GET_SAVED_ITEMS });
+      cache.writeQuery<SavedItemsResult>({
+        query: GET_SAVED_ITEMS,
+        data: {
+          savedItems: {
+            items: [...(existing?.savedItems?.items || []), newItem],
+            total: (existing?.savedItems?.total || 0) + 1,
+          },
+        },
+      });
+    },
   });
 
   const [deleteItemMutation] = useMutation<DeleteSavedItemResult>(DELETE_SAVED_ITEM_MUTATION, {
-    refetchQueries: [{ query: GET_SAVED_ITEMS }],
+    update(cache, { data }, { variables }) {
+      if (!data?.deleteSavedItem) return;
+      const deletedKey = variables?.input?.locationSurfKey;
+      if (!deletedKey) return;
+      const existing = cache.readQuery<SavedItemsResult>({ query: GET_SAVED_ITEMS });
+      if (!existing?.savedItems) return;
+      cache.writeQuery<SavedItemsResult>({
+        query: GET_SAVED_ITEMS,
+        data: {
+          savedItems: {
+            items: existing.savedItems.items.filter(
+              (item) => item.locationSurfKey !== deletedKey
+            ),
+            total: Math.max(0, existing.savedItems.total - 1),
+          },
+        },
+      });
+    },
   });
 
   const [acknowledgeChangeMutation] = useMutation<AcknowledgeChangeResult>(ACKNOWLEDGE_CHANGE_MUTATION, {

@@ -58,6 +58,13 @@ async def get_nearby_spots(
     return [SurfInfoResponse(**s) for s in results]
 
 
+@router.get("/spots/all")
+async def get_all_spots_unpaginated() -> list[SurfInfoResponse]:
+    """Get ALL surf spots (unpaginated) for map marker display."""
+    spots = await SurfDynamoDBService.get_all_spots_unpaginated()
+    return [SurfInfoResponse(**s) for s in spots]
+
+
 @router.get("/spots/{spot_id:path}", response_model=SurfInfoResponse)
 async def get_spot(
     spot_id: str,

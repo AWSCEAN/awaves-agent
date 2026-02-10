@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 import { ko, enUS } from 'date-fns/locale';
 import { useTranslations, useLocale } from 'next-intl';
 import type { SurfInfo, SurferLevel } from '@/types';
-import { getGradeBgColor } from '@/lib/services/surfInfoService';
+import { getGradeBgColor, getGradeTextColor, getGradeBorderColor } from '@/lib/services/surfInfoService';
 
 export interface SearchResult extends SurfInfo {
   distance?: number;
@@ -210,7 +210,7 @@ export default function SearchResultsList({
             <p>{tCommon('noResults')}</p>
           </div>
         ) : (
-          <ul className="divide-y divide-sand-100">
+          <ul className="p-2 space-y-2">
             {paginatedResults.map((spot, index) => {
               const isSaved = savedSpotIds.has(spot.LocationId);
               const displayName = locale === 'ko' && spot.nameKo ? spot.nameKo : spot.name;
@@ -218,7 +218,7 @@ export default function SearchResultsList({
               return (
                 <li
                   key={spot.LocationId}
-                  className="p-4 hover:bg-sand-50 cursor-pointer transition-colors"
+                  className="p-3 bg-white rounded-xl border border-sand-200 hover:border-ocean-300 hover:shadow-md cursor-pointer transition-all"
                   onClick={() => onSpotClick(spot)}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -240,14 +240,15 @@ export default function SearchResultsList({
                       </div>
 
                       {/* Scores + Grade */}
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5">
-                          <div className={`w-2 h-2 rounded-full ${getSurfScoreColor(spot.derivedMetrics.surfScore)}`} />
-                          <span className="text-sm font-medium text-ocean-700">
+                      <div className="flex items-center gap-3 mt-1">
+                        <div className="flex items-center gap-2 bg-sand-100 rounded-lg px-2.5 py-1">
+                          <div className={`w-3 h-3 rounded-full ${getSurfScoreColor(spot.derivedMetrics.surfScore)}`} />
+                          <span className="text-lg font-bold text-ocean-800">
                             {Math.round(spot.derivedMetrics.surfScore)}
                           </span>
+                          <span className="text-xs text-ocean-500">/100</span>
                         </div>
-                        <span className={`px-1.5 py-0.5 rounded text-xs font-bold text-white ${getGradeBgColor(spot.derivedMetrics.surfGrade)}`}>
+                        <span className={`px-3 py-1 rounded-lg text-base font-bold border ${getGradeBgColor(spot.derivedMetrics.surfGrade)} ${getGradeTextColor(spot.derivedMetrics.surfGrade)} ${getGradeBorderColor(spot.derivedMetrics.surfGrade)}`}>
                           {spot.derivedMetrics.surfGrade}
                         </span>
                       </div>
@@ -272,8 +273,8 @@ export default function SearchResultsList({
                       }}
                       className={`p-2 rounded-full transition-colors ${
                         isSaved
-                          ? 'text-coral-500 bg-coral-50 hover:bg-coral-100'
-                          : 'text-ocean-400 hover:text-coral-500 hover:bg-coral-50'
+                          ? 'text-red-500 bg-red-50 hover:bg-red-100'
+                          : 'text-ocean-400 hover:text-red-500 hover:bg-red-50'
                       }`}
                       title={isSaved ? (locale === 'ko' ? '저장 취소' : 'Remove from saved') : (locale === 'ko' ? '저장' : 'Save spot')}
                     >

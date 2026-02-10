@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import LogoOverlay from '@/components/LogoOverlay';
 import SavedItemCard from '@/components/SavedItemCard';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { useAuth } from '@/contexts/AuthContext';
+import SurfLoadingScreen from '@/components/SurfLoadingScreen';
 import { useSavedItems } from '@/hooks/useSavedItems';
+import { getSavedLocale, saveLocale } from '@/lib/i18n';
 import type { SavedItemResponse, FeedbackStatus, Language } from '@/types';
 
 const translations = {
@@ -38,12 +38,20 @@ const translations = {
 };
 
 export default function SavedPage() {
-  const router = useRouter();
-  const { logout } = useAuth();
-  const [lang, setLang] = useState<Language>('en');
+  const [lang, setLangState] = useState<Language>('en');
   const [feedbackMap, setFeedbackMap] = useState<Record<string, FeedbackStatus>>({});
 
   const t = translations[lang];
+
+  // Hydrate from persisted locale after mount
+  useEffect(() => {
+    setLangState(getSavedLocale());
+  }, []);
+
+  const setLang = (newLang: Language) => {
+    setLangState(newLang);
+    saveLocale(newLang);
+  };
 
   // Use GraphQL hook
   const {
@@ -103,10 +111,14 @@ export default function SavedPage() {
     }
   };
 
-  const handleLogout = async () => {
-    await logout();
-    router.push('/');
-  };
+  // Show full-page loading when data is loading and no cached items available
+  if (isLoading && savedItems.length === 0) {
+    return (
+      <ProtectedRoute>
+        <SurfLoadingScreen />
+      </ProtectedRoute>
+    );
+  }
 
   return (
     <ProtectedRoute>
@@ -115,22 +127,36 @@ export default function SavedPage() {
         {/* Header */}
         <header className="fixed top-0 left-0 right-0 z-40 glass">
           <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-end">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              {/* Language Toggle (icon + label) */}
+              <button
+                onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
+                className="flex items-center gap-1 px-2 py-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
+                title={lang === 'ko' ? 'English' : '한국어'}
+              >
+                <svg className="w-4 h-4 text-ocean-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                </svg>
+                <span className="text-xs font-semibold text-ocean-700">{lang === 'ko' ? 'KO' : 'EN'}</span>
+              </button>
+              {/* Saved Spots Link */}
+              <Link href="/saved" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+                {t.title}
+              </Link>
+              {/* Map Link */}
               <Link href="/map" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
                 {t.map}
               </Link>
-              <Link href="/mypage" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
-                {t.mypage}
-              </Link>
-              <button
-                onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
-                className="text-sm font-medium text-ocean-700 hover:text-ocean-500"
+              {/* My Page Icon */}
+              <Link
+                href="/mypage"
+                className="p-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
+                title={t.mypage}
               >
-                {lang === 'ko' ? 'EN' : '한국어'}
-              </button>
-              <button onClick={handleLogout} className="btn-outline text-sm">
-                {t.logout}
-              </button>
+                <svg className="w-5 h-5 text-ocean-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </Link>
             </div>
           </div>
         </header>
@@ -145,14 +171,6 @@ export default function SavedPage() {
               </span>
             )}
           </div>
-
-          {/* Loading State */}
-          {isLoading && (
-            <div className="text-center py-16">
-              <div className="animate-spin w-8 h-8 border-2 border-ocean-500 border-t-transparent rounded-full mx-auto mb-4" />
-              <p className="text-ocean-600">{t.loading}</p>
-            </div>
-          )}
 
           {/* Error State */}
           {error && !isLoading && (
@@ -178,7 +196,7 @@ export default function SavedPage() {
 
           {/* Saved Items Grid */}
           {!isLoading && !error && savedItems.length > 0 && (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
               {savedItems.map((item) => {
                 const feedbackKey = item.location_surf_key;
                 return (
