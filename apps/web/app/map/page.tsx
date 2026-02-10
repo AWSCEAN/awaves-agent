@@ -19,6 +19,7 @@ import type { OverlayMode, SpotSelectionData } from '@/components/EnhancedMapbox
 import { TIME_SLOTS } from '@/lib/services/surfInfoService';
 import { surfService } from '@/lib/apiServices';
 import { useSavedItems } from '@/hooks/useSavedItems';
+import SurfLoadingScreen from '@/components/SurfLoadingScreen';
 
 const DEMO_USER_LOCATION = { lat: 37.5665, lng: 126.9780 };
 
@@ -100,6 +101,7 @@ function MapPageContent() {
   );
 
   // Center map from query params (e.g. /map?lat=38.0765&lng=128.6234)
+  // If navigating from saved list, also open the detail panel
   useEffect(() => {
     const lat = searchParams.get('lat');
     const lng = searchParams.get('lng');
@@ -108,9 +110,44 @@ function MapPageContent() {
       const lngNum = Number(lng);
       if (!isNaN(latNum) && !isNaN(lngNum)) {
         setMapCenter({ lat: latNum, lng: lngNum });
+
+        // Find matching saved spot to open detail panel
+        const locationId = `${lat}#${lng}`;
+        const matchingSaved = savedSpots.find(s => s.locationId === locationId);
+        if (matchingSaved) {
+          const surfInfo: SurfInfo = {
+            LocationId: matchingSaved.locationId,
+            SurfTimestamp: matchingSaved.surfTimestamp,
+            geo: { lat: latNum, lng: lngNum },
+            conditions: {
+              waveHeight: matchingSaved.waveHeight,
+              wavePeriod: matchingSaved.wavePeriod,
+              windSpeed: matchingSaved.windSpeed,
+              waterTemperature: matchingSaved.waterTemperature,
+            },
+            derivedMetrics: {
+              surfScore: matchingSaved.surfScore,
+              surfGrade: matchingSaved.surfGrade,
+              surfingLevel: (matchingSaved.surfingLevel || 'BEGINNER') as SurfingLevel,
+            },
+            metadata: { modelVersion: '', dataSource: '', predictionType: 'FORECAST', createdAt: '' },
+            name: matchingSaved.name || matchingSaved.locationId,
+            nameKo: matchingSaved.nameKo,
+            region: matchingSaved.region,
+            country: matchingSaved.country,
+            address: matchingSaved.address,
+            difficulty: 'beginner',
+            waveType: '',
+            bestSeason: [],
+          };
+          setSelectedSpotDetail({
+            surfInfo,
+            coordinates: { latitude: latNum, longitude: lngNum },
+          });
+        }
       }
     }
-  }, [searchParams]);
+  }, [searchParams, savedSpots]);
 
   // Generate date options (10 days)
   const dateOptions = useMemo(() =>
@@ -184,6 +221,13 @@ function MapPageContent() {
   };
 
   const handleSaveSpot = async (surfInfo: SurfInfo) => {
+    // Fly to the spot and open detail panel (same as clicking the spot)
+    setMapCenter({ lat: surfInfo.geo.lat, lng: surfInfo.geo.lng });
+    setSelectedSpotDetail({
+      surfInfo,
+      coordinates: { latitude: surfInfo.geo.lat, longitude: surfInfo.geo.lng },
+    });
+
     await saveItem({
       locationId: surfInfo.LocationId,
       surfTimestamp: surfInfo.SurfTimestamp,
@@ -588,74 +632,6 @@ function MapPageContent() {
   );
 }
 
-function SurfLoadingScreen() {
-  return (
-    <div className="h-screen flex flex-col items-center justify-center bg-sand-gradient overflow-hidden">
-      {/* 3D Scene Container */}
-      <div className="surf-scene">
-        {/* Ocean waves behind */}
-        <div className="surf-ocean">
-          <div className="surf-wave surf-wave-1" />
-          <div className="surf-wave surf-wave-2" />
-          <div className="surf-wave surf-wave-3" />
-        </div>
-
-        {/* 3D Surfer Character */}
-        <div className="surf-character">
-          {/* Shadow on water */}
-          <div className="surf-shadow" />
-
-          {/* Surfboard with 3D tilt */}
-          <div className="surf-board">
-            <div className="surf-board-top" />
-            <div className="surf-board-stripe" />
-          </div>
-
-          {/* Character body */}
-          <div className="surf-body">
-            {/* Head */}
-            <div className="surf-head">
-              <div className="surf-hair" />
-              <div className="surf-face">
-                <div className="surf-eye surf-eye-l" />
-                <div className="surf-eye surf-eye-r" />
-                <div className="surf-mouth" />
-              </div>
-            </div>
-            {/* Torso */}
-            <div className="surf-torso" />
-            {/* Arms */}
-            <div className="surf-arm surf-arm-l" />
-            <div className="surf-arm surf-arm-r" />
-            {/* Legs */}
-            <div className="surf-leg surf-leg-l" />
-            <div className="surf-leg surf-leg-r" />
-          </div>
-        </div>
-
-        {/* Splash particles */}
-        <div className="surf-splash">
-          <div className="surf-drop" style={{ animationDelay: '0s' }} />
-          <div className="surf-drop" style={{ animationDelay: '0.3s' }} />
-          <div className="surf-drop" style={{ animationDelay: '0.6s' }} />
-          <div className="surf-drop" style={{ animationDelay: '0.15s' }} />
-          <div className="surf-drop" style={{ animationDelay: '0.45s' }} />
-        </div>
-      </div>
-
-      {/* Loading text */}
-      <div className="text-center mt-8">
-        <h2 className="text-xl font-semibold text-ocean-700 mb-2">Loading your waves...</h2>
-        <div className="flex items-center justify-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-ocean-400 animate-loading-dot" style={{ animationDelay: '0ms' }} />
-          <span className="w-2 h-2 rounded-full bg-ocean-500 animate-loading-dot" style={{ animationDelay: '150ms' }} />
-          <span className="w-2 h-2 rounded-full bg-ocean-600 animate-loading-dot" style={{ animationDelay: '300ms' }} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function MapPageEnhanced() {
   const router = useRouter();
   const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
@@ -668,7 +644,7 @@ export default function MapPageEnhanced() {
       router.replace('/login');
     } else {
       setAuthState('authenticated');
-      const timer = setTimeout(() => setShowLoading(false), 1500);
+      const timer = setTimeout(() => setShowLoading(false), 500);
       return () => clearTimeout(timer);
     }
   }, [router]);

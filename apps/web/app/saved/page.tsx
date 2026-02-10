@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import LogoOverlay from '@/components/LogoOverlay';
 import SavedItemCard from '@/components/SavedItemCard';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import SurfLoadingScreen from '@/components/SurfLoadingScreen';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSavedItems } from '@/hooks/useSavedItems';
 import type { SavedItemResponse, FeedbackStatus, Language } from '@/types';
@@ -108,6 +109,15 @@ export default function SavedPage() {
     router.push('/');
   };
 
+  // Show full-page loading when data is loading and no cached items available
+  if (isLoading && savedItems.length === 0) {
+    return (
+      <ProtectedRoute>
+        <SurfLoadingScreen />
+      </ProtectedRoute>
+    );
+  }
+
   return (
     <ProtectedRoute>
       <LogoOverlay />
@@ -146,14 +156,6 @@ export default function SavedPage() {
             )}
           </div>
 
-          {/* Loading State */}
-          {isLoading && (
-            <div className="text-center py-16">
-              <div className="animate-spin w-8 h-8 border-2 border-ocean-500 border-t-transparent rounded-full mx-auto mb-4" />
-              <p className="text-ocean-600">{t.loading}</p>
-            </div>
-          )}
-
           {/* Error State */}
           {error && !isLoading && (
             <div className="text-center py-16">
@@ -178,7 +180,7 @@ export default function SavedPage() {
 
           {/* Saved Items Grid */}
           {!isLoading && !error && savedItems.length > 0 && (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
               {savedItems.map((item) => {
                 const feedbackKey = item.location_surf_key;
                 return (

@@ -165,16 +165,33 @@ export default function EnhancedMapboxMap({
   useEffect(() => {
     if (!map.current || !isMapLoaded) return;
 
-    Object.values(markersRef.current).forEach((marker) =>
-      marker.remove()
-    );
-    markersRef.current = {};
-
     const savedLocationIds = new Set(savedSpots.map((s) => s.locationId));
 
+    // Build the set of marker keys that should exist after this update
+    const desiredKeys = new Set<string>();
+
     spots.forEach((spot) => {
-      // Skip surfer marker if spot is saved (heart marker will be shown instead)
       if (savedLocationIds.has(spot.LocationId)) return;
+      desiredKeys.add(spot.LocationId);
+    });
+
+    savedSpots.forEach((savedSpot) => {
+      if (!savedSpot.locationId || !savedSpot.locationId.includes('#')) return;
+      desiredKeys.add(`saved-${savedSpot.locationId}`);
+    });
+
+    // Remove only markers that should no longer exist
+    Object.keys(markersRef.current).forEach((key) => {
+      if (!desiredKeys.has(key)) {
+        markersRef.current[key].remove();
+        delete markersRef.current[key];
+      }
+    });
+
+    // Add surfer markers for spots that don't have a marker yet
+    spots.forEach((spot) => {
+      if (savedLocationIds.has(spot.LocationId)) return;
+      if (markersRef.current[spot.LocationId]) return;
 
       const markerColor = getSurfScoreColor(spot.derivedMetrics.surfScore);
       const el = createMarkerElement(
@@ -197,8 +214,12 @@ export default function EnhancedMapboxMap({
       markersRef.current[spot.LocationId] = marker;
     });
 
+    // Add heart markers for saved spots that don't have a marker yet
     savedSpots.forEach((savedSpot) => {
       if (!savedSpot.locationId || !savedSpot.locationId.includes('#')) return;
+      const savedKey = `saved-${savedSpot.locationId}`;
+      if (markersRef.current[savedKey]) return;
+
       const [latStr, lngStr] = savedSpot.locationId.split('#');
       const lat = Number(latStr);
       const lng = Number(lngStr);
@@ -206,20 +227,21 @@ export default function EnhancedMapboxMap({
 
       const el = createMarkerElement(
         '\u2764\uFE0F',
-        '#e74c3c',
+        '#ffffff',
         () => {
           const matchingSpot = spots.find(s => s.LocationId === savedSpot.locationId);
           if (matchingSpot) {
             showSurfInfoAtCoords(lng, lat, matchingSpot, selectedDateRef.current);
           }
-        }
+        },
+        '#e74c3c'
       );
 
       const marker = new mapboxgl.Marker(el)
         .setLngLat([lng, lat])
         .addTo(map.current!);
 
-      markersRef.current[`saved-${savedSpot.locationId}`] = marker;
+      markersRef.current[savedKey] = marker;
     });
   }, [spots, savedSpots, isMapLoaded]);
 
@@ -233,13 +255,13 @@ export default function EnhancedMapboxMap({
   }, [locale]);
 
   useEffect(() => {
-    if (!map.current || !center) return;
+    if (!map.current || !isMapLoaded || !center) return;
     map.current.flyTo({
       center: [center.lng, center.lat],
       zoom: 12,
       duration: 1500,
     });
-  }, [center]);
+  }, [center, isMapLoaded]);
 
   useEffect(() => {
     if (!map.current) return;
@@ -438,7 +460,8 @@ export default function EnhancedMapboxMap({
   const createMarkerElement = (
     emoji: string,
     color: string,
-    onClick: () => void
+    onClick: () => void,
+    borderColor: string = 'white'
   ): HTMLDivElement => {
     const el = document.createElement('div');
     el.className = 'surf-marker';
@@ -456,7 +479,7 @@ export default function EnhancedMapboxMap({
       width: 32px;
       height: 32px;
       background: ${color};
-      border: 3px solid white;
+      border: 3px solid ${borderColor};
       border-radius: 50%;
       display: flex;
       align-items: center;

@@ -75,6 +75,7 @@ export default function SavedItemCard({
   feedbackStatus,
 }: SavedItemCardProps) {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [showFeedbackToast, setShowFeedbackToast] = useState(false);
   const t = translations[lang];
 
   const formatDate = (dateStr: string) => {
@@ -101,7 +102,7 @@ export default function SavedItemCard({
   const locationName = item.address || `${item.location_id.replace('#', ', ')}`;
 
   return (
-    <div className="card relative overflow-hidden">
+    <div className="card relative overflow-hidden break-inside-avoid">
       {/* Card Content - Dimmed when flag_change is true */}
       <div className={item.flag_change ? 'opacity-40 pointer-events-none' : ''}>
         {/* Header with location and remove button */}
@@ -148,7 +149,7 @@ export default function SavedItemCard({
         </div>
 
         {/* Conditions Grid */}
-        <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+        <div className="grid grid-cols-2 gap-2 text-sm">
           {item.wave_height !== undefined && (
             <div className="flex items-center gap-1">
               <span>🌊</span>
@@ -181,24 +182,32 @@ export default function SavedItemCard({
 
         {/* Departure Date */}
         {item.departure_date && (
-          <div className="text-xs text-ocean-500 mb-3">
+          <div className="text-xs text-ocean-500 mt-3">
             <span>{t.departureDate}: {formatDate(item.departure_date)}</span>
           </div>
         )}
 
-        {/* Feedback Section */}
-        {!feedbackStatus ? (
-          <div className="border-t pt-3 mb-3">
+        {/* Feedback Section - only show when no feedback given yet */}
+        {!feedbackStatus && (
+          <div className="border-t pt-3 mt-3">
             <p className="text-sm text-ocean-600 mb-2">{t.feedbackQuestion}</p>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => onFeedback('POSITIVE')}
+                onClick={() => {
+                  onFeedback('POSITIVE');
+                  setShowFeedbackToast(true);
+                  setTimeout(() => setShowFeedbackToast(false), 2000);
+                }}
                 className="flex-1 flex items-center justify-center gap-1 py-1.5 px-3 rounded-lg bg-green-50 hover:bg-green-100 text-green-700 text-sm font-medium transition-colors"
               >
                 <span>👍</span> {t.feedbackYes}
               </button>
               <button
-                onClick={() => onFeedback('NEGATIVE')}
+                onClick={() => {
+                  onFeedback('NEGATIVE');
+                  setShowFeedbackToast(true);
+                  setTimeout(() => setShowFeedbackToast(false), 2000);
+                }}
                 className="flex-1 flex items-center justify-center gap-1 py-1.5 px-3 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-sm font-medium transition-colors"
               >
                 <span>👎</span> {t.feedbackNo}
@@ -211,18 +220,12 @@ export default function SavedItemCard({
               </button>
             </div>
           </div>
-        ) : (
-          <div className="border-t pt-3 mb-3">
-            <p className="text-sm text-ocean-500 text-center">
-              {feedbackStatus === 'DEFERRED' ? '' : `✓ ${t.feedbackThanks}`}
-            </p>
-          </div>
         )}
 
         {/* View on Map Button */}
         <Link
           href={`/map?lat=${item.location_id.split('#')[0]}&lng=${item.location_id.split('#')[1]}`}
-          className="btn-primary w-full text-center block text-sm"
+          className="btn-primary w-full text-center block text-sm mt-3"
         >
           {t.viewOnMap}
         </Link>
@@ -243,6 +246,16 @@ export default function SavedItemCard({
             >
               {t.acknowledgeChange}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Thank You Overlay */}
+      {showFeedbackToast && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/10 rounded-xl z-10">
+          <div className="bg-white rounded-xl shadow-xl px-6 py-5 text-center">
+            <div className="text-3xl mb-2">🤙</div>
+            <p className="text-sm font-semibold text-ocean-800">{t.feedbackThanks}</p>
           </div>
         </div>
       )}

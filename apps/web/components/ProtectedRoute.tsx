@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import SurfLoadingScreen from '@/components/SurfLoadingScreen';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -19,11 +20,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   }, [isAuthenticated, isLoading, router]);
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-sand-gradient">
-        <div className="text-ocean-500">Loading...</div>
-      </div>
-    );
+    return <SurfLoadingScreen />;
   }
 
   if (!isAuthenticated) {
