@@ -19,11 +19,31 @@ export function generateSurfingLevel(waveHeight: number, windSpeed: number): Sur
 
 export function getGradeBgColor(grade: string): string {
   switch (grade) {
-    case 'A': return 'bg-green-500';
-    case 'B': return 'bg-yellow-500';
-    case 'C': return 'bg-orange-500';
-    case 'D': return 'bg-red-500';
-    default: return 'bg-gray-500';
+    case 'A': return 'bg-green-100';
+    case 'B': return 'bg-yellow-100';
+    case 'C': return 'bg-orange-100';
+    case 'D': return 'bg-red-100';
+    default: return 'bg-gray-100';
+  }
+}
+
+export function getGradeTextColor(grade: string): string {
+  switch (grade) {
+    case 'A': return 'text-green-700';
+    case 'B': return 'text-yellow-700';
+    case 'C': return 'text-orange-700';
+    case 'D': return 'text-red-700';
+    default: return 'text-gray-700';
+  }
+}
+
+export function getGradeBorderColor(grade: string): string {
+  switch (grade) {
+    case 'A': return 'border-green-300';
+    case 'B': return 'border-yellow-300';
+    case 'C': return 'border-orange-300';
+    case 'D': return 'border-red-300';
+    default: return 'border-gray-300';
   }
 }
 

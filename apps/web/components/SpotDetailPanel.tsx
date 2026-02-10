@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
 import type { SurfInfo } from '@/types';
-import { getGradeBgColor } from '@/lib/services/surfInfoService';
+import { getGradeBgColor, getGradeTextColor, getGradeBorderColor } from '@/lib/services/surfInfoService';
 
 interface SpotDetailPanelProps {
   surfInfo: SurfInfo;
@@ -77,7 +77,11 @@ export default function SpotDetailPanel({
                       onSave();
                     }
                   }}
-                  className="p-1 text-white/80 hover:text-white hover:bg-white/10 rounded transition-colors flex-shrink-0"
+                  className={`p-1 rounded transition-colors flex-shrink-0 ${
+                    isSaved
+                      ? 'text-red-400 hover:text-red-300'
+                      : 'text-white/80 hover:text-white hover:bg-white/10'
+                  }`}
                 >
                   <svg
                     className="w-5 h-5"
@@ -98,23 +102,29 @@ export default function SpotDetailPanel({
             <p className="text-sm text-white/80">
               {surfInfo.region}, {surfInfo.country}
             </p>
-            <div className="flex justify-between items-end">
-              <p className="text-xs text-white/60">
-                {coordinates.latitude.toFixed(4)}, {coordinates.longitude.toFixed(4)}
-              </p>
-              <p className="text-xs text-white/70">
-                {(() => {
-                  const date = new Date(surfInfo.SurfTimestamp);
-                  const year = date.getFullYear();
-                  const month = date.getMonth() + 1;
-                  const day = date.getDate();
-                  const hours = date.getHours().toString().padStart(2, '0');
-                  const minutes = date.getMinutes().toString().padStart(2, '0');
-                  return locale === 'ko'
-                    ? `${year}년 ${month}월 ${day}일 · ${hours}:${minutes}`
-                    : `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} · ${hours}:${minutes}`;
-                })()}
-              </p>
+            <p className="text-xs text-white/60">
+              {coordinates.latitude.toFixed(4)}, {coordinates.longitude.toFixed(4)}
+            </p>
+            {/* Surf Forecast Date - Prominent Display */}
+            <div className="mt-2 bg-white/20 rounded-lg px-3 py-1.5 inline-block">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span className="text-sm font-semibold text-white">
+                  {(() => {
+                    const date = new Date(surfInfo.SurfTimestamp);
+                    const year = date.getFullYear();
+                    const month = date.getMonth() + 1;
+                    const day = date.getDate();
+                    const hours = date.getHours().toString().padStart(2, '0');
+                    const minutes = date.getMinutes().toString().padStart(2, '0');
+                    return locale === 'ko'
+                      ? `${year}년 ${month}월 ${day}일 ${hours}:${minutes}`
+                      : `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} ${hours}:${minutes}`;
+                  })()}
+                </span>
+              </div>
             </div>
           </div>
           <button
@@ -142,11 +152,11 @@ export default function SpotDetailPanel({
             </div>
           </div>
           {/* Grade Box */}
-          <div className={`flex-1 p-2 rounded-xl ${getGradeBgColor(surfGrade)} text-center`}>
-            <div className="text-xs text-white/80 font-medium mb-0.5">
+          <div className={`flex-1 p-2 rounded-xl border ${getGradeBgColor(surfGrade)} ${getGradeBorderColor(surfGrade)} text-center`}>
+            <div className={`text-xs font-medium mb-0.5 ${getGradeTextColor(surfGrade)} opacity-80`}>
               {locale === 'ko' ? '등급' : 'Grade'}
             </div>
-            <div className="text-2xl font-bold text-white">
+            <div className={`text-2xl font-bold ${getGradeTextColor(surfGrade)}`}>
               {surfGrade}
             </div>
           </div>
@@ -178,11 +188,11 @@ export default function SpotDetailPanel({
             </div>
             <div>
               <div className="text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '풍속' : 'Wind Speed'}</div>
-              <div className="font-bold text-ocean-800">{windSpeed.toFixed(0)}km/h</div>
+              <div className="font-bold text-ocean-800">{windSpeed.toFixed(1)}km/h</div>
             </div>
             <div>
               <div className="text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '수온' : 'Water Temp'}</div>
-              <div className="font-bold text-ocean-800">{waterTemperature.toFixed(0)}°C</div>
+              <div className="font-bold text-ocean-800">{waterTemperature.toFixed(1)}°C</div>
             </div>
           </div>
         </div>
@@ -224,21 +234,21 @@ export default function SpotDetailPanel({
                 <tr className="border-b border-ocean-100">
                   <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '풍속' : 'Wind Speed'}</td>
                   {[0.9, 0.95, 1.0, 1.05, 0.98].map((v, idx) => (
-                    <td key={idx} className="py-1 px-1.5 text-center">{Math.round(windSpeed * v)}km/h</td>
+                    <td key={idx} className="py-1 px-1.5 text-center">{(windSpeed * v).toFixed(1)}km/h</td>
                   ))}
                 </tr>
                 {/* Water Temperature Row */}
                 <tr className="border-b border-ocean-100">
                   <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '수온' : 'Water Temp'}</td>
                   {[0, 0, 0, 0, 0].map((_, idx) => (
-                    <td key={idx} className="py-1 px-1.5 text-center">{Math.round(waterTemperature)}°</td>
+                    <td key={idx} className="py-1 px-1.5 text-center">{waterTemperature.toFixed(1)}°</td>
                   ))}
                 </tr>
                 {/* Air Temperature Row */}
                 <tr className="border-b border-ocean-100">
                   <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '기온' : 'Air Temp'}</td>
                   {[0.95, 1.0, 1.1, 1.15, 1.05].map((v, idx) => (
-                    <td key={idx} className="py-1 px-1.5 text-center">{Math.round((waterTemperature + 5) * v)}°</td>
+                    <td key={idx} className="py-1 px-1.5 text-center">{((waterTemperature + 5) * v).toFixed(1)}°</td>
                   ))}
                 </tr>
                 {/* Score Row with colored text */}

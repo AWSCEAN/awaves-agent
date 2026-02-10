@@ -3,9 +3,10 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import LogoOverlay from '@/components/LogoOverlay';
+import { getSavedLocale, saveLocale } from '@/lib/i18n';
 
 type Language = 'ko' | 'en';
 
@@ -46,9 +47,19 @@ const translations = {
 
 export default function LandingPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading, logout } = useAuth();
-  const [lang, setLang] = useState<Language>('en');
+  const { isAuthenticated, isLoading } = useAuth();
+  const [lang, setLangState] = useState<Language>('en');
   const t = translations[lang];
+
+  // Hydrate from persisted locale after mount
+  useEffect(() => {
+    setLangState(getSavedLocale());
+  }, []);
+
+  const setLang = (newLang: Language) => {
+    setLangState(newLang);
+    saveLocale(newLang);
+  };
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
@@ -58,107 +69,111 @@ export default function LandingPage() {
     }
   };
 
-  const handleLogout = async () => {
-    await logout();
-  };
-
   return (
     <>
       <LogoOverlay />
-      <main className="min-h-screen bg-sand-gradient">
+      <main className="h-screen flex flex-col overflow-hidden bg-sand-gradient">
         {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-40 glass">
-        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-end">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
-              className="text-sm font-medium text-ocean-700 hover:text-ocean-500"
-            >
-              {lang === 'ko' ? 'EN' : '한국어'}
-            </button>
-            {isLoading ? (
-              <span className="text-sm text-ocean-500">...</span>
-            ) : isAuthenticated ? (
-              <button onClick={handleLogout} className="btn-outline text-sm">
-                {t.logout}
+        <header className="flex-shrink-0 glass z-40">
+          <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-end">
+            <div className="flex items-center gap-3">
+              {/* Language Toggle (icon + label) */}
+              <button
+                onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
+                className="flex items-center gap-1 px-2 py-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
+                title={lang === 'ko' ? 'English' : '한국어'}
+              >
+                <svg className="w-4 h-4 text-ocean-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                </svg>
+                <span className="text-xs font-semibold text-ocean-700">{lang === 'ko' ? 'KO' : 'EN'}</span>
               </button>
-            ) : (
-              <Link href="/login" className="btn-outline text-sm">
-                {t.login}
-              </Link>
-            )}
+              {isLoading ? (
+                <span className="text-sm text-ocean-500">...</span>
+              ) : isAuthenticated ? (
+                <>
+                  {/* Saved Spots Link */}
+                  <Link href="/saved" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+                    {lang === 'ko' ? '저장된 스팟' : 'Saved Spots'}
+                  </Link>
+                  {/* Map Link */}
+                  <Link href="/map" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+                    {lang === 'ko' ? '지도' : 'Map'}
+                  </Link>
+                  {/* My Page Icon */}
+                  <Link
+                    href="/mypage"
+                    className="p-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
+                    title={lang === 'ko' ? '마이페이지' : 'My Page'}
+                  >
+                    <svg className="w-5 h-5 text-ocean-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </Link>
+                </>
+              ) : (
+                <Link href="/login" className="btn-outline text-sm">
+                  {t.login}
+                </Link>
+              )}
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Hero Section */}
-      <section className="pt-24 pb-20 px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="flex justify-center mb-6">
-            <Image
-              src="/awaves_main.svg"
-              alt="AWAVES"
-              width={280}
-              height={280}
-              className="animate-ripple"
-              style={{ width: 'auto', height: 'auto', maxWidth: '280px' }}
-            />
-          </div>
-          <h1 className="text-5xl font-bold text-ocean-800 mb-6">
-            {t.tagline}
-          </h1>
-          <p className="text-xl text-ocean-600 mb-10">
-            {t.subtitle}
-          </p>
-          <Link href="/map" className="btn-primary text-base px-10 py-3 inline-block whitespace-nowrap">
+        {/* Hero Section */}
+        <section className="flex-1 flex flex-col items-center justify-center px-4">
+          <div className="max-w-4xl mx-auto text-center">
+            <div className="flex justify-center mb-4">
+              <Image
+                src="/awaves_main.svg"
+                alt="AWAVES"
+                width={200}
+                height={200}
+                className="animate-ripple"
+                style={{ width: 'auto', height: 'auto', maxWidth: '200px' }}
+              />
+            </div>
+            <h1 className="text-4xl font-bold text-ocean-800 mb-3">
+              {t.tagline}
+            </h1>
+            <p className="text-lg text-ocean-600 mb-6">
+              {t.subtitle}
+            </p>
             <button onClick={handleGetStarted} className="btn-primary text-lg px-8 py-3">
               {t.cta}
             </button>
-          </Link>
-        </div>
-
-        {/* Wave illustration placeholder */}
-        <div className="max-w-5xl mx-auto mt-16">
-          <div className="aspect-video bg-ocean-gradient rounded-2xl flex items-center justify-center text-white/50 text-lg">
-            🌊 Interactive Map Preview
           </div>
-        </div>
-      </section>
 
-      {/* Features Section */}
-      <section className="py-20 px-4 bg-white/50">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-ocean-800 text-center mb-12">
-            {t.features.title}
-          </h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            <FeatureCard
-              icon="🌊"
-              title={t.features.realtime}
-              description={t.features.realtimeDesc}
-            />
-            <FeatureCard
-              icon="🤖"
-              title={t.features.ai}
-              description={t.features.aiDesc}
-            />
-            <FeatureCard
-              icon="💾"
-              title={t.features.save}
-              description={t.features.saveDesc}
-            />
+          {/* Features Row */}
+          <div className="max-w-5xl mx-auto mt-8 w-full">
+            <div className="grid grid-cols-3 gap-4">
+              <FeatureCard
+                icon="🌊"
+                title={t.features.realtime}
+                description={t.features.realtimeDesc}
+              />
+              <FeatureCard
+                icon="🤖"
+                title={t.features.ai}
+                description={t.features.aiDesc}
+              />
+              <FeatureCard
+                icon="💾"
+                title={t.features.save}
+                description={t.features.saveDesc}
+              />
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Footer */}
-      <footer className="py-8 px-4 bg-ocean-900 text-white/70">
-        <div className="max-w-6xl mx-auto text-center">
-          <p className="text-sm">
-            © 2024 AWAVES. All rights reserved.
-          </p>
-        </div>
-      </footer>
+        {/* Footer */}
+        <footer className="flex-shrink-0 py-3 px-4 bg-ocean-900 text-white/70">
+          <div className="max-w-6xl mx-auto text-center">
+            <p className="text-xs">
+              © 2024 AWAVES. All rights reserved.
+            </p>
+          </div>
+        </footer>
       </main>
     </>
   );
@@ -174,10 +189,10 @@ function FeatureCard({
   description: string;
 }) {
   return (
-    <div className="card text-center">
-      <div className="text-4xl mb-4">{icon}</div>
-      <h3 className="text-xl font-semibold text-ocean-800 mb-2">{title}</h3>
-      <p className="text-ocean-600">{description}</p>
+    <div className="card text-center py-4 px-3">
+      <div className="text-2xl mb-2">{icon}</div>
+      <h3 className="text-sm font-semibold text-ocean-800 mb-1">{title}</h3>
+      <p className="text-xs text-ocean-600">{description}</p>
     </div>
   );
 }
