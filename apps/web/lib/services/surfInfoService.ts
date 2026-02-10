@@ -20,8 +20,8 @@ export function generateSurfingLevel(waveHeight: number, windSpeed: number): Sur
 export function getGradeBgColor(grade: string): string {
   switch (grade) {
     case 'A': return 'bg-green-500';
-    case 'B': return 'bg-blue-500';
-    case 'C': return 'bg-yellow-500';
+    case 'B': return 'bg-yellow-500';
+    case 'C': return 'bg-orange-500';
     case 'D': return 'bg-red-500';
     default: return 'bg-gray-500';
   }

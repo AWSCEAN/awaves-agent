@@ -12,6 +12,7 @@ interface SpotDetailPanelProps {
   onClose: () => void;
   onSave?: () => void;
   onRemove?: () => void;
+  showLocationPrompt?: boolean;
 }
 
 function getScoreColor(score: number): string {
@@ -32,7 +33,8 @@ export default function SpotDetailPanel({
   isSaved = false,
   onClose,
   onSave,
-  onRemove
+  onRemove,
+  showLocationPrompt = false
 }: SpotDetailPanelProps) {
   const locale = useLocale();
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
@@ -49,28 +51,71 @@ export default function SpotDetailPanel({
 
   const getLevelLabel = (level: string): string => {
     switch (level) {
-      case 'BEGINNER': return locale === 'ko' ? '초급' : 'Beginner';
-      case 'INTERMEDIATE': return locale === 'ko' ? '중급' : 'Intermediate';
-      case 'ADVANCED': return locale === 'ko' ? '상급' : 'Advanced';
+      case 'BEGINNER': return locale === 'ko' ? '초급' : 'Beg';
+      case 'INTERMEDIATE': return locale === 'ko' ? '중급' : 'Int';
+      case 'ADVANCED': return locale === 'ko' ? '상급' : 'Adv';
       default: return level;
     }
   };
 
   return (
-    <div className="absolute right-0 top-0 bottom-0 w-80 bg-white shadow-xl z-40 flex flex-col animate-slide-in-right">
+    <div className={`fixed right-0 bottom-0 w-[420px] bg-white shadow-xl z-40 flex flex-col animate-slide-in-right transition-all duration-300 ${showLocationPrompt ? 'top-[100px]' : 'top-14'}`}>
       {/* Header */}
-      <div className="bg-ocean-gradient px-4 py-4">
+      <div className="bg-ocean-gradient px-4 py-3">
         <div className="flex justify-between items-start">
           <div className="flex-1 min-w-0 pr-2">
-            <h3 className="font-semibold text-white text-lg truncate">
-              {displayName}
-            </h3>
-            <p className="text-sm text-white/80 mt-1">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-white text-lg truncate">
+                {displayName}
+              </h3>
+              {(onSave || (isSaved && onRemove)) && (
+                <button
+                  onClick={() => {
+                    if (isSaved && onRemove) {
+                      setShowConfirmDelete(true);
+                    } else if (onSave) {
+                      onSave();
+                    }
+                  }}
+                  className="p-1 text-white/80 hover:text-white hover:bg-white/10 rounded transition-colors flex-shrink-0"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill={isSaved ? 'currentColor' : 'none'}
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+            <p className="text-sm text-white/80">
               {surfInfo.region}, {surfInfo.country}
             </p>
-            <p className="text-xs text-white/60 mt-1">
-              {coordinates.latitude.toFixed(4)}, {coordinates.longitude.toFixed(4)}
-            </p>
+            <div className="flex justify-between items-end">
+              <p className="text-xs text-white/60">
+                {coordinates.latitude.toFixed(4)}, {coordinates.longitude.toFixed(4)}
+              </p>
+              <p className="text-xs text-white/70">
+                {(() => {
+                  const date = new Date(surfInfo.SurfTimestamp);
+                  const year = date.getFullYear();
+                  const month = date.getMonth() + 1;
+                  const day = date.getDate();
+                  const hours = date.getHours().toString().padStart(2, '0');
+                  const minutes = date.getMinutes().toString().padStart(2, '0');
+                  return locale === 'ko'
+                    ? `${year}년 ${month}월 ${day}일 · ${hours}:${minutes}`
+                    : `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} · ${hours}:${minutes}`;
+                })()}
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -84,111 +129,135 @@ export default function SpotDetailPanel({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Score + Grade */}
-        <div className="flex justify-center gap-3">
-          <div className={`text-center p-4 rounded-xl border ${getScoreBgColor(surfScore)} flex-1`}>
-            <div className="text-xs text-ocean-600 mb-1 font-medium">
-              {locale === 'ko' ? '서핑 점수' : 'Surf Score'}
+      <div className="p-3 space-y-3">
+        {/* Score + Grade + Level - Three boxes horizontally */}
+        <div className="flex gap-2">
+          {/* Score Box */}
+          <div className={`flex-1 p-2 rounded-xl border ${getScoreBgColor(surfScore)} text-center`}>
+            <div className="text-xs text-ocean-600 font-medium mb-0.5">
+              {locale === 'ko' ? '점수' : 'Score'}
             </div>
-            <div className={`text-3xl font-bold ${getScoreColor(surfScore)}`}>
+            <div className={`text-2xl font-bold ${getScoreColor(surfScore)}`}>
               {Math.round(surfScore)}
             </div>
-            <div className="text-xs text-ocean-600 mt-1">
-              {getScoreLabel(surfScore)}
-            </div>
           </div>
-          <div className="flex flex-col items-center justify-center gap-2">
-            <div className={`w-12 h-12 rounded-xl ${getGradeBgColor(surfGrade)} text-white flex items-center justify-center text-xl font-bold`}>
+          {/* Grade Box */}
+          <div className={`flex-1 p-2 rounded-xl ${getGradeBgColor(surfGrade)} text-center`}>
+            <div className="text-xs text-white/80 font-medium mb-0.5">
+              {locale === 'ko' ? '등급' : 'Grade'}
+            </div>
+            <div className="text-2xl font-bold text-white">
               {surfGrade}
             </div>
-            <div className="text-xs text-ocean-600 font-medium">
+          </div>
+          {/* Level Box */}
+          <div className="flex-1 p-2 rounded-xl bg-ocean-100 border border-ocean-200 text-center">
+            <div className="text-xs text-ocean-600 font-medium mb-0.5">
+              {locale === 'ko' ? '숙련도' : 'Level'}
+            </div>
+            <div className="text-2xl font-bold text-ocean-800">
               {getLevelLabel(surfingLevel)}
             </div>
           </div>
         </div>
 
-        {/* Wave Conditions */}
-        <div className="bg-sand-50 rounded-xl p-4">
-          <h4 className="text-sm font-semibold text-ocean-800 mb-3 flex items-center gap-2">
-            <span className="text-lg">🌊</span>
-            {locale === 'ko' ? '파도 조건' : 'Wave Conditions'}
+        {/* Current Conditions */}
+        <div className="bg-sand-50 rounded-xl p-2.5">
+          <h4 className="text-sm font-semibold text-ocean-800 mb-1 flex items-center gap-2">
+            <span className="text-base">🌊</span>
+            {locale === 'ko' ? '현재 조건' : 'Current Conditions'}
           </h4>
-          <div className="space-y-2">
-            <DataRow
-              label={locale === 'ko' ? '파고' : 'Wave Height'}
-              value={`${waveHeight.toFixed(1)}m`}
-            />
-            <DataRow
-              label={locale === 'ko' ? '파주기' : 'Wave Period'}
-              value={`${wavePeriod.toFixed(1)}s`}
-            />
+          <div className="grid grid-cols-4 gap-3 text-center text-xs">
+            <div>
+              <div className="text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '파고' : 'Wave Height'}</div>
+              <div className="font-bold text-ocean-800">{waveHeight.toFixed(1)}m</div>
+            </div>
+            <div>
+              <div className="text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '파주기' : 'Wave Period'}</div>
+              <div className="font-bold text-ocean-800">{wavePeriod.toFixed(1)}s</div>
+            </div>
+            <div>
+              <div className="text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '풍속' : 'Wind Speed'}</div>
+              <div className="font-bold text-ocean-800">{windSpeed.toFixed(0)}km/h</div>
+            </div>
+            <div>
+              <div className="text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '수온' : 'Water Temp'}</div>
+              <div className="font-bold text-ocean-800">{waterTemperature.toFixed(0)}°C</div>
+            </div>
           </div>
         </div>
 
-        {/* Wind Conditions */}
-        <div className="bg-sand-50 rounded-xl p-4">
-          <h4 className="text-sm font-semibold text-ocean-800 mb-3 flex items-center gap-2">
-            <span className="text-lg">💨</span>
-            {locale === 'ko' ? '바람 조건' : 'Wind Conditions'}
+        {/* Hourly Forecast Table - Rows: metrics, Columns: time */}
+        <div className="bg-sand-50 rounded-xl p-2.5">
+          <h4 className="text-sm font-semibold text-ocean-800 mb-1.5 flex items-center gap-2">
+            <span className="text-base">📊</span>
+            {locale === 'ko' ? '시간대별 예보' : 'Hourly Forecast'}
           </h4>
-          <div className="space-y-2">
-            <DataRow
-              label={locale === 'ko' ? '풍속' : 'Wind Speed'}
-              value={`${windSpeed.toFixed(0)} km/h`}
-            />
-          </div>
-        </div>
-
-        {/* Temperature */}
-        <div className="bg-sand-50 rounded-xl p-4">
-          <h4 className="text-sm font-semibold text-ocean-800 mb-3 flex items-center gap-2">
-            <span className="text-lg">🌡️</span>
-            {locale === 'ko' ? '온도' : 'Temperature'}
-          </h4>
-          <div className="space-y-2">
-            <DataRow
-              label={locale === 'ko' ? '수온' : 'Water Temp'}
-              value={`${waterTemperature.toFixed(0)}°C`}
-            />
+          <div>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-ocean-600 border-b border-ocean-200">
+                  <th className="py-0.5 px-1.5 text-left font-medium w-20"></th>
+                  {[6, 9, 12, 15, 18].map((hour) => (
+                    <th key={hour} className="py-0.5 px-1.5 text-center font-medium">
+                      {hour.toString().padStart(2, '0')}:00
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="text-ocean-800">
+                {/* Wave Height Row */}
+                <tr className="border-b border-ocean-100">
+                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '파고' : 'Wave Height'}</td>
+                  {[0.9, 0.95, 1.0, 1.05, 0.98].map((v, idx) => (
+                    <td key={idx} className="py-1 px-1.5 text-center">{(waveHeight * v).toFixed(1)}m</td>
+                  ))}
+                </tr>
+                {/* Wave Period Row */}
+                <tr className="border-b border-ocean-100">
+                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '파주기' : 'Wave Period'}</td>
+                  {[0.9, 0.95, 1.0, 1.05, 0.98].map((v, idx) => (
+                    <td key={idx} className="py-1 px-1.5 text-center">{(wavePeriod * v).toFixed(1)}s</td>
+                  ))}
+                </tr>
+                {/* Wind Speed Row */}
+                <tr className="border-b border-ocean-100">
+                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '풍속' : 'Wind Speed'}</td>
+                  {[0.9, 0.95, 1.0, 1.05, 0.98].map((v, idx) => (
+                    <td key={idx} className="py-1 px-1.5 text-center">{Math.round(windSpeed * v)}km/h</td>
+                  ))}
+                </tr>
+                {/* Water Temperature Row */}
+                <tr className="border-b border-ocean-100">
+                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '수온' : 'Water Temp'}</td>
+                  {[0, 0, 0, 0, 0].map((_, idx) => (
+                    <td key={idx} className="py-1 px-1.5 text-center">{Math.round(waterTemperature)}°</td>
+                  ))}
+                </tr>
+                {/* Air Temperature Row */}
+                <tr className="border-b border-ocean-100">
+                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '기온' : 'Air Temp'}</td>
+                  {[0.95, 1.0, 1.1, 1.15, 1.05].map((v, idx) => (
+                    <td key={idx} className="py-1 px-1.5 text-center">{Math.round((waterTemperature + 5) * v)}°</td>
+                  ))}
+                </tr>
+                {/* Score Row with colored text */}
+                <tr>
+                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '점수' : 'Score'}</td>
+                  {[0.85, 0.92, 1.0, 0.95, 0.88].map((v, idx) => {
+                    const score = Math.round(surfScore * v);
+                    return (
+                      <td key={idx} className={`py-1 px-1.5 text-center font-bold ${getScoreColor(score)}`}>
+                        {score}
+                      </td>
+                    );
+                  })}
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
-
-      {/* Footer - Save/Remove Button */}
-      {(onSave || (isSaved && onRemove)) && (
-        <div className="p-4 border-t border-sand-200">
-          <button
-            onClick={() => {
-              if (isSaved && onRemove) {
-                setShowConfirmDelete(true);
-              } else if (onSave) {
-                onSave();
-              }
-            }}
-            className={`w-full py-3 px-4 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-              isSaved
-                ? 'bg-coral-500 text-white hover:bg-coral-600'
-                : 'bg-ocean-500 text-white hover:bg-ocean-600'
-            }`}
-          >
-            <svg
-              className="w-5 h-5"
-              fill={isSaved ? 'currentColor' : 'none'}
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-              />
-            </svg>
-            {isSaved ? (locale === 'ko' ? '저장 취소' : 'Remove from Saved') : (locale === 'ko' ? '저장' : 'Save Spot')}
-          </button>
-        </div>
-      )}
 
       {/* Delete Confirmation Modal */}
       {showConfirmDelete && (

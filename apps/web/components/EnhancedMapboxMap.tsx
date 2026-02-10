@@ -124,6 +124,8 @@ export default function EnhancedMapboxMap({
       setTimeout(() => map.current?.resize(), 0),
       setTimeout(() => map.current?.resize(), 100),
       setTimeout(() => map.current?.resize(), 500),
+      setTimeout(() => map.current?.resize(), 1000),
+      setTimeout(() => map.current?.resize(), 1500),
     ];
 
     const resizeObserver = new ResizeObserver(() => {
@@ -146,6 +148,20 @@ export default function EnhancedMapboxMap({
     selectedDateRef.current = selectedDate;
   }, [selectedDate]);
 
+  // Force resize after map is fully loaded to ensure controls are properly positioned
+  useEffect(() => {
+    if (!map.current || !isMapLoaded) return;
+
+    // Additional resize calls after map is loaded
+    const timers = [
+      setTimeout(() => map.current?.resize(), 100),
+      setTimeout(() => map.current?.resize(), 300),
+      setTimeout(() => map.current?.resize(), 600),
+    ];
+
+    return () => timers.forEach(clearTimeout);
+  }, [isMapLoaded]);
+
   useEffect(() => {
     if (!map.current || !isMapLoaded) return;
 
@@ -160,9 +176,10 @@ export default function EnhancedMapboxMap({
       // Skip surfer marker if spot is saved (heart marker will be shown instead)
       if (savedLocationIds.has(spot.LocationId)) return;
 
+      const markerColor = getSurfScoreColor(spot.derivedMetrics.surfScore);
       const el = createMarkerElement(
         '\u{1F3C4}',
-        '#0091c3',
+        markerColor,
         () => {
           showSurfInfoAtCoords(
             spot.geo.lng,
@@ -569,9 +586,10 @@ export default function EnhancedMapboxMap({
 
       // Add a temporary marker at the nearby spot if it doesn't already have one
       if (!markersRef.current[spot.LocationId]) {
+        const nearbyMarkerColor = getSurfScoreColor(spot.derivedMetrics.surfScore);
         const el = createMarkerElement(
           '\u{1F3C4}',
-          '#0091c3',
+          nearbyMarkerColor,
           () => {
             showSurfInfoAtCoords(spot.geo.lng, spot.geo.lat, spot, selectedDateRef.current);
           }

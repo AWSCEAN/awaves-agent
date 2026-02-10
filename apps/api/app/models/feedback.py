@@ -3,14 +3,14 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import BigInteger, Boolean, DateTime, String
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
 
 
 class Feedback(Base):
-    """Feedback model for Aurora PostgreSQL (refactored schema)."""
+    """Feedback model for Aurora PostgreSQL."""
 
     __tablename__ = "feedback"
 
@@ -25,4 +25,4 @@ class Feedback(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<Feedback {self.id} - {self.feedback_status}>"
+        return f"<Feedback {self.id} - {self.type}>"

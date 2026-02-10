@@ -44,6 +44,7 @@ app.add_middleware(
 )
 
 # Include routers
+# Include routers
 app.include_router(register.router, tags=["Registration"])  # /register at root level
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(surf.router, prefix="/surf", tags=["Surf Data"])
