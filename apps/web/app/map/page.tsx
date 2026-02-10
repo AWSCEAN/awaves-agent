@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic';
 import { format, addDays, differenceInDays, parseISO } from 'date-fns';
 import { ko, enUS } from 'date-fns/locale';
 import { useTranslations, useLocale } from 'next-intl';
-import AwavesLogo from '@/components/AwavesLogo';
+import LogoOverlay from '@/components/LogoOverlay';
 import LocationAutocomplete from '@/components/LocationAutocomplete';
 import SearchResultsList from '@/components/SearchResultsList';
 import type { SearchResult } from '@/components/SearchResultsList';
@@ -47,8 +47,7 @@ function MapPageContent() {
 
   // User location state
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
-  const [locationPermissionAsked, setLocationPermissionAsked] = useState(false);
+  const [showLocationPrompt, setShowLocationPrompt] = useState(true);
 
   // Results state
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -112,11 +111,6 @@ function MapPageContent() {
   };
 
   const handleSearch = useCallback(() => {
-    if (!locationPermissionAsked && !userLocation) {
-      setShowLocationPrompt(true);
-      setLocationPermissionAsked(true);
-    }
-
     const results = searchSpotsWithFilters({
       location: locationQuery || undefined,
       date: format(selectedDate, 'yyyy-MM-dd'),
@@ -130,7 +124,7 @@ function MapPageContent() {
     setShowResults(true);
     setHasSearched(true);
     setSelectedSpotDetail(null);
-  }, [locationQuery, selectedDate, selectedTime, surferLevel, userLocation, locationPermissionAsked]);
+  }, [locationQuery, selectedDate, selectedTime, surferLevel, userLocation]);
 
   const handleAllowLocation = () => {
     if ('geolocation' in navigator) {
@@ -219,17 +213,13 @@ function MapPageContent() {
 
   return (
     <ProtectedRoute>
+    <LogoOverlay />
     <div className="h-screen flex flex-col">
       {/* Header with Search Bar */}
-      <header className="glass z-50 px-4 py-2">
+      <header className="fixed top-0 left-0 right-0 z-40 glass px-4 py-2">
         <div className="flex items-center gap-3">
-          {/* Logo */}
-          <Link href="/" className="flex-shrink-0">
-            <AwavesLogo size="sm" />
-          </Link>
-
           {/* Search Inputs */}
-          <div className="flex-1 flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap ml-36 flex-1 justify-center">
             {/* Location */}
             <LocationAutocomplete
               value={locationQuery}
@@ -322,7 +312,7 @@ function MapPageContent() {
           </div>
 
           {/* Right side controls */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
             {/* Toggle Buttons */}
             <button
               onClick={() => setShowWindParticles(!showWindParticles)}
@@ -343,27 +333,13 @@ function MapPageContent() {
               {t('surfScore')}
             </button>
 
-            {/* Divider */}
-            <div className="w-px h-6 bg-sand-200" />
-
             {/* Saved Link */}
             <Link
               href="/saved"
-              className="text-ocean-700 hover:text-ocean-500 text-xs font-medium"
+              className="text-sm font-medium text-ocean-700 hover:text-ocean-500"
             >
               {t('saved')}
             </Link>
-
-            {/* Divider */}
-            <div className="w-px h-6 bg-sand-200" />
-
-            {/* Language Toggle */}
-            <button
-              onClick={toggleLocale}
-              className="text-xs text-ocean-600 hover:text-ocean-500 font-medium"
-            >
-              {locale === 'ko' ? 'EN' : '한국어'}
-            </button>
 
             {/* Profile Icon */}
             <Link
@@ -380,13 +356,24 @@ function MapPageContent() {
                 />
               </svg>
             </Link>
+
+            {/* Language Toggle */}
+            <button
+              onClick={toggleLocale}
+              className="flex items-center gap-1 text-sm font-medium text-ocean-700 hover:text-ocean-500"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+              </svg>
+              {locale === 'ko' ? 'KO' : 'EN'}
+            </button>
           </div>
         </div>
       </header>
 
       {/* Location Permission Prompt */}
       {showLocationPrompt && (
-        <div className="glass px-4 py-3 border-t border-sand-200 flex items-center justify-between bg-blue-50">
+        <div className="fixed top-14 left-0 right-0 z-50 px-4 py-3 border-t border-sand-200 flex items-center justify-between bg-blue-100 shadow-md">
           <div className="flex items-center gap-2 text-sm text-ocean-700">
             <svg className="w-5 h-5 text-ocean-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -422,7 +409,7 @@ function MapPageContent() {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 relative min-h-0">
+      <div className="flex-1 relative min-h-0 mt-14">
         {/* Search Results Panel */}
         <SearchResultsList
           results={searchResults}
@@ -442,6 +429,7 @@ function MapPageContent() {
           isWeeklyEstimate={isWeeklyEstimate}
           weekRange={weekRange}
           onVisibleItemsChange={setVisibleSpots}
+          showLocationPrompt={showLocationPrompt}
         />
 
         {/* Map */}
@@ -547,6 +535,7 @@ function MapPageContent() {
             onRemove={() => {
               handleRemoveSpot(selectedSpotDetail.surfInfo.LocationId);
             }}
+            showLocationPrompt={showLocationPrompt}
           />
         )}
       </div>
