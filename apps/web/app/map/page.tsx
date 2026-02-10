@@ -41,11 +41,15 @@ function MapPageContent() {
   const tSearch = useTranslations('search');
   const searchParams = useSearchParams();
 
-  // Search state
+  // Search state - input values (what user is selecting)
   const [locationQuery, setLocationQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [surferLevel, setSurferLevel] = useState<SurferLevel | ''>('');
+
+  // Search state - active values (what was last searched, only update on search button click)
+  const [searchDate, setSearchDate] = useState<Date>(new Date());
+  const [searchTime, setSearchTime] = useState<string>('');
 
   // User location state
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -214,8 +218,11 @@ function MapPageContent() {
     setShowResults(true);
     setHasSearched(true);
     setSelectedSpotDetail(null);
+    // Update active search criteria only when search button is clicked
+    setSearchDate(selectedDate);
+    setSearchTime(selectedTime);
     await fetchSpots(locationQuery || undefined);
-  }, [locationQuery, fetchSpots]);
+  }, [locationQuery, selectedDate, selectedTime, fetchSpots]);
 
   const handleAllowLocation = () => {
     if ('geolocation' in navigator) {
@@ -299,7 +306,10 @@ function MapPageContent() {
     setShowResults(true);
     setHasSearched(true);
     setSelectedSpotDetail(null);
-  }, [effectiveUserLocation]);
+    // Update active search criteria
+    setSearchDate(selectedDate);
+    setSearchTime(selectedTime);
+  }, [effectiveUserLocation, selectedDate, selectedTime]);
 
   const toggleLocale = () => {
     setLocale(locale === 'ko' ? 'en' : 'ko');
@@ -544,8 +554,8 @@ function MapPageContent() {
           onSaveSpot={handleSaveSpot}
           onRemoveSpot={handleRemoveSpot}
           savedSpotIds={savedSpotIds}
-          selectedDate={selectedDate}
-          selectedTime={selectedTime}
+          selectedDate={searchDate}
+          selectedTime={searchTime}
           onSuggestByDistance={handleSuggestByDistance}
           userLocation={effectiveUserLocation}
           isWeeklyEstimate={isWeeklyEstimate}

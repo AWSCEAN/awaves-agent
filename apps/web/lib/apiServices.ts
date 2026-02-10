@@ -225,6 +225,13 @@ export const authService = {
     return apiRequest<CommonApiResponse<UserV2>>('/auth/me');
   },
 
+  async updateUserLevel(userLevel: string): Promise<ApiResponse<CommonApiResponse<UserV2>>> {
+    return apiRequest<CommonApiResponse<UserV2>>('/auth/me/level', {
+      method: 'PATCH',
+      body: JSON.stringify({ user_level: userLevel }),
+    });
+  },
+
   async refreshToken(): Promise<ApiResponse<AuthTokens>> {
     const refreshed = await synchronizedTokenRefresh();
     if (refreshed) {

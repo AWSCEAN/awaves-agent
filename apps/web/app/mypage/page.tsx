@@ -7,6 +7,7 @@ import LogoOverlay from '@/components/LogoOverlay';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { getSavedLocale, saveLocale } from '@/lib/i18n';
+import { authService } from '@/lib/apiServices';
 import type { SurferLevel } from '@/types';
 
 type Language = 'ko' | 'en';
@@ -93,9 +94,11 @@ const translations = {
 
 export default function MyPage() {
   const router = useRouter();
-  const { user: authUser, logout } = useAuth();
+  const { user: authUser, logout, refreshAuth } = useAuth();
   const [lang, setLangState] = useState<Language>('en');
   const [userLevel, setSurferLevel] = useState<SurferLevel>('beginner');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const t = translations[lang];
 
   // Hydrate from persisted locale after mount
@@ -103,14 +106,35 @@ export default function MyPage() {
     setLangState(getSavedLocale());
   }, []);
 
+  // Initialize userLevel from authUser
+  useEffect(() => {
+    if (authUser?.user_level) {
+      setSurferLevel(authUser.user_level as SurferLevel);
+    }
+  }, [authUser]);
+
   const setLang = (newLang: Language) => {
     setLangState(newLang);
     saveLocale(newLang);
   };
 
-  const handleSaveProfile = () => {
-    // TODO: Implement profile save
-    console.log('Save profile:', { userLevel });
+  const handleSaveProfile = async () => {
+    setIsSaving(true);
+    setSaveMessage(null);
+    try {
+      const response = await authService.updateUserLevel(userLevel);
+      if (response.success && response.data?.result === 'success') {
+        setSaveMessage(lang === 'ko' ? '저장되었습니다!' : 'Saved successfully!');
+        await refreshAuth();
+      } else {
+        setSaveMessage(lang === 'ko' ? '저장에 실패했습니다' : 'Failed to save');
+      }
+    } catch {
+      setSaveMessage(lang === 'ko' ? '오류가 발생했습니다' : 'An error occurred');
+    } finally {
+      setIsSaving(false);
+      setTimeout(() => setSaveMessage(null), 3000);
+    }
   };
 
   const handleLogout = async () => {
@@ -184,18 +208,6 @@ export default function MyPage() {
 
             <div>
               <label className="block text-sm font-medium text-ocean-700 mb-1">
-                {t.password}
-              </label>
-              <input
-                type="password"
-                value="••••••••"
-                disabled
-                className="input-field bg-sand-100 cursor-not-allowed"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-ocean-700 mb-1">
                 {t.surfingLevel}
               </label>
               {/* Toggle-style level selector */}
@@ -232,9 +244,18 @@ export default function MyPage() {
             </div>
 
             <div className="flex justify-between items-center pt-4">
-              <button onClick={handleSaveProfile} className="btn-primary">
-                {t.save}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleSaveProfile}
+                  disabled={isSaving}
+                  className="btn-primary disabled:opacity-50"
+                >
+                  {isSaving ? '...' : t.save}
+                </button>
+                {saveMessage && (
+                  <span className="text-sm text-green-600">{saveMessage}</span>
+                )}
+              </div>
               <button onClick={handleLogout} className="btn-outline text-sm text-red-500 border-red-300 hover:bg-red-50">
                 {t.logout}
               </button>

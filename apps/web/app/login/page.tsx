@@ -126,15 +126,6 @@ export default function LoginPage() {
               />
             </div>
 
-            <div className="text-right">
-              <Link
-                href="/forgot-password"
-                className="text-sm text-ocean-500 hover:text-ocean-600"
-              >
-                {t.forgotPassword}
-              </Link>
-            </div>
-
             {error && (
               <p className="text-sunset-500 text-sm text-center">{error}</p>
             )}

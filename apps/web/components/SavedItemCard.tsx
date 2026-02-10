@@ -33,6 +33,7 @@ const translations = {
     surfGrade: '등급',
     level: '레벨',
     departureDate: '출발 예정',
+    forecastDate: '예측 일시',
     changeDetected: '조건이 변경되었습니다',
     acknowledgeChange: '확인',
     feedbackQuestion: '이 서핑 예측이 도움이 되었나요?',
@@ -54,6 +55,7 @@ const translations = {
     surfGrade: 'Grade',
     level: 'Level',
     departureDate: 'Departure',
+    forecastDate: 'Forecast Date',
     changeDetected: 'Conditions Changed',
     acknowledgeChange: 'Got it',
     feedbackQuestion: 'Was this surf prediction helpful?',
@@ -124,61 +126,100 @@ export default function SavedItemCard({
           </button>
         </div>
 
-        {/* Grades and Level */}
+        {/* Score and Grade - Prominent Display */}
+        <div className="flex items-center gap-3 mb-4">
+          {/* Surf Score */}
+          <div className="flex-1 bg-gradient-to-br from-ocean-50 to-sand-50 rounded-xl p-3 border border-ocean-100">
+            <div className="text-xs text-ocean-500 font-medium mb-1">{t.surfScore}</div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-3xl font-bold text-ocean-800">{item.surf_score.toFixed(0)}</span>
+              <span className="text-sm text-ocean-400">/100</span>
+            </div>
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden mt-2">
+              <div
+                className="h-full bg-gradient-to-r from-ocean-400 to-ocean-600 rounded-full transition-all"
+                style={{ width: `${item.surf_score}%` }}
+              />
+            </div>
+          </div>
+          {/* Grade Badge */}
+          <div className={`w-16 h-16 rounded-xl flex flex-col items-center justify-center shadow-sm ${gradeColors[item.surf_grade] || 'bg-gray-100'}`}>
+            <span className="text-2xl font-bold">{item.surf_grade}</span>
+            <span className="text-[10px] opacity-80">{t.surfGrade}</span>
+          </div>
+        </div>
+
+        {/* Level Badge */}
         <div className="flex items-center gap-2 mb-3">
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${gradeColors[item.surf_grade] || 'bg-gray-100'}`}>
-            {t.surfGrade}: {item.surf_grade}
-          </span>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-ocean-100 text-ocean-700">
+          <span className="text-sm px-3 py-1 rounded-lg bg-ocean-100 text-ocean-700 font-medium">
             {t.level}: {item.surfer_level}
           </span>
         </div>
 
-        {/* Surf Score */}
-        <div className="mb-3">
-          <div className="flex items-center justify-between text-sm mb-1">
-            <span className="text-ocean-600">{t.surfScore}</span>
-            <span className="font-bold text-ocean-800">{item.surf_score.toFixed(0)}/100</span>
-          </div>
-          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-ocean-400 to-ocean-600 rounded-full"
-              style={{ width: `${item.surf_score}%` }}
-            />
-          </div>
-        </div>
-
         {/* Conditions Grid */}
-        <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="grid grid-cols-2 gap-2">
           {item.wave_height !== undefined && (
-            <div className="flex items-center gap-1">
-              <span>🌊</span>
-              <span className="text-ocean-600">{t.waveHeight}:</span>
-              <span className="font-medium text-ocean-800">{item.wave_height}m</span>
+            <div className="flex items-center gap-2 bg-sand-50 rounded-lg px-2.5 py-1.5">
+              <span className="text-lg">🌊</span>
+              <div>
+                <div className="text-xs text-ocean-500">{t.waveHeight}</div>
+                <div className="font-semibold text-ocean-800">{Number(item.wave_height).toFixed(1)}m</div>
+              </div>
             </div>
           )}
           {item.wave_period !== undefined && (
-            <div className="flex items-center gap-1">
-              <span>⏱️</span>
-              <span className="text-ocean-600">{t.wavePeriod}:</span>
-              <span className="font-medium text-ocean-800">{item.wave_period}s</span>
+            <div className="flex items-center gap-2 bg-sand-50 rounded-lg px-2.5 py-1.5">
+              <span className="text-lg">⏱️</span>
+              <div>
+                <div className="text-xs text-ocean-500">{t.wavePeriod}</div>
+                <div className="font-semibold text-ocean-800">{Number(item.wave_period).toFixed(1)}s</div>
+              </div>
             </div>
           )}
           {item.wind_speed !== undefined && (
-            <div className="flex items-center gap-1">
-              <span>💨</span>
-              <span className="text-ocean-600">{t.windSpeed}:</span>
-              <span className="font-medium text-ocean-800">{item.wind_speed}km/h</span>
+            <div className="flex items-center gap-2 bg-sand-50 rounded-lg px-2.5 py-1.5">
+              <span className="text-lg">💨</span>
+              <div>
+                <div className="text-xs text-ocean-500">{t.windSpeed}</div>
+                <div className="font-semibold text-ocean-800">{Number(item.wind_speed).toFixed(1)}km/h</div>
+              </div>
             </div>
           )}
           {item.water_temperature !== undefined && (
-            <div className="flex items-center gap-1">
-              <span>🌡️</span>
-              <span className="text-ocean-600">{t.waterTemp}:</span>
-              <span className="font-medium text-ocean-800">{item.water_temperature}°C</span>
+            <div className="flex items-center gap-2 bg-sand-50 rounded-lg px-2.5 py-1.5">
+              <span className="text-lg">🌡️</span>
+              <div>
+                <div className="text-xs text-ocean-500">{t.waterTemp}</div>
+                <div className="font-semibold text-ocean-800">{Number(item.water_temperature).toFixed(1)}°C</div>
+              </div>
             </div>
           )}
         </div>
+
+        {/* Surf Forecast Date - Prominent Display */}
+        {item.surf_timestamp && (
+          <div className="mt-3 bg-ocean-50 rounded-lg px-3 py-2 flex items-center gap-2">
+            <svg className="w-4 h-4 text-ocean-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <div>
+              <div className="text-xs text-ocean-500">{t.forecastDate}</div>
+              <div className="font-semibold text-ocean-800">
+                {(() => {
+                  const date = new Date(item.surf_timestamp);
+                  const year = date.getFullYear();
+                  const month = date.getMonth() + 1;
+                  const day = date.getDate();
+                  const hours = date.getHours().toString().padStart(2, '0');
+                  const minutes = date.getMinutes().toString().padStart(2, '0');
+                  return lang === 'ko'
+                    ? `${year}년 ${month}월 ${day}일 ${hours}:${minutes}`
+                    : `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} ${hours}:${minutes}`;
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Departure Date */}
         {item.departure_date && (

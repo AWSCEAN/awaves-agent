@@ -57,10 +57,10 @@ export default function SavedSpotCard({ item, onRemove }: SavedSpotCardProps) {
             🌊 {item.waveHeight.toFixed(1)}m
           </span>
           <span className="px-2 py-0.5 bg-sand-100 rounded text-ocean-600">
-            💨 {item.windSpeed.toFixed(0)} km/h
+            💨 {item.windSpeed.toFixed(1)} km/h
           </span>
           <span className="px-2 py-0.5 bg-sand-100 rounded text-ocean-600">
-            🌡️ {item.waterTemperature.toFixed(0)}°C
+            🌡️ {item.waterTemperature.toFixed(1)}°C
           </span>
         </div>
 
