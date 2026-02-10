@@ -28,6 +28,7 @@ interface SearchResultsListProps {
   isWeeklyEstimate?: boolean;
   weekRange?: { start: Date; end: Date };
   onVisibleItemsChange?: (items: SearchResult[]) => void;
+  showLocationPrompt?: boolean;
 }
 
 const ITEMS_PER_PAGE = 25;
@@ -47,6 +48,7 @@ export default function SearchResultsList({
   isWeeklyEstimate = false,
   weekRange,
   onVisibleItemsChange,
+  showLocationPrompt = false,
 }: SearchResultsListProps) {
   const t = useTranslations('search');
   const tCommon = useTranslations('common');
@@ -113,7 +115,7 @@ export default function SearchResultsList({
   };
 
   return (
-    <div className="absolute left-0 top-0 bottom-0 w-96 bg-white shadow-xl z-40 flex flex-col">
+    <div className={`fixed left-0 bottom-0 w-96 bg-white shadow-xl z-40 flex flex-col transition-all duration-300 ${showLocationPrompt ? 'top-[100px]' : 'top-14'}`}>
       {/* Header */}
       <div className="p-4 border-b border-sand-200">
         <div className="flex items-center justify-between mb-3">
