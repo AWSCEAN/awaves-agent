@@ -306,8 +306,8 @@ function MapPageContent() {
           {/* Logo */}
           <LogoOverlay />
 
-          {/* Search Inputs */}
-          <div className="flex-1 flex items-center gap-2 flex-wrap">
+          {/* Search Inputs - ml-48 to avoid LogoOverlay overlap */}
+          <div className="flex-1 flex items-center gap-2 flex-wrap ml-48">
             {/* Location */}
             <LocationAutocomplete
               value={locationQuery}
@@ -397,31 +397,51 @@ function MapPageContent() {
               </svg>
               {locale === 'ko' ? '주변' : 'Nearby'}
             </button>
+
+            {/* Surf Score Toggle */}
+            <button
+              onClick={() => handleOverlayToggle('surf')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-1 ${
+                overlayMode === 'surf' ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-sand-200 text-ocean-700 hover:bg-sand-300'
+              }`}
+              title={t('surfScore')}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              {t('surfScore')}
+            </button>
+
+            {/* Wind Particles Toggle */}
+            <button
+              onClick={() => setShowWindParticles(!showWindParticles)}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-1 ${
+                showWindParticles ? 'bg-ocean-500 text-white hover:bg-ocean-600' : 'bg-sand-200 text-ocean-700 hover:bg-sand-300'
+              }`}
+              title={t('windParticles')}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5c1.104 0 2 .896 2 2s-.896 2-2 2H3M17 11c1.104 0 2 .896 2 2s-.896 2-2 2H3M9 17c1.104 0 2 .896 2 2s-.896 2-2 2H3" />
+              </svg>
+              {t('windParticles')}
+            </button>
           </div>
 
           {/* Right side controls */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            {/* Toggle Buttons */}
+            {/* Language Toggle (icon + label) */}
             <button
-              onClick={() => setShowWindParticles(!showWindParticles)}
-              className={`px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                showWindParticles ? 'bg-ocean-500 text-white' : 'bg-sand-100 text-ocean-700 hover:bg-sand-200'
-              }`}
-              title={t('windParticles')}
+              onClick={toggleLocale}
+              className="flex items-center gap-1 px-2 py-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
+              title={locale === 'ko' ? 'English' : '한국어'}
             >
-              {t('windParticles')}
-            </button>
-            <button
-              onClick={() => handleOverlayToggle('surf')}
-              className={`px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                overlayMode === 'surf' ? 'bg-green-500 text-white' : 'bg-sand-100 text-ocean-700 hover:bg-sand-200'
-              }`}
-              title={t('surfScore')}
-            >
-              {t('surfScore')}
+              <svg className="w-4 h-4 text-ocean-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+              </svg>
+              <span className="text-xs font-semibold text-ocean-700">{locale === 'ko' ? 'KO' : 'EN'}</span>
             </button>
 
-            {/* Saved Link */}
+            {/* Saved Spots Link */}
             <Link
               href="/saved"
               className="text-sm font-medium text-ocean-700 hover:text-ocean-500"
@@ -429,7 +449,15 @@ function MapPageContent() {
               {t('saved')}
             </Link>
 
-            {/* Profile Icon */}
+            {/* Map Link */}
+            <Link
+              href="/map"
+              className="text-sm font-medium text-ocean-700 hover:text-ocean-500"
+            >
+              {t('map')}
+            </Link>
+
+            {/* My Page Icon */}
             <Link
               href="/mypage"
               className="p-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
@@ -444,17 +472,6 @@ function MapPageContent() {
                 />
               </svg>
             </Link>
-
-            {/* Language Toggle */}
-            <button
-              onClick={toggleLocale}
-              className="flex items-center gap-1 text-sm font-medium text-ocean-700 hover:text-ocean-500"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-              </svg>
-              {locale === 'ko' ? 'KO' : 'EN'}
-            </button>
           </div>
         </div>
       </header>

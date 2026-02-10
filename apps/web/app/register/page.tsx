@@ -3,8 +3,9 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { authService } from '@/lib/apiServices';
+import { getSavedLocale, saveLocale } from '@/lib/i18n';
 import type { SurferLevel } from '@/types';
 
 type Language = 'ko' | 'en';
@@ -143,8 +144,17 @@ const translations = {
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [lang, setLang] = useState<Language>('en');
+  const [lang, setLangState] = useState<Language>('en');
   const [step, setStep] = useState(1);
+
+  useEffect(() => {
+    setLangState(getSavedLocale());
+  }, []);
+
+  const setLang = (newLang: Language) => {
+    setLangState(newLang);
+    saveLocale(newLang);
+  };
 
   // Step 1 fields
   const [username, setUsername] = useState('');
