@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://user:password@localhost:5432/awaves"
 
     # Redis/Cache (Valkey in production, Redis in local)
-    cache_url: str = "CACHE_URL=redis://default:SwO1Se2mwMnggCbB7kfdj9XmMDn27FCu@redis-19033.c340.ap-northeast-2-1.ec2.cloud.redislabs.com:19033"
+    cache_url: str = ""
 
     # AWS
     aws_region: str = "ap-northeast-2"

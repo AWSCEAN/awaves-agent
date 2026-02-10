@@ -52,6 +52,7 @@ function MapPageContent() {
   const [showLocationPrompt, setShowLocationPrompt] = useState(true);
 
   // Results state
+  const [allSpots, setAllSpots] = useState<SurfInfo[]>([]);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [visibleSpots, setVisibleSpots] = useState<SearchResult[]>([]);
   const [showResults, setShowResults] = useState(false);
@@ -74,6 +75,21 @@ function MapPageContent() {
   useEffect(() => {
     refetch();
   }, [refetch]);
+
+  // Fetch all spots on mount for default map markers
+  useEffect(() => {
+    const loadAllSpots = async () => {
+      try {
+        const response = await surfService.getAllSpots();
+        if (response.success && response.data) {
+          setAllSpots(response.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch all spots:', err);
+      }
+    };
+    loadAllSpots();
+  }, []);
 
   // Transform SavedItemResponse (snake_case) → SavedListItem (camelCase) for EnhancedMapboxMap
   const savedSpots: SavedListItem[] = useMemo(() =>
@@ -194,10 +210,11 @@ function MapPageContent() {
   }, []);
 
   const handleSearch = useCallback(async () => {
-    await fetchSpots(locationQuery || undefined);
+    setVisibleSpots([]);
     setShowResults(true);
     setHasSearched(true);
     setSelectedSpotDetail(null);
+    await fetchSpots(locationQuery || undefined);
   }, [locationQuery, fetchSpots]);
 
   const handleAllowLocation = () => {
@@ -294,8 +311,8 @@ function MapPageContent() {
     [savedSpots]
   );
 
-  // Map shows only visible page spots after search, nothing before search (saved markers handled separately)
-  const displaySpots = (hasSearched && showResults) ? visibleSpots : [];
+  // Show search results when searching, otherwise show all spots
+  const displaySpots = (hasSearched && showResults) ? visibleSpots : allSpots;
 
   return (
     <ProtectedRoute>
@@ -540,6 +557,7 @@ function MapPageContent() {
         {/* Map */}
         <EnhancedMapboxMap
           spots={displaySpots}
+          allSpots={allSpots}
           savedSpots={savedSpots}
           selectedDate={selectedDate}
           showWindParticles={showWindParticles}

@@ -27,6 +27,7 @@ interface MeasureDistancePoint {
 
 interface EnhancedMapboxMapProps {
   spots: SurfInfo[];
+  allSpots?: SurfInfo[];
   savedSpots: SavedListItem[];
   selectedDate: Date;
   showWindParticles: boolean;
@@ -46,6 +47,7 @@ function getSurfScoreColor(score: number): string {
 
 export default function EnhancedMapboxMap({
   spots,
+  allSpots,
   savedSpots,
   selectedDate,
   showWindParticles,
@@ -66,6 +68,8 @@ export default function EnhancedMapboxMap({
   const measureMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const measureLineRef = useRef<string | null>(null);
   const selectedDateRef = useRef<Date>(selectedDate);
+  const spotsRef = useRef<SurfInfo[]>(spots);
+  const allSpotsRef = useRef<SurfInfo[]>(allSpots || []);
   const noInfoPopupRef = useRef<mapboxgl.Popup | null>(null);
   const nearbyMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
@@ -143,10 +147,16 @@ export default function EnhancedMapboxMap({
     };
   }, []);
 
-  // Keep selectedDateRef in sync
+  // Keep refs in sync
   useEffect(() => {
     selectedDateRef.current = selectedDate;
   }, [selectedDate]);
+  useEffect(() => {
+    spotsRef.current = spots;
+  }, [spots]);
+  useEffect(() => {
+    allSpotsRef.current = allSpots || [];
+  }, [allSpots]);
 
   // Force resize after map is fully loaded to ensure controls are properly positioned
   useEffect(() => {
@@ -567,18 +577,20 @@ export default function EnhancedMapboxMap({
     }
 
     // 1. Check if clicked coordinate matches an existing spot (exact LocationId match)
+    // Use allSpots for detection so 100km works regardless of search state
+    const currentSpots = allSpotsRef.current.length > 0 ? allSpotsRef.current : spotsRef.current;
     const clickedLocationId = `${lngLat.lat.toFixed(4)}#${lngLat.lng.toFixed(4)}`;
-    const exactMatch = spots.find(s => s.LocationId === clickedLocationId);
+    const exactMatch = currentSpots.find(s => s.LocationId === clickedLocationId);
 
     if (exactMatch) {
       showSurfInfoAtCoords(lngLat.lng, lngLat.lat, exactMatch, currentSelectedDate);
       return;
     }
 
-    // 2. Find the best spot within 200km (highest surfScore, alphabetical tiebreaker)
+    // 2. Find the best spot within 100km (highest surfScore, alphabetical tiebreaker)
     let bestNearby: { spot: SurfInfo; distance: number } | null = null;
 
-    for (const spot of spots) {
+    for (const spot of currentSpots) {
       const R = 6371;
       const dLat = (spot.geo.lat - lngLat.lat) * Math.PI / 180;
       const dLng = (spot.geo.lng - lngLat.lng) * Math.PI / 180;
@@ -586,7 +598,7 @@ export default function EnhancedMapboxMap({
         Math.cos(lngLat.lat * Math.PI / 180) * Math.cos(spot.geo.lat * Math.PI / 180) *
         Math.sin(dLng / 2) ** 2;
       const distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      if (distance > 200) continue;
+      if (distance > 100) continue;
 
       if (
         !bestNearby ||
@@ -626,20 +638,22 @@ export default function EnhancedMapboxMap({
       return;
     }
 
-    // 3. No spot within 200km - show temporary popup
+    // 3. No spot within 100km - show temporary popup
     const noInfoMessage = locale === 'ko'
-      ? '주변 200km 이내에 서핑 정보가 없습니다.'
-      : 'No surf information available within 200km.';
+      ? '주변 100km 이내에 서핑 정보가 없습니다'
+      : 'No surf information available within 100km';
 
     noInfoPopupRef.current = new mapboxgl.Popup({
       closeOnClick: true,
-      closeButton: true,
-      maxWidth: '240px',
+      closeButton: false,
+      maxWidth: '360px',
+      className: 'no-info-popup',
     })
       .setLngLat([lngLat.lng, lngLat.lat])
       .setHTML(
-        `<div style="padding:8px;text-align:center;">` +
-        `<p style="margin:0;font-size:14px;color:#1e3a5f;">${noInfoMessage}</p>` +
+        `<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;white-space:nowrap;">` +
+        `<span style="font-size:18px;">🌊</span>` +
+        `<span style="font-size:13px;font-weight:500;color:#1e3a5f;">${noInfoMessage}</span>` +
         `</div>`
       )
       .addTo(map.current);

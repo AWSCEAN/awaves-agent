@@ -278,6 +278,10 @@ export const surfService = {
   async getNearbySpots(lat: number, lng: number, limit: number = 25): Promise<ApiResponse<SurfInfo[]>> {
     return apiRequest<SurfInfo[]>(`/surf/nearby?lat=${lat}&lng=${lng}&limit=${limit}`);
   },
+
+  async getAllSpots(): Promise<ApiResponse<SurfInfo[]>> {
+    return apiRequest<SurfInfo[]>('/surf/spots/all');
+  },
 };
 
 // Saved Spots Services
