@@ -25,8 +25,6 @@ interface SearchResultsListProps {
   selectedTime?: string;
   onSuggestByDistance?: () => void;
   userLocation?: { lat: number; lng: number } | null;
-  isWeeklyEstimate?: boolean;
-  weekRange?: { start: Date; end: Date };
   onVisibleItemsChange?: (items: SearchResult[]) => void;
   showLocationPrompt?: boolean;
 }
@@ -45,8 +43,6 @@ export default function SearchResultsList({
   selectedTime,
   onSuggestByDistance,
   userLocation,
-  isWeeklyEstimate = false,
-  weekRange,
   onVisibleItemsChange,
   showLocationPrompt = false,
 }: SearchResultsListProps) {
@@ -124,24 +120,11 @@ export default function SearchResultsList({
             <p className="text-sm text-ocean-500">
               {tCommon('results', { count: results.length })} · {getSortLabel(sortMode)}
             </p>
-            {selectedDate && !isWeeklyEstimate && (
+            {selectedDate && (
               <p className="text-xs text-ocean-400 mt-1">
                 {format(selectedDate, 'PPP', { locale: dateLocale })}
                 {selectedTime && ` · ${selectedTime}`}
               </p>
-            )}
-            {isWeeklyEstimate && weekRange && (
-              <div className="mt-1 flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-xs font-medium">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  {locale === 'ko' ? '주간 예측' : 'Weekly Prediction'}
-                </span>
-                <span className="text-xs text-ocean-400">
-                  {format(weekRange.start, 'MMM d', { locale: dateLocale })} - {format(weekRange.end, 'MMM d', { locale: dateLocale })}
-                </span>
-              </div>
             )}
           </div>
           <button
@@ -197,7 +180,7 @@ export default function SearchResultsList({
               />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            {locale === 'ko' ? '내 주변 25개 스팟 추천' : 'Suggest 25 Nearby Spots'}
+            {locale === 'ko' ? '내 주변 스팟 추천' : 'Nearby Spots'}
           </button>
         )}
       </div>

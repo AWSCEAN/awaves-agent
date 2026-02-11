@@ -218,37 +218,37 @@ export default function SpotDetailPanel({
               <tbody className="text-ocean-800">
                 {/* Wave Height Row */}
                 <tr className="border-b border-ocean-100">
-                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '파고' : 'Wave Height'}</td>
+                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '파고' : 'Wave Height'} <span className="text-ocean-400 font-normal">(m)</span></td>
                   {[0.9, 0.95, 1.0, 1.05, 0.98].map((v, idx) => (
-                    <td key={idx} className="py-1 px-1.5 text-center">{(waveHeight * v).toFixed(1)}m</td>
+                    <td key={idx} className="py-1 px-1.5 text-center">{(waveHeight * v).toFixed(1)}</td>
                   ))}
                 </tr>
                 {/* Wave Period Row */}
                 <tr className="border-b border-ocean-100">
-                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '파주기' : 'Wave Period'}</td>
+                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '파주기' : 'Wave Period'} <span className="text-ocean-400 font-normal">(s)</span></td>
                   {[0.9, 0.95, 1.0, 1.05, 0.98].map((v, idx) => (
-                    <td key={idx} className="py-1 px-1.5 text-center">{(wavePeriod * v).toFixed(1)}s</td>
+                    <td key={idx} className="py-1 px-1.5 text-center">{(wavePeriod * v).toFixed(1)}</td>
                   ))}
                 </tr>
                 {/* Wind Speed Row */}
                 <tr className="border-b border-ocean-100">
-                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '풍속' : 'Wind Speed'}</td>
+                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '풍속' : 'Wind'} <span className="text-ocean-400 font-normal">(km/h)</span></td>
                   {[0.9, 0.95, 1.0, 1.05, 0.98].map((v, idx) => (
-                    <td key={idx} className="py-1 px-1.5 text-center">{(windSpeed * v).toFixed(1)}km/h</td>
+                    <td key={idx} className="py-1 px-1.5 text-center">{(windSpeed * v).toFixed(1)}</td>
                   ))}
                 </tr>
                 {/* Water Temperature Row */}
                 <tr className="border-b border-ocean-100">
-                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '수온' : 'Water Temp'}</td>
+                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '수온' : 'Water'} <span className="text-ocean-400 font-normal">(°C)</span></td>
                   {[0, 0, 0, 0, 0].map((_, idx) => (
-                    <td key={idx} className="py-1 px-1.5 text-center">{waterTemperature.toFixed(1)}°</td>
+                    <td key={idx} className="py-1 px-1.5 text-center">{waterTemperature.toFixed(1)}</td>
                   ))}
                 </tr>
                 {/* Air Temperature Row */}
                 <tr className="border-b border-ocean-100">
-                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '기온' : 'Air Temp'}</td>
+                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '기온' : 'Air'} <span className="text-ocean-400 font-normal">(°C)</span></td>
                   {[0.95, 1.0, 1.1, 1.15, 1.05].map((v, idx) => (
-                    <td key={idx} className="py-1 px-1.5 text-center">{((waterTemperature + 5) * v).toFixed(1)}°</td>
+                    <td key={idx} className="py-1 px-1.5 text-center">{((waterTemperature + 5) * v).toFixed(1)}</td>
                   ))}
                 </tr>
                 {/* Score Row with colored text */}

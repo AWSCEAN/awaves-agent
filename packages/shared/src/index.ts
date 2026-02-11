@@ -104,6 +104,29 @@ export interface FeedbackRDB {
   created_at: string;
 }
 
+// --- Inference prediction response ---
+export interface PredictionResult {
+  locationId: string;
+  surfTimestamp: string;
+  geo: SurfInfoGeo;
+  derivedMetrics: {
+    surfScore: number;
+    surfGrade: string;
+    surfingLevel: string;
+  };
+  metadata: {
+    modelVersion: string;
+    dataSource: string;
+    predictionType: string;
+    createdAt: string;
+    cacheSource?: string;
+  };
+  weekNumber: number;
+  weekRange: string;
+  spotName: string;
+  spotNameKo?: string;
+}
+
 // --- Saved item API response (snake_case, used by frontend) ---
 export interface SavedItemResponse {
   user_id: string;

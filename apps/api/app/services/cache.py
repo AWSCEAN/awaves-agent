@@ -238,3 +238,49 @@ class CacheService:
             await client.delete(cls.SURF_ALL_KEY)
         except Exception as e:
             logger.warning(f"Failed to invalidate surf spots cache: {e}")
+
+    # --- Inference prediction cache ---
+
+    INFERENCE_PREFIX = "awaves:search:inference"
+    INFERENCE_TTL = 86400  # 24 hours
+
+    @classmethod
+    def _inference_key(cls, location_id: str, surf_date: str) -> str:
+        """Generate cache key for inference prediction."""
+        return f"{cls.INFERENCE_PREFIX}:{location_id}:{surf_date}"
+
+    @classmethod
+    async def get_inference_prediction(
+        cls, location_id: str, surf_date: str
+    ) -> Optional[dict]:
+        """Get cached inference prediction."""
+        client = await cls.get_client()
+        if not client:
+            return None
+
+        try:
+            value = await client.get(cls._inference_key(location_id, surf_date))
+            if value:
+                return json.loads(value)
+        except Exception as e:
+            logger.warning(f"Failed to get inference prediction from cache: {e}")
+
+        return None
+
+    @classmethod
+    async def store_inference_prediction(
+        cls, location_id: str, surf_date: str, data: dict
+    ) -> None:
+        """Store inference prediction in cache."""
+        client = await cls.get_client()
+        if not client:
+            return
+
+        try:
+            await client.setex(
+                cls._inference_key(location_id, surf_date),
+                cls.INFERENCE_TTL,
+                json.dumps(data),
+            )
+        except Exception as e:
+            logger.warning(f"Failed to store inference prediction in cache: {e}")
