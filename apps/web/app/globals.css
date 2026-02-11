@@ -129,7 +129,27 @@ body {
   }
 }
 
-/* Mapbox overrides */
+/* Mapbox overrides - fix Tailwind Preflight conflicts */
+.mapboxgl-map {
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.mapboxgl-marker {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  will-change: transform;
+  opacity: 1 !important;
+}
+
+.mapboxgl-canvas-container,
+.mapboxgl-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
 .mapboxgl-popup-content {
   padding: 0 !important;
   border-radius: 12px !important;
