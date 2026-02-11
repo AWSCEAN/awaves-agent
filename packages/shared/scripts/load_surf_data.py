@@ -181,7 +181,9 @@ def main():
 
     # 1. Delete existing data from DDB and Redis cache
     delete_all_items(dynamodb, table)
-    clear_redis_cache()
+
+    # 필요할 때 주석 해제하고 사용
+    # clear_redis_cache()
 
     # 2. Insert new data from CSV
     count = 0
@@ -264,8 +266,9 @@ def main():
 
     print(f"Successfully loaded {count} items into '{TABLE_NAME}'.")
 
+    # 필요할 때 주석 해제하고 사용
     # 3. Save latest per location to Redis cache
-    save_latest_to_redis(latest_map)
+    # save_latest_to_redis(latest_map)
 
 
 if __name__ == "__main__":
