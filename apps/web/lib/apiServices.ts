@@ -13,6 +13,7 @@ import type {
   UserV2,
   CommonApiResponse,
   LoginV2Response,
+  PredictionResult,
 } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
@@ -288,6 +289,22 @@ export const surfService = {
 
   async getAllSpots(): Promise<ApiResponse<SurfInfo[]>> {
     return apiRequest<SurfInfo[]>('/surf/spots/all');
+  },
+
+  async predictSurf(locationId: string, surfDate: string, surferLevel: string): Promise<ApiResponse<PredictionResult>> {
+    const response = await apiRequest<CommonApiResponse<PredictionResult>>('/surf/predict', {
+      method: 'POST',
+      body: JSON.stringify({
+        location_id: locationId,
+        surf_date: surfDate,
+        surfer_level: surferLevel,
+      }),
+    });
+
+    if (response.success && response.data?.result === 'success' && response.data.data) {
+      return { success: true, data: response.data.data };
+    }
+    return { success: false, error: response.error || 'Prediction failed' };
   },
 };
 

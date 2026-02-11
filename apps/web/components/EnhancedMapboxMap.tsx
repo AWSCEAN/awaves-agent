@@ -33,10 +33,13 @@ interface EnhancedMapboxMapProps {
   showWindParticles: boolean;
   overlayMode?: OverlayMode;
   onSpotSelect?: (data: SpotSelectionData) => void;
+  onUserLocationChange?: (location: { lat: number; lng: number }) => void;
   locale?: 'en' | 'ko';
   center?: { lat: number; lng: number } | null;
   showGeocoder?: boolean;
   showMeasureDistance?: boolean;
+  saveCountByLocation?: Map<string, number>;
+  onMultiSaveMarkerClick?: (locationId: string, coordinates: { lat: number; lng: number }) => void;
 }
 
 function getSurfScoreColor(score: number): string {
@@ -53,10 +56,13 @@ export default function EnhancedMapboxMap({
   showWindParticles,
   overlayMode = 'none',
   onSpotSelect,
+  onUserLocationChange,
   locale = 'en',
   center,
   showGeocoder = true,
   showMeasureDistance = true,
+  saveCountByLocation,
+  onMultiSaveMarkerClick,
 }: EnhancedMapboxMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -110,14 +116,20 @@ export default function EnhancedMapboxMap({
       );
     }
 
-    map.current.addControl(
-      new mapboxgl.GeolocateControl({
-        positionOptions: { enableHighAccuracy: true },
-        trackUserLocation: true,
-        showUserHeading: true,
-      }),
-      'top-right'
-    );
+    const geolocateControl = new mapboxgl.GeolocateControl({
+      positionOptions: { enableHighAccuracy: true },
+      trackUserLocation: true,
+      showUserHeading: true,
+    });
+    geolocateControl.on('geolocate', (e: any) => {
+      if (onUserLocationChange && e.coords) {
+        onUserLocationChange({
+          lat: e.coords.latitude,
+          lng: e.coords.longitude,
+        });
+      }
+    });
+    map.current.addControl(geolocateControl, 'top-right');
 
     map.current.on('load', () => {
       setIsMapLoaded(true);
@@ -172,88 +184,120 @@ export default function EnhancedMapboxMap({
     return () => timers.forEach(clearTimeout);
   }, [isMapLoaded]);
 
+  // Sync markers to viewport — only show markers within the visible map bounds
   useEffect(() => {
     if (!map.current || !isMapLoaded) return;
 
-    const savedLocationIds = new Set(savedSpots.map((s) => s.locationId));
+    const updateVisibleMarkers = () => {
+      if (!map.current) return;
 
-    // Build the set of marker keys that should exist after this update
-    const desiredKeys = new Set<string>();
+      const bounds = map.current.getBounds();
+      if (!bounds) return;
+      const savedLocationIds = new Set(savedSpots.map((s) => s.locationId));
 
-    spots.forEach((spot) => {
-      if (savedLocationIds.has(spot.LocationId)) return;
-      desiredKeys.add(spot.LocationId);
-    });
+      // Build the set of marker keys that should be visible in the current viewport
+      const desiredKeys = new Set<string>();
 
-    savedSpots.forEach((savedSpot) => {
-      if (!savedSpot.locationId || !savedSpot.locationId.includes('#')) return;
-      desiredKeys.add(`saved-${savedSpot.locationId}`);
-    });
-
-    // Remove only markers that should no longer exist
-    Object.keys(markersRef.current).forEach((key) => {
-      if (!desiredKeys.has(key)) {
-        markersRef.current[key].remove();
-        delete markersRef.current[key];
-      }
-    });
-
-    // Add surfer markers for spots that don't have a marker yet
-    spots.forEach((spot) => {
-      if (savedLocationIds.has(spot.LocationId)) return;
-      if (markersRef.current[spot.LocationId]) return;
-
-      const markerColor = getSurfScoreColor(spot.derivedMetrics.surfScore);
-      const el = createMarkerElement(
-        '\u{1F3C4}',
-        markerColor,
-        () => {
-          showSurfInfoAtCoords(
-            spot.geo.lng,
-            spot.geo.lat,
-            spot,
-            selectedDateRef.current
-          );
+      spots.forEach((spot) => {
+        if (savedLocationIds.has(spot.LocationId)) return;
+        if (bounds.contains([spot.geo.lng, spot.geo.lat])) {
+          desiredKeys.add(spot.LocationId);
         }
-      );
+      });
 
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat([spot.geo.lng, spot.geo.lat])
-        .addTo(map.current!);
+      savedSpots.forEach((savedSpot) => {
+        if (!savedSpot.locationId || !savedSpot.locationId.includes('#')) return;
+        const [latStr, lngStr] = savedSpot.locationId.split('#');
+        const lat = Number(latStr);
+        const lng = Number(lngStr);
+        if (!isNaN(lat) && !isNaN(lng) && bounds.contains([lng, lat])) {
+          desiredKeys.add(`saved-${savedSpot.locationId}`);
+        }
+      });
 
-      markersRef.current[spot.LocationId] = marker;
-    });
+      // Remove markers that are no longer in the viewport
+      Object.keys(markersRef.current).forEach((key) => {
+        if (!desiredKeys.has(key)) {
+          markersRef.current[key].remove();
+          delete markersRef.current[key];
+        }
+      });
 
-    // Add heart markers for saved spots that don't have a marker yet
-    savedSpots.forEach((savedSpot) => {
-      if (!savedSpot.locationId || !savedSpot.locationId.includes('#')) return;
-      const savedKey = `saved-${savedSpot.locationId}`;
-      if (markersRef.current[savedKey]) return;
+      // Add surfer markers for visible spots that don't have a marker yet
+      spots.forEach((spot) => {
+        if (savedLocationIds.has(spot.LocationId)) return;
+        if (!desiredKeys.has(spot.LocationId)) return;
+        if (markersRef.current[spot.LocationId]) return;
 
-      const [latStr, lngStr] = savedSpot.locationId.split('#');
-      const lat = Number(latStr);
-      const lng = Number(lngStr);
-      if (isNaN(lat) || isNaN(lng)) return;
-
-      const el = createMarkerElement(
-        '\u2764\uFE0F',
-        '#ffffff',
-        () => {
-          const matchingSpot = spots.find(s => s.LocationId === savedSpot.locationId);
-          if (matchingSpot) {
-            showSurfInfoAtCoords(lng, lat, matchingSpot, selectedDateRef.current);
+        const markerColor = getSurfScoreColor(spot.derivedMetrics.surfScore);
+        const el = createMarkerElement(
+          '\u{1F3C4}',
+          markerColor,
+          () => {
+            showSurfInfoAtCoords(
+              spot.geo.lng,
+              spot.geo.lat,
+              spot,
+              selectedDateRef.current
+            );
           }
-        },
-        '#e74c3c'
-      );
+        );
 
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat([lng, lat])
-        .addTo(map.current!);
+        const marker = new mapboxgl.Marker(el)
+          .setLngLat([spot.geo.lng, spot.geo.lat])
+          .addTo(map.current!);
 
-      markersRef.current[savedKey] = marker;
-    });
-  }, [spots, savedSpots, isMapLoaded]);
+        markersRef.current[spot.LocationId] = marker;
+      });
+
+      // Add heart markers for visible saved spots
+      savedSpots.forEach((savedSpot) => {
+        if (!savedSpot.locationId || !savedSpot.locationId.includes('#')) return;
+        const savedKey = `saved-${savedSpot.locationId}`;
+        if (!desiredKeys.has(savedKey)) return;
+        if (markersRef.current[savedKey]) return;
+
+        const [latStr, lngStr] = savedSpot.locationId.split('#');
+        const lat = Number(latStr);
+        const lng = Number(lngStr);
+        if (isNaN(lat) || isNaN(lng)) return;
+
+        const count = saveCountByLocation?.get(savedSpot.locationId) || 1;
+
+        const el = createMarkerElement(
+          '\u2764\uFE0F',
+          '#ffffff',
+          () => {
+            if (count > 1 && onMultiSaveMarkerClick) {
+              onMultiSaveMarkerClick(savedSpot.locationId, { lat, lng });
+            } else {
+              const allAvailable = allSpotsRef.current.length > 0 ? allSpotsRef.current : spotsRef.current;
+              const matchingSpot = allAvailable.find(s => s.LocationId === savedSpot.locationId);
+              if (matchingSpot) {
+                showSurfInfoAtCoords(lng, lat, matchingSpot, selectedDateRef.current);
+              }
+            }
+          },
+          '#e74c3c',
+          count
+        );
+
+        const marker = new mapboxgl.Marker(el)
+          .setLngLat([lng, lat])
+          .addTo(map.current!);
+
+        markersRef.current[savedKey] = marker;
+      });
+    };
+
+    // Run once immediately and on every map move/zoom
+    updateVisibleMarkers();
+    map.current.on('moveend', updateVisibleMarkers);
+
+    return () => {
+      map.current?.off('moveend', updateVisibleMarkers);
+    };
+  }, [spots, savedSpots, isMapLoaded, saveCountByLocation, onMultiSaveMarkerClick]);
 
   useEffect(() => {
     if (geocoderRef.current) {
@@ -471,16 +515,14 @@ export default function EnhancedMapboxMap({
     emoji: string,
     color: string,
     onClick: () => void,
-    borderColor: string = 'white'
+    borderColor: string = 'white',
+    badgeCount?: number
   ): HTMLDivElement => {
     const el = document.createElement('div');
     el.className = 'surf-marker';
     el.style.cssText = `
-      width: 36px;
-      height: 36px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      width: 32px;
+      height: 32px;
       cursor: pointer;
     `;
 
@@ -501,6 +543,31 @@ export default function EnhancedMapboxMap({
     inner.textContent = emoji;
 
     el.appendChild(inner);
+
+    if (badgeCount && badgeCount > 1) {
+      const badge = document.createElement('span');
+      badge.style.cssText = `
+        position: absolute;
+        top: -6px;
+        right: -6px;
+        min-width: 18px;
+        height: 18px;
+        background: #ef4444;
+        color: white;
+        border: 2px solid white;
+        border-radius: 9999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: bold;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+        z-index: 1;
+        padding: 0 3px;
+      `;
+      badge.textContent = String(badgeCount);
+      el.appendChild(badge);
+    }
 
     el.addEventListener('mouseenter', () => {
       inner.style.transform = 'scale(1.2)';
@@ -620,7 +687,10 @@ export default function EnhancedMapboxMap({
       });
 
       // Add a temporary marker at the nearby spot if it doesn't already have one
-      if (!markersRef.current[spot.LocationId]) {
+      // Check both regular and saved marker keys
+      const hasSurfMarker = markersRef.current[spot.LocationId];
+      const hasSavedMarker = markersRef.current[`saved-${spot.LocationId}`];
+      if (!hasSurfMarker && !hasSavedMarker) {
         const nearbyMarkerColor = getSurfScoreColor(spot.derivedMetrics.surfScore);
         const el = createMarkerElement(
           '\u{1F3C4}',

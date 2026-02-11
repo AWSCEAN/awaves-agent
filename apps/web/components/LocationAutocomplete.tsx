@@ -17,6 +17,8 @@ interface LocationAutocompleteProps {
   onSelect: (option: LocationOption) => void;
   placeholder?: string;
   className?: string;
+  hasError?: boolean;
+  errorPlaceholder?: string;
 }
 
 export default function LocationAutocomplete({
@@ -25,6 +27,8 @@ export default function LocationAutocomplete({
   onSelect,
   placeholder,
   className = '',
+  hasError = false,
+  errorPlaceholder,
 }: LocationAutocompleteProps) {
   const t = useTranslations('search');
   const locale = useLocale();
@@ -125,10 +129,13 @@ export default function LocationAutocomplete({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => value.length >= 1 && options.length > 0 && setIsOpen(true)}
-        placeholder={placeholder || t('locationPlaceholder')}
-        className="w-full px-3 py-2 text-sm border border-sand-200 rounded-lg
-          focus:outline-none focus:ring-2 focus:ring-ocean-500/50 focus:border-ocean-500
-          bg-white text-ocean-800 placeholder:text-ocean-400"
+        placeholder={hasError && errorPlaceholder ? errorPlaceholder : (placeholder || t('locationPlaceholder'))}
+        className={`w-full px-3 py-2 text-sm border rounded-lg
+          focus:outline-none focus:ring-2 bg-white text-ocean-800 ${
+            hasError
+              ? 'border-red-400 focus:ring-red-500/50 focus:border-red-500 placeholder:text-red-400'
+              : 'border-sand-200 focus:ring-ocean-500/50 focus:border-ocean-500 placeholder:text-ocean-400'
+          }`}
       />
 
       {isOpen && options.length > 0 && (

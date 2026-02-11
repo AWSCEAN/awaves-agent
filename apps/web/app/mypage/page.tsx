@@ -150,7 +150,7 @@ export default function MyPage() {
     <div className="min-h-screen bg-sand-gradient">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-40 glass">
-        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-end">
+        <div className="px-4 py-2 flex items-center justify-end">
           <div className="flex items-center gap-3">
             {/* Language Toggle (icon + label) */}
             <button
@@ -187,7 +187,7 @@ export default function MyPage() {
 
       {/* Content */}
       <main className="max-w-2xl mx-auto px-4 pt-24 pb-8">
-        <h1 className="text-3xl font-bold text-ocean-800 mb-8">{t.title}</h1>
+        <h1 className="text-3xl font-bold text-ocean-700 tracking-tight text-center mb-8">{t.title}</h1>
 
         {/* Profile Section */}
         <section className="card mb-8">

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { format, addDays, differenceInDays, parseISO } from 'date-fns';
+import { format, addDays, differenceInDays } from 'date-fns';
 import { ko, enUS } from 'date-fns/locale';
 import { useTranslations, useLocale } from 'next-intl';
 import LogoOverlay from '@/components/LogoOverlay';
@@ -12,16 +12,18 @@ import LocationAutocomplete from '@/components/LocationAutocomplete';
 import SearchResultsList from '@/components/SearchResultsList';
 import type { SearchResult } from '@/components/SearchResultsList';
 import SpotDetailPanel from '@/components/SpotDetailPanel';
+import TimeSlotPickerPanel from '@/components/TimeSlotPickerPanel';
+import PredictionResultPanel from '@/components/PredictionResultPanel';
+import DatePickerInput from '@/components/DatePickerInput';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import LocaleProvider, { useLocale as useAppLocale } from '@/components/LocaleProvider';
-import type { SurfInfo, SavedListItem, SurferLevel, SurfingLevel, SurfGrade } from '@/types';
+import type { SurfInfo, SavedListItem, SurferLevel, SurfingLevel, SurfGrade, PredictionResult } from '@/types';
 import type { OverlayMode, SpotSelectionData } from '@/components/EnhancedMapboxMap';
 import { TIME_SLOTS } from '@/lib/services/surfInfoService';
 import { surfService } from '@/lib/apiServices';
 import { useSavedItems } from '@/hooks/useSavedItems';
 import SurfLoadingScreen from '@/components/SurfLoadingScreen';
 
-const DEMO_USER_LOCATION = { lat: 37.5665, lng: 126.9780 };
 
 const EnhancedMapboxMap = dynamic(
   () => import('@/components/EnhancedMapboxMap'),
@@ -51,9 +53,20 @@ function MapPageContent() {
   const [searchDate, setSearchDate] = useState<Date>(new Date());
   const [searchTime, setSearchTime] = useState<string>('');
 
-  // User location state
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [showLocationPrompt, setShowLocationPrompt] = useState(true);
+  // User location state - persist permission across navigations
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('userLocation');
+      return saved ? JSON.parse(saved) : null;
+    }
+    return null;
+  });
+  const [showLocationPrompt, setShowLocationPrompt] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return !localStorage.getItem('locationPermissionGranted');
+    }
+    return true;
+  });
 
   // Results state
   const [allSpots, setAllSpots] = useState<SurfInfo[]>([]);
@@ -69,6 +82,19 @@ function MapPageContent() {
 
   // Selected spot detail panel state
   const [selectedSpotDetail, setSelectedSpotDetail] = useState<SpotSelectionData | null>(null);
+
+  // Prediction state
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+  const [predictionResult, setPredictionResult] = useState<PredictionResult | null>(null);
+  const [showPrediction, setShowPrediction] = useState(false);
+  const [predictionErrors, setPredictionErrors] = useState<{ location?: boolean; level?: boolean }>({});
+
+  // Time slot picker for multi-save markers
+  const [timeSlotSelection, setTimeSlotSelection] = useState<{
+    locationId: string;
+    coordinates: { lat: number; lng: number };
+    saves: SavedListItem[];
+  } | null>(null);
 
   // Quick date selector state
   const [showQuickDateSelect, setShowQuickDateSelect] = useState(true);
@@ -120,6 +146,22 @@ function MapPageContent() {
     [savedItems]
   );
 
+  // Group saves by locationId for multi-save markers
+  const saveCountByLocation = useMemo(() => {
+    const counts = new Map<string, number>();
+    savedSpots.forEach(s => counts.set(s.locationId, (counts.get(s.locationId) || 0) + 1));
+    return counts;
+  }, [savedSpots]);
+
+  const savesByLocation = useMemo(() => {
+    const grouped = new Map<string, SavedListItem[]>();
+    savedSpots.forEach(s => {
+      if (!grouped.has(s.locationId)) grouped.set(s.locationId, []);
+      grouped.get(s.locationId)!.push(s);
+    });
+    return grouped;
+  }, [savedSpots]);
+
   // Center map from query params (e.g. /map?lat=38.0765&lng=128.6234)
   // If navigating from saved list, also open the detail panel
   useEffect(() => {
@@ -131,10 +173,13 @@ function MapPageContent() {
       if (!isNaN(latNum) && !isNaN(lngNum)) {
         setMapCenter({ lat: latNum, lng: lngNum });
 
-        // Find matching saved spot to open detail panel
+        // Find matching saved spots to open detail or time slot picker
         const locationId = `${lat}#${lng}`;
-        const matchingSaved = savedSpots.find(s => s.locationId === locationId);
-        if (matchingSaved) {
+        const savesAtLocation = savesByLocation.get(locationId) || [];
+        if (savesAtLocation.length > 1) {
+          setTimeSlotSelection({ locationId, coordinates: { lat: latNum, lng: lngNum }, saves: savesAtLocation });
+        } else if (savesAtLocation.length === 1) {
+          const matchingSaved = savesAtLocation[0];
           const surfInfo: SurfInfo = {
             LocationId: matchingSaved.locationId,
             SurfTimestamp: matchingSaved.surfTimestamp,
@@ -175,17 +220,12 @@ function MapPageContent() {
     []
   );
 
-  // Check if selected date is beyond 10 days (weekly estimate)
-  const { daysFromToday, isWeeklyEstimate, weekRange } = useMemo(() => {
+  // Determine days from today and if we're in prediction mode (>10 days)
+  const { daysFromToday, isPredictionMode } = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const days = differenceInDays(selectedDate, today);
-    const isWeekly = days > 9;
-    return {
-      daysFromToday: days,
-      isWeeklyEstimate: isWeekly,
-      weekRange: isWeekly ? { start: selectedDate, end: addDays(selectedDate, 6) } : undefined,
-    };
+    return { daysFromToday: days, isPredictionMode: days > 9 };
   }, [selectedDate]);
 
   const handleOverlayToggle = (mode: OverlayMode) => {
@@ -218,21 +258,58 @@ function MapPageContent() {
     setShowResults(true);
     setHasSearched(true);
     setSelectedSpotDetail(null);
+    // Close prediction panel if open
+    setShowPrediction(false);
+    setPredictionResult(null);
     // Update active search criteria only when search button is clicked
     setSearchDate(selectedDate);
     setSearchTime(selectedTime);
     await fetchSpots(locationQuery || undefined);
   }, [locationQuery, selectedDate, selectedTime, fetchSpots]);
 
+  const handlePredictionSearch = useCallback(async () => {
+    const errors: { location?: boolean; level?: boolean } = {};
+    if (!locationQuery || !selectedLocationId) errors.location = true;
+    if (!surferLevel) errors.level = true;
+
+    if (Object.keys(errors).length > 0) {
+      setPredictionErrors(errors);
+      return;
+    }
+
+    setPredictionErrors({});
+    setShowResults(false);
+    setHasSearched(false);
+    setSelectedSpotDetail(null);
+
+    try {
+      const response = await surfService.predictSurf(
+        selectedLocationId!,
+        format(selectedDate, 'yyyy-MM-dd'),
+        surferLevel,
+      );
+      if (response.success && response.data) {
+        setPredictionResult(response.data);
+        setShowPrediction(true);
+        setMapCenter({ lat: response.data.geo.lat, lng: response.data.geo.lng });
+      }
+    } catch (err) {
+      console.error('Prediction failed:', err);
+    }
+  }, [locationQuery, selectedLocationId, selectedDate, surferLevel]);
+
   const handleAllowLocation = () => {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setUserLocation({
+          const loc = {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
-          });
+          };
+          setUserLocation(loc);
           setShowLocationPrompt(false);
+          localStorage.setItem('locationPermissionGranted', 'true');
+          localStorage.setItem('userLocation', JSON.stringify(loc));
           fetchSpots(locationQuery || undefined);
         },
         () => {
@@ -277,6 +354,7 @@ function MapPageContent() {
 
   const handleSpotClick = (spot: SearchResult) => {
     setMapCenter({ lat: spot.geo.lat, lng: spot.geo.lng });
+    setTimeSlotSelection(null);
     setSelectedSpotDetail({
       surfInfo: spot,
       coordinates: { latitude: spot.geo.lat, longitude: spot.geo.lng },
@@ -284,32 +362,78 @@ function MapPageContent() {
   };
 
   const handleMapSpotSelect = (data: SpotSelectionData) => {
+    setTimeSlotSelection(null);
     setSelectedSpotDetail(data);
   };
 
-  // Get effective user location (real or demo)
-  const effectiveUserLocation = userLocation || DEMO_USER_LOCATION;
+  const handleMultiSaveMarkerClick = useCallback((locationId: string, coordinates: { lat: number; lng: number }) => {
+    const saves = savesByLocation.get(locationId) || [];
+    setSelectedSpotDetail(null);
+    setTimeSlotSelection({ locationId, coordinates, saves });
+  }, [savesByLocation]);
+
+  const handleTimeSlotSelect = useCallback((save: SavedListItem) => {
+    const [latStr, lngStr] = save.locationId.split('#');
+    const lat = Number(latStr);
+    const lng = Number(lngStr);
+    const surfInfo: SurfInfo = {
+      LocationId: save.locationId,
+      SurfTimestamp: save.surfTimestamp,
+      geo: { lat, lng },
+      conditions: {
+        waveHeight: save.waveHeight,
+        wavePeriod: save.wavePeriod,
+        windSpeed: save.windSpeed,
+        waterTemperature: save.waterTemperature,
+      },
+      derivedMetrics: {
+        surfScore: save.surfScore,
+        surfGrade: save.surfGrade,
+        surfingLevel: (save.surfingLevel || 'BEGINNER') as SurfingLevel,
+      },
+      metadata: { modelVersion: '', dataSource: '', predictionType: 'FORECAST', createdAt: '' },
+      name: save.name || save.locationId,
+      nameKo: save.nameKo,
+      region: save.region,
+      country: save.country,
+      address: save.address,
+      difficulty: 'beginner',
+      waveType: '',
+      bestSeason: [],
+    };
+    setSelectedSpotDetail({
+      surfInfo,
+      coordinates: { latitude: lat, longitude: lng },
+    });
+    setTimeSlotSelection(null);
+  }, []);
 
   const handleSuggestByDistance = useCallback(async () => {
+    if (!userLocation) return;
     try {
       const response = await surfService.getNearbySpots(
-        effectiveUserLocation.lat,
-        effectiveUserLocation.lng,
-        25,
+        userLocation.lat,
+        userLocation.lng,
+        100,
       );
       if (response.success && response.data) {
-        setSearchResults(response.data as SearchResult[]);
+        // Filter to only spots within 50km
+        const nearby = (response.data as SearchResult[]).filter(
+          (spot) => spot.distance !== undefined && spot.distance <= 50
+        );
+        setSearchResults(nearby);
       }
     } catch (err) {
       console.error('Failed to fetch nearby spots:', err);
     }
+    setVisibleSpots([]);
     setShowResults(true);
     setHasSearched(true);
     setSelectedSpotDetail(null);
     // Update active search criteria
     setSearchDate(selectedDate);
     setSearchTime(selectedTime);
-  }, [effectiveUserLocation, selectedDate, selectedTime]);
+  }, [userLocation, selectedDate, selectedTime]);
 
   const toggleLocale = () => {
     setLocale(locale === 'ko' ? 'en' : 'ko');
@@ -338,80 +462,102 @@ function MapPageContent() {
             {/* Location */}
             <LocationAutocomplete
               value={locationQuery}
-              onChange={setLocationQuery}
-              onSelect={() => {}}
+              onChange={(val) => {
+                setLocationQuery(val);
+                setPredictionErrors((prev) => ({ ...prev, location: false }));
+              }}
+              onSelect={(option) => {
+                setSelectedLocationId(option.type === 'spot' ? option.id : null);
+                setPredictionErrors((prev) => ({ ...prev, location: false }));
+              }}
               placeholder={tSearch('locationPlaceholder')}
               className="w-48"
+              hasError={!!predictionErrors.location}
+              errorPlaceholder={tSearch('predictionLocationRequired')}
             />
 
             {/* Date */}
-            <input
-              type="date"
-              value={format(selectedDate, 'yyyy-MM-dd')}
-              min={format(new Date(), 'yyyy-MM-dd')}
-              onChange={(e) => {
-                if (e.target.value) {
-                  setSelectedDate(parseISO(e.target.value));
-                }
-              }}
-              className="px-3 py-2 text-sm border border-sand-200 rounded-lg
-                focus:outline-none focus:ring-2 focus:ring-ocean-500/50 focus:border-ocean-500
-                bg-white text-ocean-800 w-40"
+            <DatePickerInput
+              value={selectedDate}
+              onChange={setSelectedDate}
+              className="w-40"
             />
 
-            {/* Time */}
-            <select
-              value={selectedTime}
-              onChange={(e) => setSelectedTime(e.target.value)}
-              className="px-3 py-2 text-sm border border-sand-200 rounded-lg
-                focus:outline-none focus:ring-2 focus:ring-ocean-500/50 focus:border-ocean-500
-                bg-white text-ocean-800 w-28"
-            >
-              <option value="">{tSearch('allTimes')}</option>
-              {TIME_SLOTS.map((time) => (
-                <option key={time} value={time}>
-                  {time}
-                </option>
-              ))}
-            </select>
+            {/* Time - hidden in prediction mode */}
+            {!isPredictionMode && (
+              <select
+                value={selectedTime}
+                onChange={(e) => setSelectedTime(e.target.value)}
+                className="px-3 py-2 text-sm border border-sand-200 rounded-lg
+                  focus:outline-none focus:ring-2 focus:ring-ocean-500/50 focus:border-ocean-500
+                  bg-white text-ocean-800 w-28"
+              >
+                <option value="">{tSearch('allTimes')}</option>
+                {TIME_SLOTS.map((time) => (
+                  <option key={time} value={time}>
+                    {time}
+                  </option>
+                ))}
+              </select>
+            )}
 
             {/* Surfer Level */}
             <select
               value={surferLevel}
-              onChange={(e) => setSurferLevel(e.target.value as SurferLevel | '')}
-              className="px-3 py-2 text-sm border border-sand-200 rounded-lg
-                focus:outline-none focus:ring-2 focus:ring-ocean-500/50 focus:border-ocean-500
-                bg-white text-ocean-800 w-32"
+              onChange={(e) => {
+                setSurferLevel(e.target.value as SurferLevel | '');
+                setPredictionErrors((prev) => ({ ...prev, level: false }));
+              }}
+              className={`px-3 py-2 text-sm border rounded-lg
+                focus:outline-none focus:ring-2 bg-white w-32 ${
+                  predictionErrors.level
+                    ? 'border-red-400 text-red-400 focus:ring-red-500/50 focus:border-red-500'
+                    : 'border-sand-200 text-ocean-800 focus:ring-ocean-500/50 focus:border-ocean-500'
+                }`}
             >
-              <option value="">{tSearch('allLevels')}</option>
+              <option value="">{predictionErrors.level ? tSearch('predictionLevelRequired') : tSearch('allLevels')}</option>
               <option value="beginner">{tSearch('difficulty.beginner')}</option>
               <option value="intermediate">{tSearch('difficulty.intermediate')}</option>
               <option value="advanced">{tSearch('difficulty.advanced')}</option>
             </select>
 
-            {/* Search Button */}
+            {/* Search / Predict Button */}
             <button
-              onClick={handleSearch}
-              className="px-4 py-2 bg-ocean-500 text-white text-sm font-medium rounded-lg
-                hover:bg-ocean-600 transition-colors flex items-center gap-1"
+              onClick={isPredictionMode ? handlePredictionSearch : handleSearch}
+              className={`px-4 py-2 text-white text-sm font-medium rounded-lg
+                transition-colors flex items-center gap-1 ${
+                  isPredictionMode
+                    ? 'bg-indigo-500 hover:bg-indigo-600'
+                    : 'bg-ocean-500 hover:bg-ocean-600'
+                }`}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  d={isPredictionMode
+                    ? "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                    : "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  }
                 />
               </svg>
-              {tSearch('searchButton')}
+              {isPredictionMode ? tSearch('predictButton') : tSearch('searchButton')}
             </button>
 
             {/* Nearby Spots Button */}
             <button
               onClick={handleSuggestByDistance}
-              className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg
-                hover:bg-blue-600 transition-colors flex items-center gap-1"
-              title={locale === 'ko' ? '내 주변 25개 스팟 추천' : 'Suggest 25 Nearby Spots'}
+              disabled={!userLocation}
+              className={`px-4 py-2 text-white text-sm font-medium rounded-lg
+                transition-colors flex items-center gap-1 ${
+                  userLocation
+                    ? 'bg-blue-500 hover:bg-blue-600'
+                    : 'bg-blue-300 cursor-not-allowed opacity-60'
+                }`}
+              title={!userLocation
+                ? (locale === 'ko' ? '위치 권한이 필요합니다' : 'Location permission required')
+                : (locale === 'ko' ? '내 주변 스팟 추천' : 'Nearby Spots')}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -542,27 +688,38 @@ function MapPageContent() {
 
       {/* Main Content */}
       <div className="flex-1 relative min-h-0">
-        {/* Search Results Panel */}
-        <SearchResultsList
-          results={searchResults}
-          isOpen={showResults && hasSearched}
-          onClose={() => {
-            setShowResults(false);
-            setVisibleSpots([]);
-          }}
-          onSpotClick={handleSpotClick}
-          onSaveSpot={handleSaveSpot}
-          onRemoveSpot={handleRemoveSpot}
-          savedSpotIds={savedSpotIds}
-          selectedDate={searchDate}
-          selectedTime={searchTime}
-          onSuggestByDistance={handleSuggestByDistance}
-          userLocation={effectiveUserLocation}
-          isWeeklyEstimate={isWeeklyEstimate}
-          weekRange={weekRange}
-          onVisibleItemsChange={setVisibleSpots}
-          showLocationPrompt={showLocationPrompt}
-        />
+        {/* Prediction Result Panel or Search Results Panel */}
+        {showPrediction && predictionResult ? (
+          <PredictionResultPanel
+            result={predictionResult}
+            surferLevel={surferLevel}
+            isOpen={showPrediction}
+            onClose={() => {
+              setShowPrediction(false);
+              setPredictionResult(null);
+            }}
+            showLocationPrompt={showLocationPrompt}
+          />
+        ) : (
+          <SearchResultsList
+            results={searchResults}
+            isOpen={showResults && hasSearched}
+            onClose={() => {
+              setShowResults(false);
+              setVisibleSpots([]);
+            }}
+            onSpotClick={handleSpotClick}
+            onSaveSpot={handleSaveSpot}
+            onRemoveSpot={handleRemoveSpot}
+            savedSpotIds={savedSpotIds}
+            selectedDate={searchDate}
+            selectedTime={searchTime}
+            onSuggestByDistance={handleSuggestByDistance}
+            userLocation={userLocation}
+            onVisibleItemsChange={setVisibleSpots}
+            showLocationPrompt={showLocationPrompt}
+          />
+        )}
 
         {/* Map */}
         <EnhancedMapboxMap
@@ -573,16 +730,26 @@ function MapPageContent() {
           showWindParticles={showWindParticles}
           overlayMode={overlayMode}
           onSpotSelect={handleMapSpotSelect}
+          onUserLocationChange={(loc) => {
+            setUserLocation(loc);
+            setShowLocationPrompt(false);
+            localStorage.setItem('locationPermissionGranted', 'true');
+            localStorage.setItem('userLocation', JSON.stringify(loc));
+          }}
           locale={locale}
           center={mapCenter}
           showGeocoder={false}
           showMeasureDistance={false}
+          saveCountByLocation={saveCountByLocation}
+          onMultiSaveMarkerClick={handleMultiSaveMarkerClick}
         />
 
-        {/* 10-Day Quick Date Selector - Bottom Center */}
-        <div className={`absolute bottom-3 left-1/2 -translate-x-1/2 z-30 transition-all duration-300
-          ${showResults && hasSearched ? 'ml-48' : ''}
-          ${selectedSpotDetail ? 'mr-40' : ''}`}
+        {/* 10-Day Quick Date Selector - Bottom Center of visible map area */}
+        <div
+          className="absolute bottom-3 z-30 transition-all duration-300 -translate-x-1/2"
+          style={{
+            left: `calc(${showResults && hasSearched ? '384px' : '0px'} + (100% - ${showResults && hasSearched ? '384px' : '0px'} - ${selectedSpotDetail || timeSlotSelection ? '420px' : '0px'}) / 2)`,
+          }}
         >
           {showQuickDateSelect ? (
             <>
@@ -652,6 +819,19 @@ function MapPageContent() {
             </button>
           )}
         </div>
+
+        {/* Time Slot Picker Panel - Right Side (multi-save markers) */}
+        {timeSlotSelection && !selectedSpotDetail && (
+          <TimeSlotPickerPanel
+            locationId={timeSlotSelection.locationId}
+            coordinates={timeSlotSelection.coordinates}
+            saves={timeSlotSelection.saves}
+            onClose={() => setTimeSlotSelection(null)}
+            onSelectTimeSlot={handleTimeSlotSelect}
+            showLocationPrompt={showLocationPrompt}
+            locale={locale as 'en' | 'ko'}
+          />
+        )}
 
         {/* Spot Detail Panel - Right Side */}
         {selectedSpotDetail && (
