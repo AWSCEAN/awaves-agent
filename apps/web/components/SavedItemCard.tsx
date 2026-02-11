@@ -7,6 +7,7 @@ import type { SavedItemResponse, FeedbackStatus, Language } from '@/types';
 interface SavedItemCardProps {
   item: SavedItemResponse;
   lang: Language;
+  spotName?: { name: string; nameKo?: string };
   onRemove: () => void;
   onAcknowledgeChange: () => void;
   onFeedback: (status: FeedbackStatus) => void;
@@ -71,6 +72,7 @@ const translations = {
 export default function SavedItemCard({
   item,
   lang,
+  spotName,
   onRemove,
   onAcknowledgeChange,
   onFeedback,
@@ -101,7 +103,11 @@ export default function SavedItemCard({
     onRemove();
   };
 
-  const locationName = item.address || `${item.location_id.replace('#', ', ')}`;
+  // Resolve display name: spotName from surf data > address from save > coordinates fallback
+  const resolvedSpotName = spotName
+    ? (lang === 'ko' && spotName.nameKo ? spotName.nameKo : spotName.name)
+    : null;
+  const locationName = resolvedSpotName || item.address || `${item.location_id.replace('#', ', ')}`;
 
   return (
     <div className="card relative overflow-hidden break-inside-avoid">

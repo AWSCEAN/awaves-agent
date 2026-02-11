@@ -275,20 +275,30 @@ export const surfService = {
     return apiRequest<SurfInfo>(`/surf/spots/${id}`);
   },
 
-  async searchSpots(query: string): Promise<ApiResponse<SurfInfo[]>> {
-    return apiRequest<SurfInfo[]>(`/surf/search?q=${encodeURIComponent(query)}`);
+  async searchSpots(query: string, date?: string, time?: string): Promise<ApiResponse<SurfInfo[]>> {
+    const params = new URLSearchParams({ q: query });
+    if (date) params.set('date', date);
+    if (time) params.set('time', time);
+    return apiRequest<SurfInfo[]>(`/surf/search?${params.toString()}`);
   },
 
   async getRecommendations(userId: string): Promise<ApiResponse<SurfInfo[]>> {
     return apiRequest<SurfInfo[]>(`/surf/recommendations?user_id=${userId}`);
   },
 
-  async getNearbySpots(lat: number, lng: number, limit: number = 25): Promise<ApiResponse<SurfInfo[]>> {
-    return apiRequest<SurfInfo[]>(`/surf/nearby?lat=${lat}&lng=${lng}&limit=${limit}`);
+  async getNearbySpots(lat: number, lng: number, limit: number = 25, date?: string, time?: string): Promise<ApiResponse<SurfInfo[]>> {
+    const params = new URLSearchParams({ lat: lat.toString(), lng: lng.toString(), limit: limit.toString() });
+    if (date) params.set('date', date);
+    if (time) params.set('time', time);
+    return apiRequest<SurfInfo[]>(`/surf/nearby?${params.toString()}`);
   },
 
-  async getAllSpots(): Promise<ApiResponse<SurfInfo[]>> {
-    return apiRequest<SurfInfo[]>('/surf/spots/all');
+  async getAllSpots(date?: string, time?: string): Promise<ApiResponse<SurfInfo[]>> {
+    const params = new URLSearchParams();
+    if (date) params.set('date', date);
+    if (time) params.set('time', time);
+    const qs = params.toString();
+    return apiRequest<SurfInfo[]>(`/surf/spots/all${qs ? `?${qs}` : ''}`);
   },
 
   async predictSurf(locationId: string, surfDate: string, surferLevel: string): Promise<ApiResponse<PredictionResult>> {

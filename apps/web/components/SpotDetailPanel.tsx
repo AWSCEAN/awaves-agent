@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
-import type { SurfInfo } from '@/types';
+import type { SurfInfo, SavedListItem } from '@/types';
 import { getGradeBgColor, getGradeTextColor, getGradeBorderColor } from '@/lib/services/surfInfoService';
 
 interface SpotDetailPanelProps {
@@ -13,6 +13,8 @@ interface SpotDetailPanelProps {
   onSave?: () => void;
   onRemove?: () => void;
   showLocationPrompt?: boolean;
+  savedTimeslots?: SavedListItem[];
+  onTimeslotSelect?: (save: SavedListItem) => void;
 }
 
 function getScoreColor(score: number): string {
@@ -34,7 +36,9 @@ export default function SpotDetailPanel({
   onClose,
   onSave,
   onRemove,
-  showLocationPrompt = false
+  showLocationPrompt = false,
+  savedTimeslots,
+  onTimeslotSelect,
 }: SpotDetailPanelProps) {
   const locale = useLocale();
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
@@ -137,6 +141,43 @@ export default function SpotDetailPanel({
           </button>
         </div>
       </div>
+
+      {/* Saved Time Slot Selector */}
+      {savedTimeslots && savedTimeslots.length > 1 && onTimeslotSelect && (
+        <div className="px-3 pt-2 pb-1 border-b border-sand-200">
+          <div className="text-xs text-ocean-500 font-medium mb-1.5">
+            {locale === 'ko'
+              ? `${savedTimeslots.length}개 저장된 시간대`
+              : `${savedTimeslots.length} saved time slots`}
+          </div>
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            {[...savedTimeslots]
+              .sort((a, b) => new Date(a.surfTimestamp).getTime() - new Date(b.surfTimestamp).getTime())
+              .map((save) => {
+                const d = new Date(save.surfTimestamp);
+                const isActive = save.surfTimestamp === surfInfo.SurfTimestamp;
+                const timeLabel = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+                const dateLabel = locale === 'ko'
+                  ? `${d.getMonth() + 1}/${d.getDate()}`
+                  : `${d.getMonth() + 1}/${d.getDate()}`;
+                return (
+                  <button
+                    key={save.locationSurfKey}
+                    onClick={() => onTimeslotSelect(save)}
+                    className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                      isActive
+                        ? 'bg-ocean-500 text-white'
+                        : 'bg-sand-100 text-ocean-700 hover:bg-sand-200'
+                    }`}
+                  >
+                    <span>{dateLabel}</span>
+                    <span className="ml-1">{timeLabel}</span>
+                  </button>
+                );
+              })}
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="p-3 space-y-3">

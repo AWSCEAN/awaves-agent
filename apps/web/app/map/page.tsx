@@ -232,20 +232,33 @@ function MapPageContent() {
     setOverlayMode((prev) => (prev === mode ? 'none' : mode));
   };
 
-  const fetchSpots = useCallback(async (query?: string) => {
+  const fetchSpots = useCallback(async (query?: string, date?: string, time?: string, level?: string) => {
     try {
+      // Always fetch all spots for the selected date so map markers stay in sync
+      const allSpotsPromise = surfService.getAllSpots(date, time);
+
       if (query) {
-        const response = await surfService.searchSpots(query);
-        if (response.success && response.data) {
-          setSearchResults(response.data as SearchResult[]);
+        const [searchResponse, allResponse] = await Promise.all([
+          surfService.searchSpots(query, date, time),
+          allSpotsPromise,
+        ]);
+        let results = (searchResponse.success && searchResponse.data) ? searchResponse.data as SearchResult[] : [];
+        if (level) {
+          results = results.filter(s => s.difficulty === level);
+        }
+        setSearchResults(results);
+        if (allResponse.success && allResponse.data) {
+          setAllSpots(allResponse.data);
         }
       } else {
-        const response = await surfService.getSpots({
-          minWaveHeight: undefined,
-          maxWaveHeight: undefined,
-        });
+        const response = await allSpotsPromise;
         if (response.success && response.data) {
-          setSearchResults(response.data.items as SearchResult[]);
+          let results = response.data as SearchResult[];
+          if (level) {
+            results = results.filter(s => s.difficulty === level);
+          }
+          setSearchResults(results);
+          setAllSpots(response.data);
         }
       }
     } catch (err) {
@@ -264,8 +277,9 @@ function MapPageContent() {
     // Update active search criteria only when search button is clicked
     setSearchDate(selectedDate);
     setSearchTime(selectedTime);
-    await fetchSpots(locationQuery || undefined);
-  }, [locationQuery, selectedDate, selectedTime, fetchSpots]);
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    await fetchSpots(locationQuery || undefined, dateStr, selectedTime || undefined, surferLevel || undefined);
+  }, [locationQuery, selectedDate, selectedTime, surferLevel, fetchSpots]);
 
   const handlePredictionSearch = useCallback(async () => {
     const errors: { location?: boolean; level?: boolean } = {};
@@ -329,13 +343,16 @@ function MapPageContent() {
       coordinates: { latitude: surfInfo.geo.lat, longitude: surfInfo.geo.lng },
     });
 
+    // Use the display name as address so saved spots page shows the name
+    const displayName = surfInfo.name || surfInfo.address || surfInfo.LocationId;
+
     await saveItem({
       locationId: surfInfo.LocationId,
       surfTimestamp: surfInfo.SurfTimestamp,
       surferLevel: surfInfo.derivedMetrics.surfingLevel,
       surfScore: surfInfo.derivedMetrics.surfScore,
       surfGrade: surfInfo.derivedMetrics.surfGrade,
-      address: surfInfo.address,
+      address: displayName,
       region: surfInfo.region,
       country: surfInfo.country,
       waveHeight: surfInfo.conditions.waveHeight,
@@ -345,8 +362,10 @@ function MapPageContent() {
     });
   };
 
-  const handleRemoveSpot = async (locationId: string) => {
-    const saved = savedSpots.find((s) => s.locationId === locationId);
+  const handleRemoveSpot = async (locationId: string, surfTimestamp?: string) => {
+    const saved = surfTimestamp
+      ? savedSpots.find((s) => s.locationId === locationId && s.surfTimestamp === surfTimestamp)
+      : savedSpots.find((s) => s.locationId === locationId);
     if (saved) {
       await deleteItem(saved.locationSurfKey);
     }
@@ -411,16 +430,21 @@ function MapPageContent() {
   const handleSuggestByDistance = useCallback(async () => {
     if (!userLocation) return;
     try {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const response = await surfService.getNearbySpots(
         userLocation.lat,
         userLocation.lng,
         100,
+        dateStr,
+        selectedTime || undefined,
       );
       if (response.success && response.data) {
-        // Filter to only spots within 50km
-        const nearby = (response.data as SearchResult[]).filter(
+        let nearby = (response.data as SearchResult[]).filter(
           (spot) => spot.distance !== undefined && spot.distance <= 50
         );
+        if (surferLevel) {
+          nearby = nearby.filter(s => s.difficulty === surferLevel);
+        }
         setSearchResults(nearby);
       }
     } catch (err) {
@@ -433,15 +457,16 @@ function MapPageContent() {
     // Update active search criteria
     setSearchDate(selectedDate);
     setSearchTime(selectedTime);
-  }, [userLocation, selectedDate, selectedTime]);
+  }, [userLocation, selectedDate, selectedTime, surferLevel]);
 
   const toggleLocale = () => {
     setLocale(locale === 'ko' ? 'en' : 'ko');
   };
 
-  // Memoize savedSpotIds using LocationId
+  // Memoize savedSpotIds using LocationId#SurfTimestamp composite key
+  // This allows saving the same spot at different times
   const savedSpotIds = useMemo(() =>
-    new Set(savedSpots.map((s) => s.locationId)),
+    new Set(savedSpots.map((s) => `${s.locationId}#${s.surfTimestamp}`)),
     [savedSpots]
   );
 
@@ -840,15 +865,21 @@ function MapPageContent() {
             coordinates={selectedSpotDetail.coordinates}
             isSaved={savedSpots.some(
               (s) => s.locationId === selectedSpotDetail.surfInfo.LocationId
+                && s.surfTimestamp === selectedSpotDetail.surfInfo.SurfTimestamp
             )}
             onClose={() => setSelectedSpotDetail(null)}
             onSave={() => {
               handleSaveSpot(selectedSpotDetail.surfInfo);
             }}
             onRemove={() => {
-              handleRemoveSpot(selectedSpotDetail.surfInfo.LocationId);
+              handleRemoveSpot(
+                selectedSpotDetail.surfInfo.LocationId,
+                selectedSpotDetail.surfInfo.SurfTimestamp,
+              );
             }}
             showLocationPrompt={showLocationPrompt}
+            savedTimeslots={savesByLocation.get(selectedSpotDetail.surfInfo.LocationId)}
+            onTimeslotSelect={handleTimeSlotSelect}
           />
         )}
       </div>
