@@ -50,7 +50,7 @@ export interface SurfInfo {
   region: string;
   country: string;
   address?: string;
-  difficulty: SurferLevel;
+  difficulty?: SurferLevel;
   waveType: string;
   bestSeason: string[];
   description?: string;

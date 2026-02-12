@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
-import type { SurfInfo } from '@/types';
+import type { SurfInfo, SavedListItem } from '@/types';
 import { getGradeBgColor, getGradeTextColor, getGradeBorderColor } from '@/lib/services/surfInfoService';
 
 interface SpotDetailPanelProps {
@@ -13,6 +13,10 @@ interface SpotDetailPanelProps {
   onSave?: () => void;
   onRemove?: () => void;
   showLocationPrompt?: boolean;
+  savedTimeslots?: SavedListItem[];
+  currentConditions?: SurfInfo | null;
+  onTimeslotSelect?: (save: SavedListItem) => void;
+  onCurrentSelect?: (surfInfo: SurfInfo) => void;
 }
 
 function getScoreColor(score: number): string {
@@ -34,10 +38,15 @@ export default function SpotDetailPanel({
   onClose,
   onSave,
   onRemove,
-  showLocationPrompt = false
+  showLocationPrompt = false,
+  savedTimeslots,
+  currentConditions,
+  onTimeslotSelect,
+  onCurrentSelect,
 }: SpotDetailPanelProps) {
   const locale = useLocale();
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const displayName = locale === 'ko' && surfInfo.nameKo ? surfInfo.nameKo : surfInfo.name;
   const { surfScore, surfGrade, surfingLevel } = surfInfo.derivedMetrics;
@@ -99,9 +108,30 @@ export default function SpotDetailPanel({
                 </button>
               )}
             </div>
-            <p className="text-sm text-white/80">
-              {surfInfo.region}, {surfInfo.country}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm text-white/80">
+                {surfInfo.region}, {surfInfo.country}
+              </p>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(surfInfo.address || displayName);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="p-0.5 rounded text-white/50 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0"
+                title={locale === 'ko' ? '주소 복사' : 'Copy address'}
+              >
+                {copied ? (
+                  <svg className="w-3.5 h-3.5 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                )}
+              </button>
+            </div>
             <p className="text-xs text-white/60">
               {coordinates.latitude.toFixed(4)}, {coordinates.longitude.toFixed(4)}
             </p>
@@ -137,6 +167,60 @@ export default function SpotDetailPanel({
           </button>
         </div>
       </div>
+
+      {/* Saved Time Slot Selector */}
+      {savedTimeslots && savedTimeslots.length >= 1 && (onTimeslotSelect || (currentConditions && onCurrentSelect)) && (
+        <div className="px-3 pt-2 pb-1 border-b border-sand-200">
+          <div className="text-xs text-ocean-500 font-medium mb-1.5">
+            {locale === 'ko'
+              ? `${savedTimeslots.length}개 저장된 시간대${currentConditions ? ' + 현재' : ''}`
+              : `${savedTimeslots.length} saved slot${savedTimeslots.length !== 1 ? 's' : ''}${currentConditions ? ' + Current' : ''}`}
+          </div>
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            {/* Current Conditions Button */}
+            {currentConditions && onCurrentSelect && (
+              <button
+                onClick={() => onCurrentSelect(currentConditions)}
+                className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  currentConditions.SurfTimestamp === surfInfo.SurfTimestamp
+                    ? 'bg-ocean-500 text-white'
+                    : 'bg-ocean-100 text-ocean-700 hover:bg-ocean-200 border border-ocean-300'
+                }`}
+              >
+                {locale === 'ko' ? '현재' : 'Current'}
+              </button>
+            )}
+            {/* Saved Timeslot Buttons */}
+            {onTimeslotSelect && [...savedTimeslots]
+              .sort((a, b) => new Date(a.surfTimestamp).getTime() - new Date(b.surfTimestamp).getTime())
+              .map((save) => {
+                const d = new Date(save.surfTimestamp);
+                const isActive = save.surfTimestamp === surfInfo.SurfTimestamp;
+                const timeLabel = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+                const dateLabel = locale === 'ko'
+                  ? `${d.getMonth() + 1}/${d.getDate()}`
+                  : `${d.getMonth() + 1}/${d.getDate()}`;
+                return (
+                  <button
+                    key={save.locationSurfKey}
+                    onClick={() => onTimeslotSelect(save)}
+                    className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 ${
+                      isActive
+                        ? 'bg-ocean-500 text-white'
+                        : 'bg-sand-100 text-ocean-700 hover:bg-sand-200'
+                    }`}
+                  >
+                    <svg className={`w-3 h-3 flex-shrink-0 ${isActive ? 'text-red-300' : 'text-red-400'}`} fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                    <span>{dateLabel}</span>
+                    <span>{timeLabel}</span>
+                  </button>
+                );
+              })}
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="p-3 space-y-3">

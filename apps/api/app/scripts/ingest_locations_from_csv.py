@@ -1,0 +1,230 @@
+"""
+Ingest location data from mock_surf_data_geocode.csv into DynamoDB (locations table)
+and OpenSearch (locations index).
+
+Usage:
+    cd apps/api
+    python -m app.scripts.ingest_locations_from_csv
+
+Requirements:
+    - DynamoDB local running on port 8000 (or AWS DynamoDB configured)
+    - OpenSearch running on port 9200
+"""
+
+import csv
+import json
+import os
+import sys
+from decimal import Decimal
+from pathlib import Path
+
+import boto3
+from botocore.exceptions import ClientError
+from dotenv import load_dotenv
+from opensearchpy import OpenSearch
+
+# Load .env.local from apps/api
+_env_local = Path(__file__).resolve().parent.parent.parent / ".env.local"
+load_dotenv(_env_local)
+
+# Configuration from environment
+DDB_ENDPOINT_URL = os.getenv("DDB_ENDPOINT_URL", "http://localhost:8000")
+LOCATIONS_TABLE = os.getenv("DYNAMODB_LOCATIONS_TABLE", "locations")
+REGION = os.getenv("AWS_REGION", "ap-northeast-2")
+OPENSEARCH_HOST = os.getenv("OPENSEARCH_HOST", "localhost")
+OPENSEARCH_PORT = int(os.getenv("OPENSEARCH_PORT", "9200"))
+
+# CSV file path (relative to apps/api/)
+CSV_FILE = Path(__file__).resolve().parent.parent.parent.parent.parent / "mock_surf_data_geocode.csv"
+
+
+def create_ddb_table(dynamodb_client):
+    """Create the locations DynamoDB table if it doesn't exist."""
+    try:
+        dynamodb_client.describe_table(TableName=LOCATIONS_TABLE)
+        print(f"DynamoDB table '{LOCATIONS_TABLE}' already exists.")
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "ResourceNotFoundException":
+            print(f"Creating DynamoDB table '{LOCATIONS_TABLE}'...")
+            dynamodb_client.create_table(
+                TableName=LOCATIONS_TABLE,
+                KeySchema=[
+                    {"AttributeName": "locationId", "KeyType": "HASH"},
+                ],
+                AttributeDefinitions=[
+                    {"AttributeName": "locationId", "AttributeType": "S"},
+                ],
+                BillingMode="PAY_PER_REQUEST",
+            )
+            dynamodb_client.get_waiter("table_exists").wait(TableName=LOCATIONS_TABLE)
+            print(f"DynamoDB table '{LOCATIONS_TABLE}' created.")
+        else:
+            raise
+
+
+def create_opensearch_index(os_client: OpenSearch):
+    """Create the locations OpenSearch index if it doesn't exist."""
+    index_name = "locations"
+
+    if os_client.indices.exists(index=index_name):
+        print(f"OpenSearch index '{index_name}' already exists. Deleting for re-ingestion...")
+        os_client.indices.delete(index=index_name)
+
+    mapping = {
+        "settings": {
+            "number_of_shards": 1,
+            "number_of_replicas": 0,
+        },
+        "mappings": {
+            "properties": {
+                "locationId": {"type": "keyword"},
+                "display_name": {"type": "text", "analyzer": "standard"},
+                "city": {"type": "text", "analyzer": "standard", "fields": {"keyword": {"type": "keyword"}}},
+                "state": {"type": "keyword"},
+                "country": {"type": "keyword"},
+                "location": {"type": "geo_point"},
+            }
+        },
+    }
+
+    os_client.indices.create(index=index_name, body=mapping)
+    print(f"OpenSearch index '{index_name}' created.")
+
+
+def read_csv(csv_path: Path) -> list[dict]:
+    """Read locations from CSV file and generate locationId."""
+    locations = []
+    seen_ids = set()
+
+    with open(csv_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            lat = row["lat"].strip()
+            lon = row["lon"].strip()
+            location_id = f"{lat}#{lon}"
+
+            # Deduplicate by locationId
+            if location_id in seen_ids:
+                continue
+            seen_ids.add(location_id)
+
+            locations.append({
+                "locationId": location_id,
+                "lat": float(lat),
+                "lon": float(lon),
+                "display_name": row.get("display_name", "").strip(),
+                "city": row.get("city", "").strip(),
+                "state": row.get("state", "").strip(),
+                "country": row.get("country", "").strip(),
+            })
+
+    return locations
+
+
+def ingest_to_dynamodb(dynamodb_resource, locations: list[dict]):
+    """Write locations to DynamoDB locations table."""
+    table = dynamodb_resource.Table(LOCATIONS_TABLE)
+    count = 0
+
+    with table.batch_writer() as batch:
+        for loc in locations:
+            item = {
+                "locationId": loc["locationId"],
+                "lat": Decimal(str(loc["lat"])),
+                "lon": Decimal(str(loc["lon"])),
+                "display_name": loc["display_name"],
+                "city": loc["city"],
+                "state": loc["state"],
+                "country": loc["country"],
+            }
+            batch.put_item(Item=item)
+            count += 1
+
+    print(f"Ingested {count} locations into DynamoDB '{LOCATIONS_TABLE}'.")
+
+
+def ingest_to_opensearch(os_client: OpenSearch, locations: list[dict]):
+    """Bulk index locations into OpenSearch."""
+    index_name = "locations"
+    actions = []
+
+    for loc in locations:
+        actions.append(json.dumps({"index": {"_index": index_name, "_id": loc["locationId"]}}))
+        actions.append(json.dumps({
+            "locationId": loc["locationId"],
+            "display_name": loc["display_name"],
+            "city": loc["city"],
+            "state": loc["state"],
+            "country": loc["country"],
+            "location": {
+                "lat": loc["lat"],
+                "lon": loc["lon"],
+            },
+        }))
+
+    body = "\n".join(actions) + "\n"
+    response = os_client.bulk(body=body, refresh=True)
+
+    errors = response.get("errors", False)
+    items = response.get("items", [])
+    success = sum(1 for item in items if item.get("index", {}).get("status") in (200, 201))
+
+    if errors:
+        failed = [item for item in items if item.get("index", {}).get("status") not in (200, 201)]
+        print(f"Warning: {len(failed)} documents failed to index.")
+
+    print(f"Indexed {success} locations into OpenSearch '{index_name}'.")
+
+
+def main():
+    # Validate CSV exists
+    if not CSV_FILE.exists():
+        print(f"Error: CSV file not found at {CSV_FILE}")
+        sys.exit(1)
+
+    print(f"Reading CSV from: {CSV_FILE}")
+    locations = read_csv(CSV_FILE)
+    print(f"Found {len(locations)} unique locations.")
+
+    # DynamoDB setup
+    ddb_kwargs = {
+        "region_name": REGION,
+        "aws_access_key_id": os.getenv("AWS_ACCESS_KEY_ID", "dummy"),
+        "aws_secret_access_key": os.getenv("AWS_SECRET_ACCESS_KEY", "dummy"),
+    }
+    if DDB_ENDPOINT_URL:
+        ddb_kwargs["endpoint_url"] = DDB_ENDPOINT_URL
+
+    dynamodb_client = boto3.client("dynamodb", **ddb_kwargs)
+    dynamodb_resource = boto3.resource("dynamodb", **ddb_kwargs)
+
+    create_ddb_table(dynamodb_client)
+    ingest_to_dynamodb(dynamodb_resource, locations)
+
+    # OpenSearch setup
+    os_client = OpenSearch(
+        hosts=[{"host": OPENSEARCH_HOST, "port": OPENSEARCH_PORT}],
+        use_ssl=False,
+        verify_certs=False,
+        timeout=30,
+    )
+
+    try:
+        info = os_client.info()
+        print(f"OpenSearch connected: version {info['version']['number']}")
+    except Exception as e:
+        print(f"Error: Cannot connect to OpenSearch at {OPENSEARCH_HOST}:{OPENSEARCH_PORT}")
+        print(f"  {e}")
+        print("  Make sure OpenSearch is running: docker compose up -d")
+        sys.exit(1)
+
+    create_opensearch_index(os_client)
+    ingest_to_opensearch(os_client, locations)
+
+    print("\nIngestion complete!")
+    print(f"  DynamoDB: {len(locations)} locations in '{LOCATIONS_TABLE}'")
+    print(f"  OpenSearch: {len(locations)} locations in 'locations' index")
+
+
+if __name__ == "__main__":
+    main()

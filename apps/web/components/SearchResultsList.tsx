@@ -19,7 +19,7 @@ interface SearchResultsListProps {
   onClose: () => void;
   onSpotClick: (spot: SearchResult) => void;
   onSaveSpot: (spot: SearchResult) => void;
-  onRemoveSpot?: (locationId: string) => void;
+  onRemoveSpot?: (locationId: string, surfTimestamp?: string) => void;
   savedSpotIds: Set<string>;
   selectedDate?: Date;
   selectedTime?: string;
@@ -53,7 +53,7 @@ export default function SearchResultsList({
 
   const [currentPage, setCurrentPage] = useState(1);
   const [sortMode, setSortMode] = useState<SortMode>('surfScore');
-  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; surfTimestamp: string; name: string } | null>(null);
 
   // Reset to page 1 when results change
   useEffect(() => {
@@ -93,8 +93,12 @@ export default function SearchResultsList({
     return 'bg-red-500';
   };
 
-  const getDifficultyLabel = (difficulty: SurferLevel): string => {
-    return t(`difficulty.${difficulty}`);
+  const getLevelLabel = (spot: SearchResult): string => {
+    const level = spot.derivedMetrics?.surfingLevel;
+    if (level) {
+      return t(`difficulty.${level.toLowerCase()}`);
+    }
+    return '';
   };
 
   if (!isOpen) return null;
@@ -195,12 +199,13 @@ export default function SearchResultsList({
         ) : (
           <ul className="p-2 space-y-2">
             {paginatedResults.map((spot, index) => {
-              const isSaved = savedSpotIds.has(spot.LocationId);
+              const compositeKey = `${spot.LocationId}#${spot.SurfTimestamp}`;
+              const isSaved = savedSpotIds.has(compositeKey);
               const displayName = locale === 'ko' && spot.nameKo ? spot.nameKo : spot.name;
 
               return (
                 <li
-                  key={spot.LocationId}
+                  key={compositeKey}
                   className="p-3 bg-white rounded-xl border border-sand-200 hover:border-ocean-300 hover:shadow-md cursor-pointer transition-all"
                   onClick={() => onSpotClick(spot)}
                 >
@@ -217,9 +222,11 @@ export default function SearchResultsList({
                       {/* Location and Level */}
                       <div className="flex items-center gap-2 text-xs text-ocean-500 mb-2">
                         <span>{spot.region}, {spot.country}</span>
-                        <span className="px-1.5 py-0.5 bg-sand-100 rounded text-ocean-600">
-                          {getDifficultyLabel(spot.difficulty)}
-                        </span>
+                        {getLevelLabel(spot) && (
+                          <span className="px-1.5 py-0.5 bg-sand-100 rounded text-ocean-600">
+                            {getLevelLabel(spot)}
+                          </span>
+                        )}
                       </div>
 
                       {/* Scores + Grade */}
@@ -249,7 +256,7 @@ export default function SearchResultsList({
                       onClick={(e) => {
                         e.stopPropagation();
                         if (isSaved && onRemoveSpot) {
-                          setConfirmDelete({ id: spot.LocationId, name: displayName });
+                          setConfirmDelete({ id: spot.LocationId, surfTimestamp: spot.SurfTimestamp, name: displayName });
                         } else if (!isSaved) {
                           onSaveSpot(spot);
                         }
@@ -331,7 +338,7 @@ export default function SearchResultsList({
               <button
                 onClick={() => {
                   if (onRemoveSpot) {
-                    onRemoveSpot(confirmDelete.id);
+                    onRemoveSpot(confirmDelete.id, confirmDelete.surfTimestamp);
                   }
                   setConfirmDelete(null);
                 }}
