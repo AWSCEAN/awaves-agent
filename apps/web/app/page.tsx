@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import LogoOverlay from '@/components/LogoOverlay';
+import SurfLoadingScreen from '@/components/SurfLoadingScreen';
 import { getSavedLocale, saveLocale } from '@/lib/i18n';
 
 type Language = 'ko' | 'en';
@@ -49,6 +50,7 @@ export default function LandingPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
   const [lang, setLangState] = useState<Language>('en');
+  const [navigating, setNavigating] = useState(false);
   const t = translations[lang];
 
   // Hydrate from persisted locale after mount
@@ -63,11 +65,16 @@ export default function LandingPage() {
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
+      setNavigating(true);
       router.push('/map');
     } else {
       router.push('/login');
     }
   };
+
+  if (navigating) {
+    return <SurfLoadingScreen />;
+  }
 
   return (
     <>

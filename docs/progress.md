@@ -3,7 +3,7 @@
 ## 현재 상태
 - **마일스톤**: M3 - 지도 & 스팟 기능
 - **상태**: 🟡 진행중
-- **마지막 업데이트**: 2026-02-07
+- **마지막 업데이트**: 2026-02-11
 
 ## 다음 작업
 1. [x] 사용자명 기반 회원가입 V2 구현 (t01_user-registration01)
@@ -11,8 +11,9 @@
 3. [x] 인증 기반 UI 동작 및 접근 제어 (t04_user-login02)
 4. [x] 지도 페이지 Mapbox 통합 (t06_map01)
 5. [x] 프론트엔드 DB 스키마 정렬 및 3-tier 지도 클릭 (t06_map03)
-6. [ ] 프론트엔드-백엔드 API 연동 완성
-7. [ ] 저장된 스팟 기능 백엔드 연동
+6. [x] OpenSearch 기반 위치 키워드 검색 구현 (t05_search03)
+7. [ ] 프론트엔드-백엔드 API 연동 완성
+8. [ ] 저장된 스팟 기능 백엔드 연동
 
 ## 블로커
 - 없음
@@ -20,6 +21,24 @@
 ---
 
 ## 작업 기록
+
+### 2026-02-11
+#### 완료
+- OpenSearch 기반 위치 키워드 검색 구현 (Task: t05_search03)
+  - Infrastructure: Docker Compose로 OpenSearch 로컬 환경 구성
+  - Backend: OpenSearch 서비스, 검색 서비스, surf_info 서비스 신규 생성
+  - Backend: `GET /search?q=` 엔드포인트 (multi_match 키워드 검색)
+  - Backend: CSV 자동 시딩 (앱 시작 시 인덱스가 비어있으면 자동 인제스션)
+  - Backend: Redis 캐시 연동 (`awaves:surf:latest:{locationId}`)
+  - Frontend: searchSpots() → `/search` 엔드포인트로 변경
+  - Docs: architecture, api, development, progress 문서 업데이트
+
+#### 결정 사항
+- OpenSearch는 키워드 검색 전용, DynamoDB가 데이터 소스 오브 트루스
+- locationId는 CSV 인제스션 시 1회 생성, 런타임에서 float 재구성 금지
+- 앱 시작 시 자동 시딩 (인덱스 비어있을 때만)
+
+---
 
 ### 2026-02-05
 #### 완료

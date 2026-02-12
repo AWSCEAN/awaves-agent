@@ -5,11 +5,9 @@ import mapboxgl from 'mapbox-gl';
 import MapboxGeocoder from '@mapbox/mapbox-gl-geocoder';
 import { lineString } from '@turf/helpers';
 import length from '@turf/length';
-import { format } from 'date-fns';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css';
 import type { SurfInfo, SavedListItem } from '@/types';
-import { getCachedForecast, setCachedForecast, surfInfoToCache } from '@/lib/coordinateCache';
 
 export interface SpotSelectionData {
   surfInfo: SurfInfo;
@@ -215,9 +213,10 @@ export default function EnhancedMapboxMap({
         }
       });
 
-      // Remove markers that are no longer in the viewport
+      // Remove markers that are no longer in the viewport or are saved markers
+      // (saved markers are always recreated to ensure badge counts stay in sync)
       Object.keys(markersRef.current).forEach((key) => {
-        if (!desiredKeys.has(key)) {
+        if (!desiredKeys.has(key) || key.startsWith('saved-')) {
           markersRef.current[key].remove();
           delete markersRef.current[key];
         }
@@ -587,40 +586,13 @@ export default function EnhancedMapboxMap({
     lng: number,
     lat: number,
     spot: SurfInfo,
-    currentSelectedDate: Date
+    _currentSelectedDate: Date
   ) => {
     if (!map.current || !onSpotSelect) return;
 
-    const dateStr = format(currentSelectedDate, 'yyyy-MM-dd');
-
-    // Check cache first
-    const cached = getCachedForecast(lat, lng, dateStr);
-    if (cached) {
-      const cachedSurfInfo: SurfInfo = {
-        ...spot,
-        conditions: {
-          waveHeight: cached.waveHeight,
-          wavePeriod: cached.wavePeriod,
-          windSpeed: cached.windSpeed,
-          waterTemperature: cached.waterTemperature,
-        },
-        derivedMetrics: {
-          surfScore: cached.surfScore,
-          surfGrade: cached.surfGrade,
-          surfingLevel: cached.surfingLevel,
-        },
-      };
-
-      onSpotSelect({
-        surfInfo: cachedSurfInfo,
-        coordinates: { latitude: lat, longitude: lng },
-      });
-      return;
-    }
-
-    // Use spot data directly (already has forecast from BE)
-    setCachedForecast(lat, lng, dateStr, surfInfoToCache(spot));
-
+    // Always use the spot data directly — it already has the correct
+    // date/time-specific forecast from the backend. Skipping cache avoids
+    // stale data when the user changes search time conditions.
     onSpotSelect({
       surfInfo: spot,
       coordinates: { latitude: lat, longitude: lng },

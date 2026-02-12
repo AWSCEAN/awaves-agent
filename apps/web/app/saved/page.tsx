@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import LogoOverlay from '@/components/LogoOverlay';
 import SavedItemCard from '@/components/SavedItemCard';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import SurfLoadingScreen from '@/components/SurfLoadingScreen';
 import { useSavedItems } from '@/hooks/useSavedItems';
+import { surfService } from '@/lib/apiServices';
 import { getSavedLocale, saveLocale } from '@/lib/i18n';
-import type { SavedItemResponse, FeedbackStatus, Language } from '@/types';
+import type { SavedItemResponse, FeedbackStatus, Language, SurfInfo } from '@/types';
 
 const translations = {
   ko: {
@@ -65,6 +66,21 @@ export default function SavedPage() {
   } = useSavedItems();
 
   const error = queryError?.message || null;
+
+  // Fetch all surf spots to build a locationId → name lookup
+  const [spotNameMap, setSpotNameMap] = useState<Map<string, { name: string; nameKo?: string }>>(new Map());
+
+  useEffect(() => {
+    surfService.getAllSpots().then((response) => {
+      if (response.success && response.data) {
+        const nameMap = new Map<string, { name: string; nameKo?: string }>();
+        (response.data as SurfInfo[]).forEach((spot) => {
+          nameMap.set(spot.LocationId, { name: spot.name, nameKo: spot.nameKo });
+        });
+        setSpotNameMap(nameMap);
+      }
+    });
+  }, []);
 
   // Initialize feedbackMap from GraphQL response
   useEffect(() => {
@@ -206,6 +222,7 @@ export default function SavedPage() {
                     key={item.location_surf_key}
                     item={item}
                     lang={lang}
+                    spotName={spotNameMap.get(item.location_id)}
                     onRemove={() => handleRemove(item)}
                     onAcknowledgeChange={() => handleAcknowledgeChange(item)}
                     onFeedback={(status) => handleFeedback(item, status)}

@@ -84,7 +84,35 @@ export function parseLocationId(locationId: string): { lat: number; lng: number 
   return { lat, lng };
 }
 
-export const TIME_SLOTS = ['06:00', '09:00', '12:00', '15:00', '18:00'];
+export const TIME_SLOTS = ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00', '24:00'];
+
+/**
+ * Get the most recent 3-hour time slot rounded down from the current LOCAL time.
+ * e.g. local 11:00 → '09:00', local 15:30 → '15:00', local 02:00 → '00:00'
+ */
+export function getCurrentTimeSlot(): string {
+  const now = new Date();
+  const hours = now.getHours();
+  const roundedHour = Math.floor(hours / 3) * 3;
+  return `${roundedHour.toString().padStart(2, '0')}:00`;
+}
+
+/**
+ * Convert a local date + time slot to UTC date + time for DynamoDB queries.
+ * DynamoDB SurfTimestamp is stored in UTC, so we need to convert.
+ * e.g. KST (UTC+9): 2026-02-13 03:00 → UTC: 2026-02-12 18:00
+ */
+export function localToUTC(localDate: string, localTime: string): { date: string; time: string } {
+  const [year, month, day] = localDate.split('-').map(Number);
+  const [hours, minutes] = localTime.split(':').map(Number);
+  const local = new Date(year, month - 1, day, hours, minutes);
+  const utcY = local.getUTCFullYear();
+  const utcM = (local.getUTCMonth() + 1).toString().padStart(2, '0');
+  const utcD = local.getUTCDate().toString().padStart(2, '0');
+  const utcH = local.getUTCHours().toString().padStart(2, '0');
+  const utcMin = local.getUTCMinutes().toString().padStart(2, '0');
+  return { date: `${utcY}-${utcM}-${utcD}`, time: `${utcH}:${utcMin}` };
+}
 
 export function generateSurfInfoForSpot(
   spot: {

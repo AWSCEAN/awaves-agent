@@ -55,6 +55,16 @@ class Settings(BaseSettings):
     dynamodb_saved_list_table: str = "saved_list"
     ddb_endpoint_url: str = ""
 
+    # OpenSearch
+    opensearch_host: str = "localhost"
+    opensearch_port: int = 9200
+
+    # DynamoDB locations table
+    dynamodb_locations_table: str = "locations"
+
+    # Redis TTL for surf info cache (seconds)
+    redis_ttl_seconds: int = 10800  # 3 hours
+
     # JWT
     jwt_secret_key: str = "your-super-secret-jwt-key-change-in-production"
     jwt_algorithm: str = "HS256"

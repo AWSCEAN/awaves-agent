@@ -8,6 +8,7 @@
 | pnpm | 9+ | `pnpm --version` |
 | Python | 3.11+ | `python --version` |
 | Git | 2.40+ | `git --version` |
+| Docker | 20+ | `docker --version` |
 
 ## 초기 설정
 
@@ -54,6 +55,15 @@ DATABASE_URL=postgresql://user:password@localhost:5432/awaves
 # Redis (선택)
 REDIS_URL=redis://localhost:6379
 
+# OpenSearch
+OPENSEARCH_HOST=localhost
+OPENSEARCH_PORT=9200
+
+# DynamoDB
+DDB_ENDPOINT_URL=http://localhost:8000
+DYNAMODB_LOCATIONS_TABLE=locations
+REDIS_TTL_SECONDS=10800
+
 # JWT
 JWT_SECRET_KEY=your-super-secret-key-change-in-production
 JWT_ALGORITHM=HS256
@@ -64,6 +74,15 @@ CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002,h
 ```
 
 ## 개발 서버 실행
+
+### 방법 0: OpenSearch 시작 (검색 기능 사용 시 필수)
+
+```bash
+cd apps/api
+docker compose up -d
+```
+
+OpenSearch가 시작되면 앱 시작 시 `mock_surf_data_geocode.csv`에서 자동으로 위치 데이터를 시딩합니다.
 
 ### 방법 1: 개별 실행
 

@@ -30,16 +30,23 @@ router = APIRouter()
 async def get_spots(
     min_wave_height: Optional[float] = Query(None, description="Minimum wave height"),
     max_wave_height: Optional[float] = Query(None, description="Maximum wave height"),
+    date: Optional[str] = Query(None, description="Filter by date (YYYY-MM-DD)"),
+    time: Optional[str] = Query(None, description="Filter by time (HH:MM)"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
 ) -> PaginatedSurfInfoResponse:
     """Get paginated list of surf spots from DynamoDB."""
-    spots, total = await SurfDynamoDBService.get_all_spots(page, page_size)
+    all_spots = await SurfDynamoDBService.get_spots_for_date(date, time)
 
     if min_wave_height is not None:
-        spots = [s for s in spots if s["conditions"]["waveHeight"] >= min_wave_height]
+        all_spots = [s for s in all_spots if s["conditions"]["waveHeight"] >= min_wave_height]
     if max_wave_height is not None:
-        spots = [s for s in spots if s["conditions"]["waveHeight"] <= max_wave_height]
+        all_spots = [s for s in all_spots if s["conditions"]["waveHeight"] <= max_wave_height]
+
+    total = len(all_spots)
+    start = (page - 1) * page_size
+    end = start + page_size
+    spots = all_spots[start:end]
 
     items = [SurfInfoResponse(**s) for s in spots]
     return PaginatedSurfInfoResponse(
@@ -47,16 +54,18 @@ async def get_spots(
         total=total,
         page=page,
         page_size=page_size,
-        has_more=(page * page_size) < total,
+        has_more=end < total,
     )
 
 
 @router.get("/search")
 async def search_spots(
     q: str = Query(..., min_length=1, description="Search query"),
+    date: Optional[str] = Query(None, description="Filter by date (YYYY-MM-DD)"),
+    time: Optional[str] = Query(None, description="Filter by time (HH:MM)"),
 ) -> list[SurfInfoResponse]:
     """Search surf spots by coordinate substring."""
-    results = await SurfDynamoDBService.search_spots(q)
+    results = await SurfDynamoDBService.search_spots(q, date, time)
     return [SurfInfoResponse(**s) for s in results]
 
 
@@ -65,16 +74,23 @@ async def get_nearby_spots(
     lat: float = Query(..., description="User latitude"),
     lng: float = Query(..., description="User longitude"),
     limit: int = Query(25, ge=1, le=100, description="Max results"),
+    date: Optional[str] = Query(None, description="Filter by date (YYYY-MM-DD)"),
+    time: Optional[str] = Query(None, description="Filter by time (HH:MM)"),
 ) -> list[SurfInfoResponse]:
     """Get spots sorted by distance from given coordinates."""
-    results = await SurfDynamoDBService.get_nearby_spots(lat, lng, limit)
+    results = await SurfDynamoDBService.get_nearby_spots(
+        lat, lng, limit, date, time
+    )
     return [SurfInfoResponse(**s) for s in results]
 
 
 @router.get("/spots/all")
-async def get_all_spots_unpaginated() -> list[SurfInfoResponse]:
+async def get_all_spots_unpaginated(
+    date: Optional[str] = Query(None, description="Filter by date (YYYY-MM-DD)"),
+    time: Optional[str] = Query(None, description="Filter by time (HH:MM)"),
+) -> list[SurfInfoResponse]:
     """Get ALL surf spots (unpaginated) for map marker display."""
-    spots = await SurfDynamoDBService.get_all_spots_unpaginated()
+    spots = await SurfDynamoDBService.get_spots_for_date(date, time)
     return [SurfInfoResponse(**s) for s in spots]
 
 

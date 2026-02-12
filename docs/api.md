@@ -292,24 +292,87 @@ Authorization: Bearer {access_token}
 
 ---
 
-#### GET /surf/search
-서핑 스팟 검색
+#### GET /surf/search (Deprecated)
+> ⚠️ 좌표 기반 부분 문자열 검색. `/search` 엔드포인트로 대체됨.
+
+---
+
+### 위치 키워드 검색 (Location Search - OpenSearch)
+
+#### GET /search
+OpenSearch를 사용한 위치 키워드 검색
 
 **Query Parameters**
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| q | string | ✅ | 검색어 (스팟명, 지역) |
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| q | string | ✅ | - | 검색 키워드 (도시명, 국가명, 장소명 등) |
+| size | int | ❌ | 50 | 최대 결과 수 (1-100) |
+
+**검색 대상 필드**
+| Field | Weight | Type |
+|-------|--------|------|
+| display_name | x3 | text (full-text) |
+| city | x2 | text (full-text) |
+| state | x1 | keyword |
+| country | x1 | keyword |
 
 **Response** `200 OK`
 ```json
 [
   {
-    "id": "kr-yangyang-jukdo",
-    "name": "Jukdo Beach",
-    "region": "Yangyang",
-    ...
+    "LocationId": "41.6354#-70.2911",
+    "SurfTimestamp": "2026-02-11T06:00:00Z",
+    "geo": { "lat": 41.6354, "lng": -70.2911 },
+    "conditions": {
+      "waveHeight": 1.5,
+      "wavePeriod": 8.0,
+      "windSpeed": 12.0,
+      "waterTemperature": 15.0
+    },
+    "derivedMetrics": {
+      "surfScore": 65.0,
+      "surfGrade": "B",
+      "surfingLevel": "INTERMEDIATE"
+    },
+    "metadata": {
+      "modelVersion": "sagemaker-awaves-v1.2",
+      "dataSource": "open-meteo",
+      "predictionType": "FORECAST",
+      "createdAt": "2026-02-11T00:00:00Z"
+    },
+    "name": "Keating Road, Hyannis, Barnstable...",
+    "region": "Massachusetts",
+    "country": "United States",
+    "address": "Keating Road, Hyannis, Barnstable...",
+    "difficulty": "intermediate",
+    "waveType": "Beach Break",
+    "bestSeason": []
   }
 ]
+```
+
+**검색 흐름**
+```
+키워드 입력 → OpenSearch multi_match 검색
+         → locationId 추출 (OpenSearch 문서에서 직접)
+         → Redis 캐시 확인 (awaves:surf:latest:{locationId})
+         → 캐시 미스 시 DynamoDB surf_info 조회
+         → 결과 반환
+```
+
+**Error Responses**
+| Code | Description |
+|------|-------------|
+| 422 | 유효하지 않은 쿼리 파라미터 |
+| 503 | OpenSearch 서비스 불가 |
+
+**Example**
+```bash
+# 키워드로 검색
+curl "http://localhost:8001/search?q=Australia"
+
+# 결과 수 제한
+curl "http://localhost:8001/search?q=Bondi&size=10"
 ```
 
 ---
