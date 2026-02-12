@@ -181,16 +181,38 @@ class OpenSearchService:
             body = {
                 "size": size,
                 "query": {
-                    "multi_match": {
-                        "query": query,
-                        "fields": [
-                            "display_name^3",
-                            "city^2",
-                            "state",
-                            "country",
+                    "bool": {
+                        "should": [
+                            # Exact phrase match (highest priority)
+                            {
+                                "multi_match": {
+                                    "query": query,
+                                    "fields": [
+                                        "display_name^5",
+                                        "city^3",
+                                        "state^2",
+                                        "country",
+                                    ],
+                                    "type": "phrase",
+                                    "boost": 3,
+                                }
+                            },
+                            # All terms must appear (cross-field)
+                            {
+                                "multi_match": {
+                                    "query": query,
+                                    "fields": [
+                                        "display_name^3",
+                                        "city^2",
+                                        "state",
+                                        "country",
+                                    ],
+                                    "type": "cross_fields",
+                                    "operator": "and",
+                                }
+                            },
                         ],
-                        "type": "best_fields",
-                        "fuzziness": "AUTO",
+                        "minimum_should_match": 1,
                     }
                 },
             }

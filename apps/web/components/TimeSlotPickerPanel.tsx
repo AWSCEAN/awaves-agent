@@ -1,14 +1,16 @@
 'use client';
 
-import type { SavedListItem } from '@/types';
+import type { SavedListItem, SurfInfo } from '@/types';
 import { getGradeBgColor, getGradeTextColor, getGradeBorderColor } from '@/lib/services/surfInfoService';
 
 interface TimeSlotPickerPanelProps {
   locationId: string;
   coordinates: { lat: number; lng: number };
   saves: SavedListItem[];
+  currentConditions?: SurfInfo | null;
   onClose: () => void;
   onSelectTimeSlot: (save: SavedListItem) => void;
+  onSelectCurrent?: (surfInfo: SurfInfo) => void;
   showLocationPrompt?: boolean;
   locale?: 'en' | 'ko';
 }
@@ -37,8 +39,10 @@ export default function TimeSlotPickerPanel({
   locationId,
   coordinates,
   saves,
+  currentConditions,
   onClose,
   onSelectTimeSlot,
+  onSelectCurrent,
   showLocationPrompt = false,
   locale = 'en',
 }: TimeSlotPickerPanelProps) {
@@ -62,8 +66,8 @@ export default function TimeSlotPickerPanel({
             </p>
             <p className="text-white/80 text-sm mt-1">
               {locale === 'ko'
-                ? `${saves.length}개 저장된 예보`
-                : `${saves.length} saved forecasts`}
+                ? `${saves.length}개 저장된 예보${currentConditions ? ' + 현재 조건' : ''}`
+                : `${saves.length} saved forecast${saves.length !== 1 ? 's' : ''}${currentConditions ? ' + Current' : ''}`}
             </p>
           </div>
           <button
@@ -79,6 +83,43 @@ export default function TimeSlotPickerPanel({
 
       {/* Time Slot List */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        {/* Current Conditions Entry */}
+        {currentConditions && onSelectCurrent && (
+          <button
+            onClick={() => onSelectCurrent(currentConditions)}
+            className="w-full text-left p-3 rounded-xl border-2 border-ocean-400 bg-ocean-50
+              hover:bg-ocean-100 transition-colors group relative"
+          >
+            <div className="absolute top-2 right-2 px-2 py-0.5 bg-ocean-500 text-white text-[10px] font-bold rounded-full">
+              {locale === 'ko' ? '현재' : 'CURRENT'}
+            </div>
+            <div className="flex items-center justify-between pr-16">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-ocean-800">
+                    {formatTimestamp(currentConditions.SurfTimestamp, locale).date}
+                  </span>
+                  <span className="text-sm text-ocean-500">
+                    {formatTimestamp(currentConditions.SurfTimestamp, locale).time}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 mt-1.5">
+                  <span className="text-xs text-ocean-500">
+                    {locale === 'ko' ? '파고' : 'Wave'}: {currentConditions.conditions.waveHeight.toFixed(1)}m
+                  </span>
+                  <span className="text-xs text-ocean-500">
+                    {locale === 'ko' ? '점수' : 'Score'}: {Math.round(currentConditions.derivedMetrics.surfScore)}
+                  </span>
+                </div>
+              </div>
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center border text-sm font-bold ${getGradeBgColor(currentConditions.derivedMetrics.surfGrade)} ${getGradeTextColor(currentConditions.derivedMetrics.surfGrade)} ${getGradeBorderColor(currentConditions.derivedMetrics.surfGrade)}`}>
+                {currentConditions.derivedMetrics.surfGrade}
+              </div>
+            </div>
+          </button>
+        )}
+
+        {/* Saved Time Slots */}
         {sorted.map((save) => {
           const { date, time } = formatTimestamp(save.surfTimestamp, locale);
           const grade = save.surfGrade || 'D';
@@ -88,9 +129,15 @@ export default function TimeSlotPickerPanel({
               key={save.locationSurfKey}
               onClick={() => onSelectTimeSlot(save)}
               className="w-full text-left p-3 rounded-xl border border-sand-200 hover:border-ocean-300
-                hover:bg-ocean-50/50 transition-colors group"
+                hover:bg-ocean-50/50 transition-colors group relative"
             >
-              <div className="flex items-center justify-between">
+              <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-red-50 text-red-400 text-[10px] font-medium rounded-full flex items-center gap-0.5">
+                <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+                {locale === 'ko' ? '저장됨' : 'Saved'}
+              </div>
+              <div className="flex items-center justify-between pr-16">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-ocean-800">{date}</span>

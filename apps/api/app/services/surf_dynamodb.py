@@ -165,7 +165,7 @@ class SurfDynamoDBService:
         filtered = _date_index.get(date, [])
 
         if not filtered:
-            return await cls._get_all_spots_raw()
+            return []
 
         if time:
             # Try to find items matching the exact time (e.g. "2026-02-14T06:00")
@@ -368,7 +368,6 @@ class SurfDynamoDBService:
             "region": state,
             "country": country,
             "address": display_name,
-            "difficulty": "intermediate",
             "waveType": "Beach Break",
             "bestSeason": [],
         }

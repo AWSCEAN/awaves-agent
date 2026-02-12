@@ -93,8 +93,12 @@ export default function SearchResultsList({
     return 'bg-red-500';
   };
 
-  const getDifficultyLabel = (difficulty: SurferLevel): string => {
-    return t(`difficulty.${difficulty}`);
+  const getLevelLabel = (spot: SearchResult): string => {
+    const level = spot.derivedMetrics?.surfingLevel;
+    if (level) {
+      return t(`difficulty.${level.toLowerCase()}`);
+    }
+    return '';
   };
 
   if (!isOpen) return null;
@@ -218,9 +222,11 @@ export default function SearchResultsList({
                       {/* Location and Level */}
                       <div className="flex items-center gap-2 text-xs text-ocean-500 mb-2">
                         <span>{spot.region}, {spot.country}</span>
-                        <span className="px-1.5 py-0.5 bg-sand-100 rounded text-ocean-600">
-                          {getDifficultyLabel(spot.difficulty)}
-                        </span>
+                        {getLevelLabel(spot) && (
+                          <span className="px-1.5 py-0.5 bg-sand-100 rounded text-ocean-600">
+                            {getLevelLabel(spot)}
+                          </span>
+                        )}
                       </div>
 
                       {/* Scores + Grade */}

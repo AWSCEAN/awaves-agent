@@ -79,19 +79,12 @@ class SurfInfoService:
 
                 items = response.get("Items", [])
                 if not items:
-                    if date and time:
-                        # Fallback 1: date+time → date-only
-                        return await cls.get_surf_info_by_location_id(
-                            location_id, date=date, time=None
-                        )
-                    if date:
-                        # Fallback 2: date-only → latest (no filter)
+                    if date or time:
+                        # No data for the requested conditions – return None
+                        # instead of falling back to a different date/time
                         logger.info(
-                            "No surf_info for %s on %s, falling back to latest",
-                            location_id, date,
-                        )
-                        return await cls.get_surf_info_by_location_id(
-                            location_id, date=None, time=None
+                            "No surf_info for %s with date=%s time=%s",
+                            location_id, date, time,
                         )
                     return None
 
@@ -132,7 +125,7 @@ class SurfInfoService:
             "derivedMetrics": {
                 "surfScore": float(derived.get("surfScore", {}).get("N", "0")),
                 "surfGrade": derived.get("surfGrade", {}).get("S", "D"),
-                "surfingLevel": derived.get("surfingLevel", {}).get("S", "BEGINNER"),
+                "surfingLevel": derived.get("surfingLevel", {}).get("S", ""),
             },
             "metadata": {
                 "modelVersion": metadata.get("modelVersion", {}).get(
@@ -148,7 +141,6 @@ class SurfInfoService:
             "region": location.get("state", {}).get("S", ""),
             "country": location.get("country", {}).get("S", ""),
             "address": location.get("displayName", {}).get("S", ""),
-            "difficulty": "intermediate",
             "waveType": "Beach Break",
             "bestSeason": [],
         }

@@ -19,7 +19,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import LocaleProvider, { useLocale as useAppLocale } from '@/components/LocaleProvider';
 import type { SurfInfo, SavedListItem, SurferLevel, SurfingLevel, SurfGrade, PredictionResult } from '@/types';
 import type { OverlayMode, SpotSelectionData } from '@/components/EnhancedMapboxMap';
-import { TIME_SLOTS } from '@/lib/services/surfInfoService';
+import { TIME_SLOTS, getCurrentTimeSlot, localToUTC } from '@/lib/services/surfInfoService';
 import { surfService } from '@/lib/apiServices';
 import { useSavedItems } from '@/hooks/useSavedItems';
 import SurfLoadingScreen from '@/components/SurfLoadingScreen';
@@ -46,12 +46,12 @@ function MapPageContent() {
   // Search state - input values (what user is selecting)
   const [locationQuery, setLocationQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedTime, setSelectedTime] = useState<string>('');
+  const [selectedTime, setSelectedTime] = useState<string>(() => getCurrentTimeSlot());
   const [surferLevel, setSurferLevel] = useState<SurferLevel | ''>('');
 
   // Search state - active values (what was last searched, only update on search button click)
   const [searchDate, setSearchDate] = useState<Date>(new Date());
-  const [searchTime, setSearchTime] = useState<string>('');
+  const [searchTime, setSearchTime] = useState<string>(() => getCurrentTimeSlot());
 
   // User location state - persist permission across navigations
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(() => {
@@ -106,11 +106,14 @@ function MapPageContent() {
     refetch();
   }, [refetch]);
 
-  // Fetch all spots on mount for default map markers
+  // Fetch all spots on mount for default map markers (today's date, current time slot)
   useEffect(() => {
     const loadAllSpots = async () => {
       try {
-        const response = await surfService.getAllSpots();
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const timeSlot = getCurrentTimeSlot();
+        const utc = localToUTC(todayStr, timeSlot);
+        const response = await surfService.getAllSpots(utc.date, utc.time);
         if (response.success && response.data) {
           setAllSpots(response.data);
         }
@@ -140,7 +143,7 @@ function MapPageContent() {
       surfingLevel: (item.surfer_level || 'BEGINNER') as SurfingLevel,
       surfScore: item.surf_score,
       surfGrade: (item.surf_grade || 'D') as SurfGrade,
-      name: item.location_id,
+      name: item.address || item.location_id,
       nameKo: undefined,
     })),
     [savedItems]
@@ -201,7 +204,6 @@ function MapPageContent() {
             region: matchingSaved.region,
             country: matchingSaved.country,
             address: matchingSaved.address,
-            difficulty: 'beginner',
             waveType: '',
             bestSeason: [],
           };
@@ -238,12 +240,20 @@ function MapPageContent() {
     options?: { date?: string; time?: string; surferLevel?: string }
   ) => {
     try {
+      // Convert local date+time to UTC for DynamoDB queries
+      const utc = (options?.date && options?.time)
+        ? localToUTC(options.date, options.time)
+        : options?.date
+          ? { date: options.date, time: undefined }
+          : { date: undefined, time: undefined };
+      const utcOptions = { ...options, date: utc.date, time: utc.time };
+
       // Always fetch all spots for the selected date so map markers stay in sync
-      const allSpotsPromise = surfService.getAllSpots(options?.date, options?.time);
+      const allSpotsPromise = surfService.getAllSpots(utc.date, utc.time);
 
       if (query) {
         const [response] = await Promise.all([
-          surfService.searchSpots(query, options),
+          surfService.searchSpots(query, utcOptions),
           allSpotsPromise.then(res => {
             if (res.success && res.data) setAllSpots(res.data);
           }),
@@ -252,17 +262,18 @@ function MapPageContent() {
           setSearchResults(response.data as SearchResult[]);
         }
       } else {
-        const [response] = await Promise.all([
-          surfService.getSpots({
-            minWaveHeight: undefined,
-            maxWaveHeight: undefined,
-          }),
-          allSpotsPromise.then(res => {
-            if (res.success && res.data) setAllSpots(res.data);
-          }),
-        ]);
+        // No query: use allSpots filtered by date/time, then apply surferLevel client-side
+        const response = await allSpotsPromise;
         if (response.success && response.data) {
-          setSearchResults(response.data.items as SearchResult[]);
+          setAllSpots(response.data);
+          let results = response.data as SearchResult[];
+          if (options?.surferLevel) {
+            const level = options.surferLevel.toUpperCase();
+            results = results.filter(s =>
+              s.derivedMetrics?.surfingLevel?.toUpperCase() === level
+            );
+          }
+          setSearchResults(results);
         }
       }
     } catch (err) {
@@ -429,7 +440,6 @@ function MapPageContent() {
       region: save.region,
       country: save.country,
       address: save.address,
-      difficulty: 'beginner',
       waveType: '',
       bestSeason: [],
     };
@@ -440,23 +450,28 @@ function MapPageContent() {
     setTimeSlotSelection(null);
   }, []);
 
+  const getCurrentConditionsForLocation = useCallback((locationId: string): SurfInfo | null => {
+    return allSpots.find(s => s.LocationId === locationId) || null;
+  }, [allSpots]);
+
   const handleSuggestByDistance = useCallback(async () => {
     if (!userLocation) return;
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const utcNearby = selectedTime ? localToUTC(dateStr, selectedTime) : { date: dateStr, time: undefined };
       const response = await surfService.getNearbySpots(
         userLocation.lat,
         userLocation.lng,
         100,
-        dateStr,
-        selectedTime || undefined,
+        utcNearby.date,
+        utcNearby.time,
       );
       if (response.success && response.data) {
         let nearby = (response.data as SearchResult[]).filter(
           (spot) => spot.distance !== undefined && spot.distance <= 50
         );
         if (surferLevel) {
-          nearby = nearby.filter(s => s.difficulty === surferLevel);
+          nearby = nearby.filter(s => s.derivedMetrics?.surfingLevel?.toUpperCase() === surferLevel.toUpperCase());
         }
         setSearchResults(nearby);
       }
@@ -530,7 +545,6 @@ function MapPageContent() {
                   focus:outline-none focus:ring-2 focus:ring-ocean-500/50 focus:border-ocean-500
                   bg-white text-ocean-800 w-28"
               >
-                <option value="">{tSearch('allTimes')}</option>
                 {TIME_SLOTS.map((time) => (
                   <option key={time} value={time}>
                     {time}
@@ -864,8 +878,16 @@ function MapPageContent() {
             locationId={timeSlotSelection.locationId}
             coordinates={timeSlotSelection.coordinates}
             saves={timeSlotSelection.saves}
+            currentConditions={getCurrentConditionsForLocation(timeSlotSelection.locationId)}
             onClose={() => setTimeSlotSelection(null)}
             onSelectTimeSlot={handleTimeSlotSelect}
+            onSelectCurrent={(surfInfo) => {
+              setSelectedSpotDetail({
+                surfInfo,
+                coordinates: { latitude: timeSlotSelection.coordinates.lat, longitude: timeSlotSelection.coordinates.lng },
+              });
+              setTimeSlotSelection(null);
+            }}
             showLocationPrompt={showLocationPrompt}
             locale={locale as 'en' | 'ko'}
           />
@@ -892,7 +914,14 @@ function MapPageContent() {
             }}
             showLocationPrompt={showLocationPrompt}
             savedTimeslots={savesByLocation.get(selectedSpotDetail.surfInfo.LocationId)}
+            currentConditions={getCurrentConditionsForLocation(selectedSpotDetail.surfInfo.LocationId)}
             onTimeslotSelect={handleTimeSlotSelect}
+            onCurrentSelect={(surfInfo) => {
+              setSelectedSpotDetail({
+                surfInfo,
+                coordinates: selectedSpotDetail.coordinates,
+              });
+            }}
           />
         )}
       </div>
