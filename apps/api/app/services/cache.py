@@ -33,7 +33,7 @@ class CacheService:
                 return None
 
             # Parse the cache URL
-            if not cache_url.startswith("redis://"):
+            if not cache_url.startswith(("redis://", "rediss://")):
                 cache_url = f"redis://{cache_url}"
 
             try:

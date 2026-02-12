@@ -319,7 +319,12 @@ class SurfDynamoDBService:
         conditions = item.get("conditions", {}).get("M", {})
         derived = item.get("derivedMetrics", {}).get("M", {})
         metadata = item.get("metadata", {}).get("M", {})
+
         location = item.get("location", {}).get("M", {})
+        display_name = location.get("displayName", {}).get("S", "")
+        city = location.get("city", {}).get("S", "")
+        state = location.get("state", {}).get("S", "")
+        country = location.get("country", {}).get("S", "")
 
         raw_grade = derived.get("surfGrade", {}).get("S", "D")
         surf_grade = cls._numeric_grade_to_letter(raw_grade)
@@ -359,9 +364,11 @@ class SurfDynamoDBService:
                 "createdAt": metadata.get("createdAt", {}).get("S", ""),
             },
             "name": name,
-            "region": location.get("state", {}).get("S", ""),
-            "country": location.get("country", {}).get("S", ""),
-            "difficulty": cls._surfing_level_to_difficulty(surfing_level),
+            "city": city,
+            "region": state,
+            "country": country,
+            "address": display_name,
+            "difficulty": "intermediate",
             "waveType": "Beach Break",
             "bestSeason": [],
         }

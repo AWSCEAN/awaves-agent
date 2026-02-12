@@ -232,39 +232,44 @@ function MapPageContent() {
     setOverlayMode((prev) => (prev === mode ? 'none' : mode));
   };
 
-  const fetchSpots = useCallback(async (query?: string, date?: string, time?: string, level?: string) => {
+  
+  const fetchSpots = useCallback(async (
+    query?: string,
+    options?: { date?: string; time?: string; surferLevel?: string }
+  ) => {
     try {
       // Always fetch all spots for the selected date so map markers stay in sync
-      const allSpotsPromise = surfService.getAllSpots(date, time);
+      const allSpotsPromise = surfService.getAllSpots(options?.date, options?.time);
 
       if (query) {
-        const [searchResponse, allResponse] = await Promise.all([
-          surfService.searchSpots(query, date, time),
-          allSpotsPromise,
+        const [response] = await Promise.all([
+          surfService.searchSpots(query, options),
+          allSpotsPromise.then(res => {
+            if (res.success && res.data) setAllSpots(res.data);
+          }),
         ]);
-        let results = (searchResponse.success && searchResponse.data) ? searchResponse.data as SearchResult[] : [];
-        if (level) {
-          results = results.filter(s => s.difficulty === level);
-        }
-        setSearchResults(results);
-        if (allResponse.success && allResponse.data) {
-          setAllSpots(allResponse.data);
+        if (response.success && response.data) {
+          setSearchResults(response.data as SearchResult[]);
         }
       } else {
-        const response = await allSpotsPromise;
+        const [response] = await Promise.all([
+          surfService.getSpots({
+            minWaveHeight: undefined,
+            maxWaveHeight: undefined,
+          }),
+          allSpotsPromise.then(res => {
+            if (res.success && res.data) setAllSpots(res.data);
+          }),
+        ]);
         if (response.success && response.data) {
-          let results = response.data as SearchResult[];
-          if (level) {
-            results = results.filter(s => s.difficulty === level);
-          }
-          setSearchResults(results);
-          setAllSpots(response.data);
+          setSearchResults(response.data.items as SearchResult[]);
         }
       }
     } catch (err) {
       console.error('Failed to fetch spots:', err);
     }
   }, []);
+
 
   const handleSearch = useCallback(async () => {
     setVisibleSpots([]);
@@ -278,7 +283,11 @@ function MapPageContent() {
     setSearchDate(selectedDate);
     setSearchTime(selectedTime);
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    await fetchSpots(locationQuery || undefined, dateStr, selectedTime || undefined, surferLevel || undefined);
+    await fetchSpots(locationQuery || undefined, {
+      date: format(selectedDate, 'yyyy-MM-dd'),
+      time: selectedTime || undefined,
+      surferLevel: surferLevel || undefined,
+    });
   }, [locationQuery, selectedDate, selectedTime, surferLevel, fetchSpots]);
 
   const handlePredictionSearch = useCallback(async () => {
@@ -324,7 +333,11 @@ function MapPageContent() {
           setShowLocationPrompt(false);
           localStorage.setItem('locationPermissionGranted', 'true');
           localStorage.setItem('userLocation', JSON.stringify(loc));
-          fetchSpots(locationQuery || undefined);
+          fetchSpots(locationQuery || undefined, {
+            date: format(selectedDate, 'yyyy-MM-dd'),
+            time: selectedTime || undefined,
+            surferLevel: surferLevel || undefined,
+          });
         },
         () => {
           setShowLocationPrompt(false);

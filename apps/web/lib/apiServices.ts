@@ -275,11 +275,15 @@ export const surfService = {
     return apiRequest<SurfInfo>(`/surf/spots/${id}`);
   },
 
-  async searchSpots(query: string, date?: string, time?: string): Promise<ApiResponse<SurfInfo[]>> {
+  async searchSpots(
+    query: string,
+    options?: { date?: string; time?: string; surferLevel?: string }
+  ): Promise<ApiResponse<SurfInfo[]>> {
     const params = new URLSearchParams({ q: query });
-    if (date) params.set('date', date);
-    if (time) params.set('time', time);
-    return apiRequest<SurfInfo[]>(`/surf/search?${params.toString()}`);
+    if (options?.date) params.set('date', options.date);
+    if (options?.time) params.set('time', options.time);
+    if (options?.surferLevel) params.set('surfer_level', options.surferLevel);
+    return apiRequest<SurfInfo[]>(`/search?${params.toString()}`);
   },
 
   async getRecommendations(userId: string): Promise<ApiResponse<SurfInfo[]>> {

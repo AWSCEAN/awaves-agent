@@ -15,6 +15,7 @@ AWAVES는 AI 기반 서핑 스팟 탐색 플랫폼입니다. 사용자의 실력
 | Language | Python | 3.11 | 백엔드 언어 |
 | Database | PostgreSQL | 15+ | 주 데이터 저장소 |
 | Cache | Redis | 7+ | 세션/캐시 |
+| Search | OpenSearch | 2.x | 위치 키워드 검색 |
 | Auth | JWT | - | 인증 토큰 |
 | Monorepo | pnpm + Turborepo | - | 패키지 관리 |
 
@@ -26,16 +27,18 @@ AWAVES는 AI 기반 서핑 스팟 탐색 플랫폼입니다. 사용자의 실력
 │   (User)    │     │  Frontend   │     │  Backend    │
 └─────────────┘     └─────────────┘     └──────┬──────┘
                            │                    │
-                           │                    ▼
-                    ┌──────▼──────┐     ┌─────────────┐
-                    │   Mapbox    │     │ PostgreSQL  │
-                    │   API       │     │  (Neon)     │
-                    └─────────────┘     └─────────────┘
-                                               │
-                                        ┌──────▼──────┐
-                                        │   Redis     │
-                                        │   Cache     │
-                                        └─────────────┘
+                           │            ┌───────┼───────────┐
+                           │            ▼       ▼           ▼
+                    ┌──────▼──────┐  ┌───────┐ ┌─────────┐ ┌──────────┐
+                    │   Mapbox    │  │ Postgr│ │DynamoDB  │ │OpenSearch│
+                    │   API       │  │ eSQL  │ │(surf_info│ │(locations│
+                    └─────────────┘  └───────┘ │locations)│ │  index)  │
+                                               └────┬────┘ └──────────┘
+                                                    │
+                                             ┌──────▼──────┐
+                                             │   Redis     │
+                                             │   Cache     │
+                                             └─────────────┘
 ```
 
 ## 디렉토리 구조
@@ -74,11 +77,19 @@ awaves-agent/
 │       │   ├── routers/          # API 라우터
 │       │   │   ├── auth.py       # 인증
 │       │   │   ├── surf.py       # 서핑 데이터
+│       │   │   ├── search.py     # 위치 키워드 검색 (OpenSearch)
 │       │   │   ├── saved.py      # 저장된 스팟
 │       │   │   └── feedback.py   # 피드백
 │       │   ├── schemas/          # Pydantic 스키마
 │       │   ├── models/           # SQLAlchemy 모델
 │       │   ├── services/         # 비즈니스 로직
+│       │   │   ├── opensearch_service.py  # OpenSearch 클라이언트
+│       │   │   ├── search_service.py      # 검색 오케스트레이션
+│       │   │   ├── surf_info_service.py   # surf_info DDB 조회
+│       │   │   ├── surf_dynamodb.py       # 기존 서핑 데이터 서비스
+│       │   │   ├── cache.py               # Redis 캐시
+│       │   │   └── dynamodb.py            # 저장 목록 DDB
+│       │   ├── scripts/          # 데이터 인제스션 스크립트
 │       │   └── db/               # DB 설정
 │       └── tests/                # 테스트
 │
@@ -124,6 +135,7 @@ awaves-agent/
 | `/auth/me` | GET | 현재 사용자 |
 | `/surf/spots` | GET | 스팟 목록 |
 | `/surf/spots/{id}` | GET | 스팟 상세 |
+| `/search` | GET | 위치 키워드 검색 (OpenSearch) |
 | `/saved` | GET/POST | 저장된 스팟 |
 | `/feedback` | POST | 피드백 제출 |
 
