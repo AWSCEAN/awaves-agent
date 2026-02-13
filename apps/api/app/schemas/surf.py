@@ -91,8 +91,13 @@ class SurfInfoResponse(BaseModel):
     name: str = ""
     nameKo: Optional[str] = None
     region: str = ""
+    regionKo: Optional[str] = None
     country: str = ""
+    countryKo: Optional[str] = None
     address: Optional[str] = None
+    addressKo: Optional[str] = None
+    city: Optional[str] = None
+    cityKo: Optional[str] = None
     difficulty: str = "intermediate"
     waveType: str = "Beach Break"
     bestSeason: list[str] = []

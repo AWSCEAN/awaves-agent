@@ -277,12 +277,13 @@ export const surfService = {
 
   async searchSpots(
     query: string,
-    options?: { date?: string; time?: string; surferLevel?: string }
+    options?: { date?: string; time?: string; surferLevel?: string; language?: string }
   ): Promise<ApiResponse<SurfInfo[]>> {
     const params = new URLSearchParams({ q: query });
     if (options?.date) params.set('date', options.date);
     if (options?.time) params.set('time', options.time);
     if (options?.surferLevel) params.set('surfer_level', options.surferLevel);
+    if (options?.language) params.set('language', options.language);
     return apiRequest<SurfInfo[]>(`/search?${params.toString()}`);
   },
 

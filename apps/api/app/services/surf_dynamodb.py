@@ -111,6 +111,47 @@ class SurfDynamoDBService:
             return _scan_cache if _scan_cache else []
 
     @classmethod
+    async def _enrich_with_korean(cls, spots: list[dict]) -> list[dict]:
+        """Enrich spots with Korean address fields from locations table."""
+        if not spots:
+            return spots
+
+        try:
+            loc_ids = [s["LocationId"] for s in spots]
+            # BatchGetItem: max 100 keys per request
+            ko_map: dict[str, dict] = {}
+            for i in range(0, len(loc_ids), 100):
+                batch_ids = loc_ids[i:i + 100]
+                keys = [{"locationId": {"S": lid}} for lid in batch_ids]
+                async with await cls.get_client() as client:
+                    resp = await client.batch_get_item(
+                        RequestItems={
+                            settings.dynamodb_locations_table: {
+                                "Keys": keys,
+                                "ProjectionExpression": "locationId, display_name_ko, city_ko, state_ko, country_ko",
+                            }
+                        }
+                    )
+                for item in resp.get("Responses", {}).get(settings.dynamodb_locations_table, []):
+                    lid = item["locationId"]["S"]
+                    ko_map[lid] = {
+                        "nameKo": item.get("display_name_ko", {}).get("S", "") or None,
+                        "cityKo": item.get("city_ko", {}).get("S", "") or None,
+                        "regionKo": item.get("state_ko", {}).get("S", "") or None,
+                        "countryKo": item.get("country_ko", {}).get("S", "") or None,
+                        "addressKo": item.get("display_name_ko", {}).get("S", "") or None,
+                    }
+
+            for spot in spots:
+                ko = ko_map.get(spot["LocationId"])
+                if ko:
+                    spot.update(ko)
+        except Exception as e:
+            logger.warning(f"Failed to enrich spots with Korean data: {e}")
+
+        return spots
+
+    @classmethod
     async def _get_all_spots_raw(cls) -> list[dict]:
         """Get all unique locations with latest forecast. Uses Redis cache."""
         cached = await CacheService.get_all_surf_spots()
@@ -126,6 +167,7 @@ class SurfDynamoDBService:
                 location_map[loc_id] = item
 
         spots = [cls._to_surf_info(item) for item in location_map.values()]
+        spots = await cls._enrich_with_korean(spots)
         spots.sort(
             key=lambda s: s["derivedMetrics"]["surfScore"], reverse=True
         )
@@ -201,6 +243,7 @@ class SurfDynamoDBService:
                         location_map[loc_id] = item
 
         spots = [cls._to_surf_info(item) for item in location_map.values()]
+        spots = await cls._enrich_with_korean(spots)
         spots.sort(
             key=lambda s: s["derivedMetrics"]["surfScore"], reverse=True
         )
@@ -246,7 +289,8 @@ class SurfDynamoDBService:
                     KeyConditionExpression=key_expr,
                     ExpressionAttributeValues=expr_values,
                 )
-                return [cls._to_surf_info(item) for item in response.get("Items", [])]
+                spots = [cls._to_surf_info(item) for item in response.get("Items", [])]
+                return await cls._enrich_with_korean(spots)
         except Exception as e:
             logger.error(f"Failed to get spot data: {e}")
             return []
@@ -333,6 +377,12 @@ class SurfDynamoDBService:
         display_name = location.get("displayName", {}).get("S", "")
         name = display_name if display_name else f"{lat}, {lng}"
 
+        # Korean address fields (from location nested object if present)
+        display_name_ko = location.get("displayNameKo", {}).get("S", "")
+        city_ko = location.get("cityKo", {}).get("S", "")
+        state_ko = location.get("stateKo", {}).get("S", "")
+        country_ko = location.get("countryKo", {}).get("S", "")
+
         return {
             "LocationId": loc_id,
             "SurfTimestamp": item["SurfTimestamp"]["S"],
@@ -364,10 +414,15 @@ class SurfDynamoDBService:
                 "createdAt": metadata.get("createdAt", {}).get("S", ""),
             },
             "name": name,
+            "nameKo": display_name_ko or None,
             "city": city,
+            "cityKo": city_ko or None,
             "region": state,
+            "regionKo": state_ko or None,
             "country": country,
+            "countryKo": country_ko or None,
             "address": display_name,
+            "addressKo": display_name_ko or None,
             "waveType": "Beach Break",
             "bestSeason": [],
         }

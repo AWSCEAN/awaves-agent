@@ -4,10 +4,18 @@ import { useState } from 'react';
 import Link from 'next/link';
 import type { SavedItemResponse, FeedbackStatus, Language } from '@/types';
 
+interface SpotNameInfo {
+  name: string;
+  nameKo?: string;
+  regionKo?: string;
+  countryKo?: string;
+  cityKo?: string;
+}
+
 interface SavedItemCardProps {
   item: SavedItemResponse;
   lang: Language;
-  spotName?: { name: string; nameKo?: string };
+  spotName?: SpotNameInfo;
   onRemove: () => void;
   onAcknowledgeChange: () => void;
   onFeedback: (status: FeedbackStatus) => void;
@@ -82,6 +90,18 @@ export default function SavedItemCard({
   const [showFeedbackToast, setShowFeedbackToast] = useState(false);
   const t = translations[lang];
 
+  const getLevelLabel = (level: string): string => {
+    if (lang === 'ko') {
+      switch (level) {
+        case 'BEGINNER': return '초급';
+        case 'INTERMEDIATE': return '중급';
+        case 'ADVANCED': return '상급';
+        default: return level;
+      }
+    }
+    return level;
+  };
+
   const formatDate = (dateStr: string) => {
     try {
       return new Date(dateStr).toLocaleDateString(lang === 'ko' ? 'ko-KR' : 'en-US', {
@@ -118,9 +138,9 @@ export default function SavedItemCard({
           <div>
             <h3 className="font-semibold text-ocean-800 text-lg line-clamp-1">{locationName}</h3>
             <div className="flex items-center gap-2 text-sm text-ocean-600">
-              {item.region && <span>{item.region}</span>}
+              {item.region && <span>{lang === 'ko' && spotName?.regionKo ? spotName.regionKo : item.region}</span>}
               {item.region && item.country && <span>•</span>}
-              {item.country && <span>{item.country}</span>}
+              {item.country && <span>{lang === 'ko' && spotName?.countryKo ? spotName.countryKo : item.country}</span>}
             </div>
             {item.surf_timestamp && (
               <div className="inline-flex items-center gap-1.5 mt-1.5 px-2 py-0.5 rounded-md shadow-sm border border-ocean-200">
@@ -131,13 +151,11 @@ export default function SavedItemCard({
                   {(() => {
                     const date = new Date(item.surf_timestamp);
                     const year = date.getFullYear();
-                    const month = date.getMonth() + 1;
-                    const day = date.getDate();
+                    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                    const day = date.getDate().toString().padStart(2, '0');
                     const hours = date.getHours().toString().padStart(2, '0');
                     const minutes = date.getMinutes().toString().padStart(2, '0');
-                    return lang === 'ko'
-                      ? `${year}년 ${month}월 ${day}일 ${hours}:${minutes}`
-                      : `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} ${hours}:${minutes}`;
+                    return `${year}-${month}-${day} ${hours}:${minutes}`;
                   })()}
                 </span>
               </div>
@@ -178,7 +196,7 @@ export default function SavedItemCard({
         {/* Level Badge */}
         <div className="flex items-center gap-2 mb-3">
           <span className="text-sm px-3 py-1 rounded-lg bg-ocean-100 text-ocean-700 font-medium">
-            {t.level}: {item.surfer_level}
+            {t.level}: {getLevelLabel(item.surfer_level)}
           </span>
         </div>
 
@@ -229,8 +247,8 @@ export default function SavedItemCard({
           </div>
         )}
 
-        {/* Feedback Section - only show when no feedback given yet */}
-        {!feedbackStatus && (
+        {/* Feedback Section - only show when no feedback given yet and date is in the past */}
+        {!feedbackStatus && new Date(item.surf_timestamp) < new Date() && (
           <div className="border-t pt-3 mt-3">
             <p className="text-sm text-ocean-600 mb-2">{t.feedbackQuestion}</p>
             <div className="flex items-center gap-2">

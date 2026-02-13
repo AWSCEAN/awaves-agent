@@ -49,14 +49,14 @@ export default function LocationAutocomplete({
       const countrySet = new Set<string>();
 
       spots.forEach((spot) => {
-        locations.push({ id: spot.LocationId, name: spot.name, type: 'spot' });
+        locations.push({ id: spot.LocationId, name: spot.name, nameKo: spot.nameKo, type: 'spot' });
         if (spot.region && !regionSet.has(spot.region)) {
           regionSet.add(spot.region);
-          locations.push({ id: `region-${spot.region}`, name: spot.region, type: 'region' });
+          locations.push({ id: `region-${spot.region}`, name: spot.region, nameKo: spot.regionKo, type: 'region' });
         }
         if (spot.country && !countrySet.has(spot.country)) {
           countrySet.add(spot.country);
-          locations.push({ id: `country-${spot.country}`, name: spot.country, type: 'country' });
+          locations.push({ id: `country-${spot.country}`, name: spot.country, nameKo: spot.countryKo, type: 'country' });
         }
       });
 

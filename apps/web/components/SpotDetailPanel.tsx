@@ -110,7 +110,7 @@ export default function SpotDetailPanel({
             </div>
             <div className="flex items-center gap-1.5">
               <p className="text-sm text-white/80">
-                {surfInfo.region}, {surfInfo.country}
+                {locale === 'ko' && surfInfo.regionKo ? surfInfo.regionKo : surfInfo.region}, {locale === 'ko' && surfInfo.countryKo ? surfInfo.countryKo : surfInfo.country}
               </p>
               <button
                 onClick={() => {
@@ -145,13 +145,11 @@ export default function SpotDetailPanel({
                   {(() => {
                     const date = new Date(surfInfo.SurfTimestamp);
                     const year = date.getFullYear();
-                    const month = date.getMonth() + 1;
-                    const day = date.getDate();
+                    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                    const day = date.getDate().toString().padStart(2, '0');
                     const hours = date.getHours().toString().padStart(2, '0');
                     const minutes = date.getMinutes().toString().padStart(2, '0');
-                    return locale === 'ko'
-                      ? `${year}년 ${month}월 ${day}일 ${hours}:${minutes}`
-                      : `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} ${hours}:${minutes}`;
+                    return `${year}-${month}-${day} ${hours}:${minutes}`;
                   })()}
                 </span>
               </div>
@@ -247,7 +245,7 @@ export default function SpotDetailPanel({
           {/* Level Box */}
           <div className="flex-1 p-2 rounded-xl bg-ocean-100 border border-ocean-200 text-center">
             <div className="text-xs text-ocean-600 font-medium mb-0.5">
-              {locale === 'ko' ? '숙련도' : 'Level'}
+              {locale === 'ko' ? '레벨' : 'Level'}
             </div>
             <div className="text-2xl font-bold text-ocean-800">
               {getLevelLabel(surfingLevel)}
