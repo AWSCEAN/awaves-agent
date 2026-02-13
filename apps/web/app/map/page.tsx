@@ -23,6 +23,7 @@ import { TIME_SLOTS, getCurrentTimeSlot, localToUTC } from '@/lib/services/surfI
 import { surfService } from '@/lib/apiServices';
 import { useSavedItems } from '@/hooks/useSavedItems';
 import SurfLoadingScreen from '@/components/SurfLoadingScreen';
+import { useAuth } from '@/contexts/AuthContext';
 
 
 const EnhancedMapboxMap = dynamic(
@@ -42,16 +43,24 @@ function MapPageContent() {
   const t = useTranslations('header');
   const tSearch = useTranslations('search');
   const searchParams = useSearchParams();
+  const { user } = useAuth();
 
   // Search state - input values (what user is selecting)
   const [locationQuery, setLocationQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedTime, setSelectedTime] = useState<string>(() => getCurrentTimeSlot());
+  const [selectedTime, setSelectedTime] = useState<string>('');
   const [surferLevel, setSurferLevel] = useState<SurferLevel | ''>('');
+
+  // Initialize surferLevel from user's saved level
+  useEffect(() => {
+    if (user?.user_level) {
+      setSurferLevel(user.user_level as SurferLevel);
+    }
+  }, [user?.user_level]);
 
   // Search state - active values (what was last searched, only update on search button click)
   const [searchDate, setSearchDate] = useState<Date>(new Date());
-  const [searchTime, setSearchTime] = useState<string>(() => getCurrentTimeSlot());
+  const [searchTime, setSearchTime] = useState<string>('');
 
   // User location state - persist permission across navigations
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(() => {
@@ -241,10 +250,11 @@ function MapPageContent() {
   ) => {
     try {
       // Convert local date+time to UTC for DynamoDB queries
+      // When "All Times" is selected (no time), use noon as reference for consistent UTC conversion
       const utc = (options?.date && options?.time)
         ? localToUTC(options.date, options.time)
         : options?.date
-          ? { date: options.date, time: undefined }
+          ? localToUTC(options.date, '12:00')
           : { date: undefined, time: undefined };
       const utcOptions = { ...options, date: utc.date, time: utc.time };
 
@@ -458,7 +468,9 @@ function MapPageContent() {
     if (!userLocation) return;
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const utcNearby = selectedTime ? localToUTC(dateStr, selectedTime) : { date: dateStr, time: undefined };
+      const utcNearby = selectedTime
+        ? localToUTC(dateStr, selectedTime)
+        : localToUTC(dateStr, '12:00');
       const response = await surfService.getNearbySpots(
         userLocation.lat,
         userLocation.lng,
@@ -545,6 +557,7 @@ function MapPageContent() {
                   focus:outline-none focus:ring-2 focus:ring-ocean-500/50 focus:border-ocean-500
                   bg-white text-ocean-800 w-28"
               >
+                <option value="">{tSearch('allTimes')}</option>
                 {TIME_SLOTS.map((time) => (
                   <option key={time} value={time}>
                     {time}

@@ -7,9 +7,12 @@ import type { SavedItemResponse, FeedbackStatus, Language } from '@/types';
 interface SpotNameInfo {
   name: string;
   nameKo?: string;
+  city?: string;
+  region?: string;
+  country?: string;
+  cityKo?: string;
   regionKo?: string;
   countryKo?: string;
-  cityKo?: string;
 }
 
 interface SavedItemCardProps {
@@ -138,9 +141,13 @@ export default function SavedItemCard({
           <div>
             <h3 className="font-semibold text-ocean-800 text-lg line-clamp-1">{locationName}</h3>
             <div className="flex items-center gap-2 text-sm text-ocean-600">
-              {item.region && <span>{lang === 'ko' && spotName?.regionKo ? spotName.regionKo : item.region}</span>}
-              {item.region && item.country && <span>•</span>}
-              {item.country && <span>{lang === 'ko' && spotName?.countryKo ? spotName.countryKo : item.country}</span>}
+              {(item.region || spotName?.region) && (
+                <span>{lang === 'ko' && spotName?.regionKo ? spotName.regionKo : (item.region || spotName?.region)}</span>
+              )}
+              {(item.region || spotName?.region) && (item.country || spotName?.country) && <span>•</span>}
+              {(item.country || spotName?.country) && (
+                <span>{lang === 'ko' && spotName?.countryKo ? spotName.countryKo : (item.country || spotName?.country)}</span>
+              )}
             </div>
             {item.surf_timestamp && (
               <div className="inline-flex items-center gap-1.5 mt-1.5 px-2 py-0.5 rounded-md shadow-sm border border-ocean-200">
@@ -225,7 +232,7 @@ export default function SavedItemCard({
               <span className="text-lg">💨</span>
               <div>
                 <div className="text-xs text-ocean-500">{t.windSpeed}</div>
-                <div className="font-semibold text-ocean-800">{Number(item.wind_speed).toFixed(1)}km/h</div>
+                <div className="font-semibold text-ocean-800">{Number(item.wind_speed).toFixed(1)}m/s</div>
               </div>
             </div>
           )}

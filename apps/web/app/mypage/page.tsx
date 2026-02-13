@@ -60,7 +60,7 @@ const translations = {
         description: '보드 위 균형 유지 및 긴 라이딩 가능한 분',
       },
       advanced: {
-        title: '고급 (Advanced)',
+        title: '상급 (Advanced)',
         description: '강한 파도와 다양한 기술 구사 가능한 분',
       },
     },
