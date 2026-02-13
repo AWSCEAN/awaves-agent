@@ -68,23 +68,29 @@ export default function SavedPage() {
   const error = queryError?.message || null;
 
   // Fetch all surf spots to build a locationId → name lookup
-  const [spotNameMap, setSpotNameMap] = useState<Map<string, { name: string; nameKo?: string; regionKo?: string; countryKo?: string; cityKo?: string }>>(new Map());
+  const [spotNameMap, setSpotNameMap] = useState<Map<string, { name: string; nameKo?: string; city?: string; region?: string; country?: string; cityKo?: string; regionKo?: string; countryKo?: string }>>(new Map());
+  const [spotNameMapLoading, setSpotNameMapLoading] = useState(true);
 
   useEffect(() => {
     surfService.getAllSpots().then((response) => {
       if (response.success && response.data) {
-        const nameMap = new Map<string, { name: string; nameKo?: string; regionKo?: string; countryKo?: string; cityKo?: string }>();
+        const nameMap = new Map<string, { name: string; nameKo?: string; city?: string; region?: string; country?: string; cityKo?: string; regionKo?: string; countryKo?: string }>();
         (response.data as SurfInfo[]).forEach((spot) => {
           nameMap.set(spot.LocationId, {
             name: spot.name,
             nameKo: spot.nameKo,
+            city: spot.city,
+            region: spot.region,
+            country: spot.country,
+            cityKo: spot.cityKo,
             regionKo: spot.regionKo,
             countryKo: spot.countryKo,
-            cityKo: spot.cityKo,
           });
         });
         setSpotNameMap(nameMap);
       }
+    }).finally(() => {
+      setSpotNameMapLoading(false);
     });
   }, []);
 
@@ -134,7 +140,8 @@ export default function SavedPage() {
   };
 
   // Show full-page loading when data is loading and no cached items available
-  if (isLoading && savedItems.length === 0) {
+  // Wait for both savedItems AND spotNameMap to be ready to avoid showing coordinates
+  if ((isLoading && savedItems.length === 0) || spotNameMapLoading) {
     return (
       <ProtectedRoute>
         <SurfLoadingScreen />

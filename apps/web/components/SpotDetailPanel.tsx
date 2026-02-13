@@ -270,7 +270,7 @@ export default function SpotDetailPanel({
             </div>
             <div>
               <div className="text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '풍속' : 'Wind Speed'}</div>
-              <div className="font-bold text-ocean-800">{windSpeed.toFixed(1)}km/h</div>
+              <div className="font-bold text-ocean-800">{windSpeed.toFixed(1)}m/s</div>
             </div>
             <div>
               <div className="text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '수온' : 'Water Temp'}</div>
@@ -314,21 +314,21 @@ export default function SpotDetailPanel({
                 </tr>
                 {/* Wind Speed Row */}
                 <tr className="border-b border-ocean-100">
-                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '풍속' : 'Wind'} <span className="text-ocean-400 font-normal">(km/h)</span></td>
+                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '풍속' : 'Wind Speed'} <span className="text-ocean-400 font-normal">(m/s)</span></td>
                   {[0.9, 0.95, 1.0, 1.05, 0.98].map((v, idx) => (
                     <td key={idx} className="py-1 px-1.5 text-center">{(windSpeed * v).toFixed(1)}</td>
                   ))}
                 </tr>
                 {/* Water Temperature Row */}
                 <tr className="border-b border-ocean-100">
-                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '수온' : 'Water'} <span className="text-ocean-400 font-normal">(°C)</span></td>
+                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '수온' : 'Water Temp'} <span className="text-ocean-400 font-normal">(°C)</span></td>
                   {[0, 0, 0, 0, 0].map((_, idx) => (
                     <td key={idx} className="py-1 px-1.5 text-center">{waterTemperature.toFixed(1)}</td>
                   ))}
                 </tr>
                 {/* Air Temperature Row */}
                 <tr className="border-b border-ocean-100">
-                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '기온' : 'Air'} <span className="text-ocean-400 font-normal">(°C)</span></td>
+                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '기온' : 'Air Temp'} <span className="text-ocean-400 font-normal">(°C)</span></td>
                   {[0.95, 1.0, 1.1, 1.15, 1.05].map((v, idx) => (
                     <td key={idx} className="py-1 px-1.5 text-center">{((waterTemperature + 5) * v).toFixed(1)}</td>
                   ))}
