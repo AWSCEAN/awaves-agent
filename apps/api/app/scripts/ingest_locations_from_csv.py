@@ -1,14 +1,16 @@
 """
-Ingest location data from mock_surf_data_geocode.csv into DynamoDB (locations table)
-and OpenSearch (locations index).
+Ingest location data from CSV into DynamoDB (locations table) and OpenSearch (locations index).
+
+Supports both English-only CSV (mock_surf_data_geocode.csv) and bilingual CSV
+(surf_locations_korean_translations.csv) with Korean translations.
 
 Usage:
     cd apps/api
-    python -m app.scripts.ingest_locations_from_csv
+    python -m app.scripts.ingest_locations_from_csv [--csv PATH]
 
 Requirements:
     - DynamoDB local running on port 8000 (or AWS DynamoDB configured)
-    - OpenSearch running on port 9200
+    - OpenSearch running on port 9200 (with nori plugin for Korean)
 """
 
 import csv
@@ -36,6 +38,8 @@ OPENSEARCH_PORT = int(os.getenv("OPENSEARCH_PORT", "9200"))
 
 # CSV file path (relative to apps/api/)
 CSV_FILE = Path(__file__).resolve().parent.parent.parent.parent.parent / "mock_surf_data_geocode.csv"
+# Korean translations CSV
+CSV_FILE_KO = Path(__file__).resolve().parent.parent.parent.parent.parent / "surf_locations_korean_translations.csv"
 
 
 def create_ddb_table(dynamodb_client):
@@ -70,34 +74,96 @@ def create_opensearch_index(os_client: OpenSearch):
         print(f"OpenSearch index '{index_name}' already exists. Deleting for re-ingestion...")
         os_client.indices.delete(index=index_name)
 
-    mapping = {
-        "settings": {
-            "number_of_shards": 1,
-            "number_of_replicas": 0,
-        },
-        "mappings": {
-            "properties": {
-                "locationId": {"type": "keyword"},
-                "display_name": {"type": "text", "analyzer": "standard"},
-                "city": {"type": "text", "analyzer": "standard", "fields": {"keyword": {"type": "keyword"}}},
-                "state": {"type": "keyword"},
-                "country": {"type": "keyword"},
-                "location": {"type": "geo_point"},
+    # Check if nori plugin is available
+    has_nori = _check_nori_plugin(os_client)
+
+    settings = {
+        "number_of_shards": 1,
+        "number_of_replicas": 0,
+    }
+
+    if has_nori:
+        settings["analysis"] = {
+            "analyzer": {
+                "korean_analyzer": {
+                    "type": "custom",
+                    "tokenizer": "nori_tokenizer",
+                    "filter": ["lowercase", "nori_part_of_speech"],
+                }
             }
+        }
+
+    properties = {
+        "locationId": {"type": "keyword"},
+        "display_name": {"type": "text", "analyzer": "standard"},
+        "city": {"type": "text", "analyzer": "standard", "fields": {"keyword": {"type": "keyword"}}},
+        "state": {"type": "keyword"},
+        "country": {"type": "keyword"},
+        "location": {"type": "geo_point"},
+    }
+
+    # Add Korean fields
+    ko_analyzer = "korean_analyzer" if has_nori else "standard"
+    properties.update({
+        "display_name_ko": {
+            "type": "text",
+            "analyzer": ko_analyzer,
+            "fields": {"keyword": {"type": "keyword"}},
         },
+        "city_ko": {
+            "type": "text",
+            "analyzer": ko_analyzer,
+            "fields": {"keyword": {"type": "keyword"}},
+        },
+        "state_ko": {
+            "type": "text",
+            "analyzer": ko_analyzer,
+            "fields": {"keyword": {"type": "keyword"}},
+        },
+        "country_ko": {
+            "type": "text",
+            "analyzer": ko_analyzer,
+            "fields": {"keyword": {"type": "keyword"}},
+        },
+    })
+
+    mapping = {
+        "settings": settings,
+        "mappings": {"properties": properties},
     }
 
     os_client.indices.create(index=index_name, body=mapping)
-    print(f"OpenSearch index '{index_name}' created.")
+    analyzer_info = "with Korean (nori) analyzer" if has_nori else "without Korean analyzer (nori plugin not installed)"
+    print(f"OpenSearch index '{index_name}' created {analyzer_info}.")
+
+
+def _check_nori_plugin(os_client: OpenSearch) -> bool:
+    """Check if the nori analysis plugin is installed."""
+    try:
+        plugins = os_client.cat.plugins(format="json")
+        for plugin in plugins:
+            if "nori" in plugin.get("component", "").lower():
+                return True
+        # Also try via analyze API
+        os_client.indices.analyze(body={"tokenizer": "nori_tokenizer", "text": "테스트"})
+        return True
+    except Exception:
+        return False
 
 
 def read_csv(csv_path: Path) -> list[dict]:
-    """Read locations from CSV file and generate locationId."""
+    """Read locations from CSV file and generate locationId.
+
+    Supports both English-only and bilingual CSVs.
+    """
     locations = []
     seen_ids = set()
 
     with open(csv_path, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
+        fieldnames = reader.fieldnames or []
+        has_korean = "display_name_kr" in fieldnames
+
         for row in reader:
             lat = row["lat"].strip()
             lon = row["lon"].strip()
@@ -108,7 +174,7 @@ def read_csv(csv_path: Path) -> list[dict]:
                 continue
             seen_ids.add(location_id)
 
-            locations.append({
+            loc = {
                 "locationId": location_id,
                 "lat": float(lat),
                 "lon": float(lon),
@@ -116,7 +182,16 @@ def read_csv(csv_path: Path) -> list[dict]:
                 "city": row.get("city", "").strip(),
                 "state": row.get("state", "").strip(),
                 "country": row.get("country", "").strip(),
-            })
+            }
+
+            # Add Korean fields if present
+            if has_korean:
+                loc["display_name_ko"] = row.get("display_name_kr", "").strip()
+                loc["city_ko"] = row.get("city_kr", "").strip()
+                loc["state_ko"] = row.get("state_kr", "").strip()
+                loc["country_ko"] = row.get("country_kr", "").strip()
+
+            locations.append(loc)
 
     return locations
 
@@ -137,6 +212,16 @@ def ingest_to_dynamodb(dynamodb_resource, locations: list[dict]):
                 "state": loc["state"],
                 "country": loc["country"],
             }
+            # Add Korean fields if present
+            if loc.get("display_name_ko"):
+                item["display_name_ko"] = loc["display_name_ko"]
+            if loc.get("city_ko"):
+                item["city_ko"] = loc["city_ko"]
+            if loc.get("state_ko"):
+                item["state_ko"] = loc["state_ko"]
+            if loc.get("country_ko"):
+                item["country_ko"] = loc["country_ko"]
+
             batch.put_item(Item=item)
             count += 1
 
@@ -150,7 +235,7 @@ def ingest_to_opensearch(os_client: OpenSearch, locations: list[dict]):
 
     for loc in locations:
         actions.append(json.dumps({"index": {"_index": index_name, "_id": loc["locationId"]}}))
-        actions.append(json.dumps({
+        doc = {
             "locationId": loc["locationId"],
             "display_name": loc["display_name"],
             "city": loc["city"],
@@ -160,7 +245,12 @@ def ingest_to_opensearch(os_client: OpenSearch, locations: list[dict]):
                 "lat": loc["lat"],
                 "lon": loc["lon"],
             },
-        }))
+            "display_name_ko": loc.get("display_name_ko", ""),
+            "city_ko": loc.get("city_ko", ""),
+            "state_ko": loc.get("state_ko", ""),
+            "country_ko": loc.get("country_ko", ""),
+        }
+        actions.append(json.dumps(doc))
 
     body = "\n".join(actions) + "\n"
     response = os_client.bulk(body=body, refresh=True)
@@ -177,14 +267,25 @@ def ingest_to_opensearch(os_client: OpenSearch, locations: list[dict]):
 
 
 def main():
-    # Validate CSV exists
-    if not CSV_FILE.exists():
-        print(f"Error: CSV file not found at {CSV_FILE}")
+    # Determine which CSV to use
+    csv_path = CSV_FILE_KO if CSV_FILE_KO.exists() else CSV_FILE
+
+    # Allow override via command line
+    if len(sys.argv) > 2 and sys.argv[1] == "--csv":
+        csv_path = Path(sys.argv[2])
+
+    if not csv_path.exists():
+        print(f"Error: CSV file not found at {csv_path}")
         sys.exit(1)
 
-    print(f"Reading CSV from: {CSV_FILE}")
-    locations = read_csv(CSV_FILE)
+    print(f"Reading CSV from: {csv_path}")
+    locations = read_csv(csv_path)
     print(f"Found {len(locations)} unique locations.")
+
+    has_korean = any(loc.get("display_name_ko") for loc in locations)
+    if has_korean:
+        ko_count = sum(1 for loc in locations if loc.get("display_name_ko"))
+        print(f"  Korean translations found: {ko_count}/{len(locations)}")
 
     # DynamoDB setup
     ddb_kwargs = {
@@ -224,6 +325,8 @@ def main():
     print("\nIngestion complete!")
     print(f"  DynamoDB: {len(locations)} locations in '{LOCATIONS_TABLE}'")
     print(f"  OpenSearch: {len(locations)} locations in 'locations' index")
+    if has_korean:
+        print("  Korean translations: included")
 
 
 if __name__ == "__main__":

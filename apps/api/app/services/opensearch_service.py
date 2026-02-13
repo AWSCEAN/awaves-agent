@@ -1,6 +1,7 @@
 """OpenSearch service for location keyword search."""
 
 import logging
+import re
 from typing import Optional
 
 from opensearchpy import AsyncOpenSearch
@@ -8,6 +9,16 @@ from opensearchpy import AsyncOpenSearch
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Regex to detect Korean (Hangul) characters
+_KOREAN_PATTERN = re.compile("[\uAC00-\uD7A3]")
+
+
+def detect_language(text: str) -> str:
+    """Detect if text contains Korean characters."""
+    if _KOREAN_PATTERN.search(text):
+        return "ko"
+    return "en"
 
 
 class OpenSearchService:
@@ -67,12 +78,23 @@ class OpenSearchService:
             exists = await client.indices.exists(index=cls.INDEX_NAME)
             if exists:
                 logger.info("OpenSearch index '%s' already exists.", cls.INDEX_NAME)
+                # Try to add Korean fields to existing index (idempotent)
+                await cls._ensure_korean_mappings(client)
                 return True
 
             mapping = {
                 "settings": {
                     "number_of_shards": 1,
                     "number_of_replicas": 0,
+                    "analysis": {
+                        "analyzer": {
+                            "korean_analyzer": {
+                                "type": "custom",
+                                "tokenizer": "nori_tokenizer",
+                                "filter": ["lowercase", "nori_part_of_speech"],
+                            }
+                        }
+                    },
                 },
                 "mappings": {
                     "properties": {
@@ -82,16 +104,141 @@ class OpenSearchService:
                         "state": {"type": "keyword"},
                         "country": {"type": "keyword"},
                         "location": {"type": "geo_point"},
+                        # Korean fields
+                        "display_name_ko": {
+                            "type": "text",
+                            "analyzer": "korean_analyzer",
+                            "fields": {"keyword": {"type": "keyword"}},
+                        },
+                        "city_ko": {
+                            "type": "text",
+                            "analyzer": "korean_analyzer",
+                            "fields": {"keyword": {"type": "keyword"}},
+                        },
+                        "state_ko": {
+                            "type": "text",
+                            "analyzer": "korean_analyzer",
+                            "fields": {"keyword": {"type": "keyword"}},
+                        },
+                        "country_ko": {
+                            "type": "text",
+                            "analyzer": "korean_analyzer",
+                            "fields": {"keyword": {"type": "keyword"}},
+                        },
                     }
                 },
             }
 
             await client.indices.create(index=cls.INDEX_NAME, body=mapping)
-            logger.info("OpenSearch index '%s' created.", cls.INDEX_NAME)
+            logger.info("OpenSearch index '%s' created with Korean analyzer.", cls.INDEX_NAME)
             return True
         except Exception as e:
             logger.error("Failed to create OpenSearch index: %s", e)
             return False
+
+    @classmethod
+    async def _ensure_korean_mappings(cls, client: AsyncOpenSearch) -> None:
+        """Add Korean field mappings to existing index, recreating if needed."""
+        try:
+            # Check current mappings for analyzer conflicts
+            current_mappings = await client.indices.get_mapping(index=cls.INDEX_NAME)
+            props = (
+                current_mappings.get(cls.INDEX_NAME, {})
+                .get("mappings", {})
+                .get("properties", {})
+            )
+
+            # If Korean fields exist with wrong analyzer, we must recreate
+            needs_recreate = False
+            for field in ("display_name_ko", "city_ko", "state_ko", "country_ko"):
+                field_mapping = props.get(field, {})
+                if field_mapping and field_mapping.get("analyzer") != "korean_analyzer":
+                    needs_recreate = True
+                    break
+
+            if needs_recreate:
+                logger.info(
+                    "Korean fields exist with wrong analyzer. "
+                    "Deleting index '%s' so it can be recreated with correct mappings.",
+                    cls.INDEX_NAME,
+                )
+                await client.indices.delete(index=cls.INDEX_NAME)
+                await cls.create_index_if_not_exists()
+                logger.info("Index recreated with Korean analyzer mappings.")
+                return
+
+            # Check if nori analyzer exists in settings
+            current_settings = await client.indices.get_settings(index=cls.INDEX_NAME)
+            index_settings = (
+                current_settings.get(cls.INDEX_NAME, {})
+                .get("settings", {})
+                .get("index", {})
+            )
+            analysis = index_settings.get("analysis", {})
+
+            if "korean_analyzer" not in analysis.get("analyzer", {}):
+                logger.info("Adding Korean analyzer to existing index...")
+                try:
+                    await client.indices.close(index=cls.INDEX_NAME)
+                    await client.indices.put_settings(
+                        index=cls.INDEX_NAME,
+                        body={
+                            "analysis": {
+                                "analyzer": {
+                                    "korean_analyzer": {
+                                        "type": "custom",
+                                        "tokenizer": "nori_tokenizer",
+                                        "filter": ["lowercase", "nori_part_of_speech"],
+                                    }
+                                }
+                            }
+                        },
+                    )
+                    await client.indices.open(index=cls.INDEX_NAME)
+                    logger.info("Korean analyzer added to existing index.")
+                except Exception as e:
+                    logger.warning("Could not add Korean analyzer: %s", e)
+                    try:
+                        await client.indices.open(index=cls.INDEX_NAME)
+                    except Exception:
+                        pass
+
+            # Add Korean field mappings if not yet present
+            ko_fields_missing = any(
+                field not in props
+                for field in ("display_name_ko", "city_ko", "state_ko", "country_ko")
+            )
+            if ko_fields_missing:
+                await client.indices.put_mapping(
+                    index=cls.INDEX_NAME,
+                    body={
+                        "properties": {
+                            "display_name_ko": {
+                                "type": "text",
+                                "analyzer": "korean_analyzer",
+                                "fields": {"keyword": {"type": "keyword"}},
+                            },
+                            "city_ko": {
+                                "type": "text",
+                                "analyzer": "korean_analyzer",
+                                "fields": {"keyword": {"type": "keyword"}},
+                            },
+                            "state_ko": {
+                                "type": "text",
+                                "analyzer": "korean_analyzer",
+                                "fields": {"keyword": {"type": "keyword"}},
+                            },
+                            "country_ko": {
+                                "type": "text",
+                                "analyzer": "korean_analyzer",
+                                "fields": {"keyword": {"type": "keyword"}},
+                            },
+                        }
+                    },
+                )
+                logger.info("Korean field mappings added to existing index.")
+        except Exception as e:
+            logger.warning("Could not ensure Korean mappings on existing index: %s", e)
 
     @classmethod
     async def index_location(cls, location_data: dict) -> bool:
@@ -111,6 +258,11 @@ class OpenSearchService:
                     "lat": location_data["lat"],
                     "lon": location_data["lon"],
                 },
+                # Korean fields
+                "display_name_ko": location_data.get("display_name_ko", ""),
+                "city_ko": location_data.get("city_ko", ""),
+                "state_ko": location_data.get("state_ko", ""),
+                "country_ko": location_data.get("country_ko", ""),
             }
 
             await client.index(
@@ -144,6 +296,11 @@ class OpenSearchService:
                     "lat": loc["lat"],
                     "lon": loc["lon"],
                 },
+                # Korean fields
+                "display_name_ko": loc.get("display_name_ko", ""),
+                "city_ko": loc.get("city_ko", ""),
+                "state_ko": loc.get("state_ko", ""),
+                "country_ko": loc.get("country_ko", ""),
             })
 
         if not actions:
@@ -168,8 +325,15 @@ class OpenSearchService:
             return 0
 
     @classmethod
-    async def search_locations(cls, query: str, size: int = 50) -> list[dict]:
+    async def search_locations(
+        cls, query: str, size: int = 50, language: Optional[str] = None
+    ) -> list[dict]:
         """Search locations by keyword using multi_match.
+
+        Args:
+            query: Search query string.
+            size: Max number of results.
+            language: Language hint ('en', 'ko', or None for auto-detect).
 
         Returns list of dicts with locationId and location metadata.
         """
@@ -177,45 +341,15 @@ class OpenSearchService:
         if not client:
             return []
 
+        # Auto-detect language if not provided
+        if language is None:
+            language = detect_language(query)
+
         try:
-            body = {
-                "size": size,
-                "query": {
-                    "bool": {
-                        "should": [
-                            # Exact phrase match (highest priority)
-                            {
-                                "multi_match": {
-                                    "query": query,
-                                    "fields": [
-                                        "display_name^5",
-                                        "city^3",
-                                        "state^2",
-                                        "country",
-                                    ],
-                                    "type": "phrase",
-                                    "boost": 3,
-                                }
-                            },
-                            # All terms must appear (cross-field)
-                            {
-                                "multi_match": {
-                                    "query": query,
-                                    "fields": [
-                                        "display_name^3",
-                                        "city^2",
-                                        "state",
-                                        "country",
-                                    ],
-                                    "type": "cross_fields",
-                                    "operator": "and",
-                                }
-                            },
-                        ],
-                        "minimum_should_match": 1,
-                    }
-                },
-            }
+            if language == "ko":
+                body = cls._build_korean_query(query, size)
+            else:
+                body = cls._build_english_query(query, size)
 
             response = await client.search(index=cls.INDEX_NAME, body=body)
             hits = response.get("hits", {}).get("hits", [])
@@ -229,6 +363,10 @@ class OpenSearchService:
                     "city": source.get("city", ""),
                     "state": source.get("state", ""),
                     "country": source.get("country", ""),
+                    "display_name_ko": source.get("display_name_ko", ""),
+                    "city_ko": source.get("city_ko", ""),
+                    "state_ko": source.get("state_ko", ""),
+                    "country_ko": source.get("country_ko", ""),
                     "lat": source.get("location", {}).get("lat"),
                     "lon": source.get("location", {}).get("lon"),
                     "score": hit.get("_score", 0),
@@ -238,6 +376,106 @@ class OpenSearchService:
         except Exception as e:
             logger.error("OpenSearch search failed: %s", e)
             return []
+
+    @classmethod
+    def _build_english_query(cls, query: str, size: int) -> dict:
+        """Build the existing English search query (unchanged logic)."""
+        return {
+            "size": size,
+            "query": {
+                "bool": {
+                    "should": [
+                        # Exact phrase match (highest priority)
+                        {
+                            "multi_match": {
+                                "query": query,
+                                "fields": [
+                                    "display_name^5",
+                                    "city^3",
+                                    "state^2",
+                                    "country",
+                                ],
+                                "type": "phrase",
+                                "boost": 3,
+                            }
+                        },
+                        # All terms must appear (cross-field)
+                        {
+                            "multi_match": {
+                                "query": query,
+                                "fields": [
+                                    "display_name^3",
+                                    "city^2",
+                                    "state",
+                                    "country",
+                                ],
+                                "type": "cross_fields",
+                                "operator": "and",
+                            }
+                        },
+                    ],
+                    "minimum_should_match": 1,
+                }
+            },
+        }
+
+    @classmethod
+    def _build_korean_query(cls, query: str, size: int) -> dict:
+        """Build Korean search query using nori analyzer."""
+        return {
+            "size": size,
+            "query": {
+                "bool": {
+                    "should": [
+                        # Exact phrase match on Korean fields
+                        {
+                            "multi_match": {
+                                "query": query,
+                                "fields": [
+                                    "display_name_ko^5",
+                                    "city_ko^3",
+                                    "state_ko^2",
+                                    "country_ko",
+                                ],
+                                "type": "phrase",
+                                "boost": 3,
+                                "analyzer": "korean_analyzer",
+                            }
+                        },
+                        # Cross-field match on Korean fields
+                        {
+                            "multi_match": {
+                                "query": query,
+                                "fields": [
+                                    "display_name_ko^3",
+                                    "city_ko^2",
+                                    "state_ko",
+                                    "country_ko",
+                                ],
+                                "type": "cross_fields",
+                                "operator": "and",
+                                "analyzer": "korean_analyzer",
+                            }
+                        },
+                        # Also search English fields for mixed queries
+                        {
+                            "multi_match": {
+                                "query": query,
+                                "fields": [
+                                    "display_name^3",
+                                    "city^2",
+                                    "state",
+                                    "country",
+                                ],
+                                "type": "cross_fields",
+                                "operator": "and",
+                            }
+                        },
+                    ],
+                    "minimum_should_match": 1,
+                }
+            },
+        }
 
     @classmethod
     async def get_document_count(cls) -> int:

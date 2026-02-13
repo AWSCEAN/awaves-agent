@@ -18,10 +18,12 @@ async def search_locations(
     date: Optional[str] = Query(None, description="Date filter (yyyy-MM-dd)"),
     time: Optional[str] = Query(None, description="Time filter (HH:mm)"),
     surfer_level: Optional[str] = Query(None, description="Surfer level filter (BEGINNER, INTERMEDIATE, ADVANCED)"),
+    language: Optional[str] = Query(None, description="Language hint (en or ko). Auto-detected if omitted."),
 ) -> list[SurfInfoResponse]:
     """Search locations by keyword using OpenSearch.
 
     Searches across display_name, city, state, and country fields.
+    Supports Korean search when language=ko or Korean characters are detected.
     Returns surf_info data filtered by date, time, and surfer level.
     """
     if not OpenSearchService._available:
@@ -31,6 +33,7 @@ async def search_locations(
         )
 
     results = await SearchService.search(
-        q, size=size, date=date, time=time, surfer_level=surfer_level
+        q, size=size, date=date, time=time, surfer_level=surfer_level,
+        language=language,
     )
     return [SurfInfoResponse(**r) for r in results]

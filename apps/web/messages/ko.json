@@ -45,7 +45,7 @@
     "difficulty": {
       "beginner": "초급",
       "intermediate": "중급",
-      "advanced": "고급",
+      "advanced": "상급",
       "expert": "전문가"
     }
   },
@@ -55,7 +55,7 @@
     "difficulty": {
       "beginner": "초급",
       "intermediate": "중급",
-      "advanced": "고급",
+      "advanced": "상급",
       "expert": "전문가"
     }
   },

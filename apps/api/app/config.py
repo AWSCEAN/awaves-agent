@@ -15,11 +15,11 @@ def get_env_files() -> tuple[str, ...]:
     env_file = base_dir / ".env"
 
     files = []
-    # .env.local takes priority if it exists
-    if env_local.exists():
-        files.append(str(env_local))
+    # .env loaded first (base), .env.local loaded last (overrides)
     if env_file.exists():
         files.append(str(env_file))
+    if env_local.exists():
+        files.append(str(env_local))
 
     return tuple(files) if files else (".env",)
 

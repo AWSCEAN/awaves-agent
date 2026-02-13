@@ -48,8 +48,13 @@ export interface SurfInfo {
   name: string;
   nameKo?: string;
   region: string;
+  regionKo?: string;
   country: string;
+  countryKo?: string;
   address?: string;
+  addressKo?: string;
+  city?: string;
+  cityKo?: string;
   difficulty?: SurferLevel;
   waveType: string;
   bestSeason: string[];
