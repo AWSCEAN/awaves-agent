@@ -51,6 +51,11 @@ async def _seed_locations_if_empty() -> None:
             "city": spot.get("city", ""),
             "state": spot.get("region", ""),
             "country": spot.get("country", ""),
+            # Korean fields
+            "display_name_ko": spot.get("addressKo", "") or spot.get("nameKo", "") or "",
+            "city_ko": spot.get("cityKo", "") or "",
+            "state_ko": spot.get("regionKo", "") or "",
+            "country_ko": spot.get("countryKo", "") or "",
         })
 
     indexed = await OpenSearchService.bulk_index_locations(locations)

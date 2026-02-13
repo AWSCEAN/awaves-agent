@@ -20,6 +20,7 @@ class SearchService:
         date: Optional[str] = None,
         time: Optional[str] = None,
         surfer_level: Optional[str] = None,
+        language: Optional[str] = None,
     ) -> list[dict]:
         """Search locations by keyword and return enriched surf_info results.
 
@@ -30,7 +31,9 @@ class SearchService:
         4. Return aggregated results enriched with location metadata
         """
         # Step 1: Search OpenSearch (location keyword search only)
-        os_results = await OpenSearchService.search_locations(query, size=size)
+        os_results = await OpenSearchService.search_locations(
+            query, size=size, language=language
+        )
         if not os_results:
             return []
 
@@ -63,12 +66,36 @@ class SearchService:
                 result["city"] = os_result.get("city", "")
                 result["state"] = os_result.get("state", "")
                 result["country"] = os_result.get("country", "")
+
+                # Korean address fields from OpenSearch
+                result["display_name_ko"] = os_result.get("display_name_ko", "")
+                result["city_ko"] = os_result.get("city_ko", "")
+                result["state_ko"] = os_result.get("state_ko", "")
+                result["country_ko"] = os_result.get("country_ko", "")
+
                 # Fill name/address from OpenSearch if DynamoDB didn't have them
                 if os_display:
                     if not result.get("name") or result["name"] == f"{result['geo']['lat']}, {result['geo']['lng']}":
                         result["name"] = os_display
                     if not result.get("address"):
                         result["address"] = os_display
+
+                # Set Korean name/address
+                os_display_ko = os_result.get("display_name_ko", "")
+                if os_display_ko:
+                    if not result.get("nameKo"):
+                        result["nameKo"] = os_display_ko
+                    if not result.get("addressKo"):
+                        result["addressKo"] = os_display_ko
+
+                # Set Korean region/country
+                if os_result.get("state_ko"):
+                    result["regionKo"] = os_result["state_ko"]
+                if os_result.get("country_ko"):
+                    result["countryKo"] = os_result["country_ko"]
+                if os_result.get("city_ko"):
+                    result["cityKo"] = os_result["city_ko"]
+
                 results.append(result)
             else:
                 # No surf data: skip if surfer_level filter is active
@@ -101,11 +128,16 @@ class SearchService:
                         "createdAt": "",
                     },
                     "name": os_result.get("display_name", f"{os_result.get('lat', 0)}, {os_result.get('lon', 0)}"),
+                    "nameKo": os_result.get("display_name_ko", ""),
                     "region": os_result.get("state", ""),
+                    "regionKo": os_result.get("state_ko", ""),
                     "country": os_result.get("country", ""),
+                    "countryKo": os_result.get("country_ko", ""),
                     "address": os_result.get("display_name", ""),
+                    "addressKo": os_result.get("display_name_ko", ""),
                     "display_name": os_result.get("display_name", ""),
                     "city": os_result.get("city", ""),
+                    "cityKo": os_result.get("city_ko", ""),
                     "state": os_result.get("state", ""),
                     "waveType": "Beach Break",
                     "bestSeason": [],

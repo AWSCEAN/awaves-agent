@@ -68,14 +68,20 @@ export default function SavedPage() {
   const error = queryError?.message || null;
 
   // Fetch all surf spots to build a locationId → name lookup
-  const [spotNameMap, setSpotNameMap] = useState<Map<string, { name: string; nameKo?: string }>>(new Map());
+  const [spotNameMap, setSpotNameMap] = useState<Map<string, { name: string; nameKo?: string; regionKo?: string; countryKo?: string; cityKo?: string }>>(new Map());
 
   useEffect(() => {
     surfService.getAllSpots().then((response) => {
       if (response.success && response.data) {
-        const nameMap = new Map<string, { name: string; nameKo?: string }>();
+        const nameMap = new Map<string, { name: string; nameKo?: string; regionKo?: string; countryKo?: string; cityKo?: string }>();
         (response.data as SurfInfo[]).forEach((spot) => {
-          nameMap.set(spot.LocationId, { name: spot.name, nameKo: spot.nameKo });
+          nameMap.set(spot.LocationId, {
+            name: spot.name,
+            nameKo: spot.nameKo,
+            regionKo: spot.regionKo,
+            countryKo: spot.countryKo,
+            cityKo: spot.cityKo,
+          });
         });
         setSpotNameMap(nameMap);
       }

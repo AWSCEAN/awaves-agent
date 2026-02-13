@@ -221,7 +221,7 @@ export default function SearchResultsList({
 
                       {/* Location and Level */}
                       <div className="flex items-center gap-2 text-xs text-ocean-500 mb-2">
-                        <span>{spot.region}, {spot.country}</span>
+                        <span>{locale === 'ko' && spot.regionKo ? spot.regionKo : spot.region}, {locale === 'ko' && spot.countryKo ? spot.countryKo : spot.country}</span>
                         {getLevelLabel(spot) && (
                           <span className="px-1.5 py-0.5 bg-sand-100 rounded text-ocean-600">
                             {getLevelLabel(spot)}
