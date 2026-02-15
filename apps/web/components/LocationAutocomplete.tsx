@@ -38,12 +38,12 @@ export default function LocationAutocomplete({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch all spots from BE on mount to build autocomplete options
+  // Fetch all spots (unpaginated) from BE on mount to build autocomplete options
   useEffect(() => {
     let cancelled = false;
-    surfService.getSpots().then((response) => {
+    surfService.getAllSpots().then((response) => {
       if (cancelled || !response.success || !response.data) return;
-      const spots = response.data.items;
+      const spots = response.data;
       const locations: LocationOption[] = [];
       const regionSet = new Set<string>();
       const countrySet = new Set<string>();
