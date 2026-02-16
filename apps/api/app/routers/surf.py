@@ -1,8 +1,5 @@
 """Surf data router."""
 
-import hashlib
-import random
-from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -12,7 +9,7 @@ from app.schemas.surf import (
     PaginatedSurfInfoResponse,
     SurfInfoResponse,
 )
-from app.services.cache import CacheService
+from app.services.prediction_service import get_surf_prediction
 from app.services.surf_dynamodb import SurfDynamoDBService
 
 
@@ -126,89 +123,10 @@ async def get_recommendations(
 async def predict_surf(request: InferencePredictionRequest) -> dict:
     """Get inference prediction for a location and date.
 
-    Currently returns mock data. Will be replaced by SageMaker endpoint.
+    Uses real ML model (LightGBM) when available, falls back to mock predictions.
+    Results are cached in Redis.
     """
-    # Check cache first
-    cached = await CacheService.get_inference_prediction(
-        request.location_id, request.surf_date
+    prediction = await get_surf_prediction(
+        request.location_id, request.surf_date, request.surfer_level
     )
-    if cached:
-        prediction = cached
-    else:
-        # Parse location
-        parts = request.location_id.split("#")
-        lat = float(parts[0]) if len(parts) >= 2 else 0.0
-        lng = float(parts[1]) if len(parts) >= 2 else 0.0
-
-        # Generate deterministic mock prediction
-        seed_str = f"{request.location_id}-{request.surf_date}-{request.surfer_level}"
-        seed = int(hashlib.md5(seed_str.encode()).hexdigest()[:8], 16)
-        rng = random.Random(seed)
-
-        surf_score = round(rng.uniform(30, 95), 1)
-        grade = (
-            "A"
-            if surf_score >= 80
-            else "B" if surf_score >= 60 else "C" if surf_score >= 40 else "D"
-        )
-        level_map = {
-            "beginner": "BEGINNER",
-            "intermediate": "INTERMEDIATE",
-            "advanced": "ADVANCED",
-        }
-        surfing_level = level_map.get(request.surfer_level, "INTERMEDIATE")
-
-        prediction = {
-            "locationId": request.location_id,
-            "surfTimestamp": f"{request.surf_date}T06:00:00Z",
-            "geo": {"lat": lat, "lng": lng},
-            "derivedMetrics": {
-                "surfScore": surf_score,
-                "surfGrade": grade,
-                "surfingLevel": surfing_level,
-            },
-            "metadata": {
-                "modelVersion": "sagemaker-awaves-v1.2",
-                "dataSource": "open-meteo",
-                "predictionType": "FORECAST",
-                "createdAt": datetime.now(timezone.utc).isoformat(),
-                "cacheSource": "SEARCH_INFERENCE",
-            },
-        }
-
-        # Cache the result
-        await CacheService.store_inference_prediction(
-            request.location_id, request.surf_date, prediction
-        )
-
-    # Calculate week number and range (Sunday-to-Saturday weeks)
-    surf_date = datetime.strptime(request.surf_date, "%Y-%m-%d")
-    # Find the Sunday that starts this week (weekday: Mon=0..Sun=6)
-    days_since_sunday = (surf_date.weekday() + 1) % 7  # Sun=0, Mon=1, ..., Sat=6
-    week_start = surf_date - timedelta(days=days_since_sunday)
-    week_end = week_start + timedelta(days=6)
-    # Week number: count Sundays from Jan 1
-    jan1 = datetime(surf_date.year, 1, 1)
-    days_since_jan1_sunday = (jan1.weekday() + 1) % 7
-    first_sunday = jan1 - timedelta(days=days_since_jan1_sunday)
-    week_number = ((week_start - first_sunday).days // 7) + 1
-
-    prediction["weekNumber"] = week_number
-    prediction["weekRange"] = (
-        f"{week_start.strftime('%b %d')} - {week_end.strftime('%b %d')}"
-    )
-
-    # Look up spot name
-    all_spots = await SurfDynamoDBService.get_all_spots_unpaginated()
-    spot_name = request.location_id
-    spot_name_ko = None
-    for spot in all_spots:
-        if spot.get("LocationId") == request.location_id:
-            spot_name = spot.get("name", request.location_id)
-            spot_name_ko = spot.get("nameKo")
-            break
-
-    prediction["spotName"] = spot_name
-    prediction["spotNameKo"] = spot_name_ko
-
     return {"result": "success", "data": prediction}

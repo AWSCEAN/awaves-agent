@@ -217,6 +217,12 @@ async def root() -> dict[str, str]:
 
 
 @app.get("/health")
-async def health_check() -> dict[str, str]:
+async def health_check() -> dict:
     """Health check endpoint."""
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        "inference": {
+            "mode": settings.inference_mode,
+            "endpoint": settings.sagemaker_local_endpoint,
+        },
+    }

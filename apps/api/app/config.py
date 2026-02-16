@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     # Redis TTL for surf info cache (seconds)
     redis_ttl_seconds: int = 10800  # 3 hours
 
+    # ML Inference - SageMaker local endpoint
+    inference_mode: str = "sagemaker"  # "sagemaker" (call endpoint) | "mock" (deterministic random fallback)
+    sagemaker_local_endpoint: str = "http://localhost:8080/invocations"
+
     # JWT
     jwt_secret_key: str = "your-super-secret-jwt-key-change-in-production"
     jwt_algorithm: str = "HS256"
