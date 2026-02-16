@@ -139,7 +139,6 @@ class CacheService:
     # --- Saved items cache ---
 
     SAVED_PREFIX = "awaves:saved"
-    SAVED_TTL = 600  # 10 minutes
 
     @classmethod
     def _saved_key(cls, user_id: str) -> str:
@@ -172,7 +171,7 @@ class CacheService:
         try:
             await client.setex(
                 cls._saved_key(user_id),
-                cls.SAVED_TTL,
+                settings.cache_ttl_saved_items,
                 json.dumps(items),
             )
         except Exception as e:
@@ -193,7 +192,6 @@ class CacheService:
     # --- Surf spots cache ---
 
     SURF_ALL_KEY = "awaves:surf:all_spots"
-    SURF_TTL = 1800  # 30 minutes
 
     @classmethod
     async def get_all_surf_spots(cls) -> Optional[list[dict]]:
@@ -221,7 +219,7 @@ class CacheService:
         try:
             await client.setex(
                 cls.SURF_ALL_KEY,
-                cls.SURF_TTL,
+                settings.cache_ttl_surf_spots,
                 json.dumps(spots),
             )
         except Exception as e:
@@ -242,7 +240,6 @@ class CacheService:
     # --- Inference prediction cache ---
 
     INFERENCE_PREFIX = "awaves:search:inference"
-    INFERENCE_TTL = 86400  # 24 hours
 
     @classmethod
     def _inference_key(cls, location_id: str, surf_date: str) -> str:
@@ -279,7 +276,7 @@ class CacheService:
         try:
             await client.setex(
                 cls._inference_key(location_id, surf_date),
-                cls.INFERENCE_TTL,
+                settings.cache_ttl_inference,
                 json.dumps(data),
             )
         except Exception as e:

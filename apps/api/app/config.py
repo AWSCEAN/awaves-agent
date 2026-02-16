@@ -1,6 +1,5 @@
 """Application configuration and settings."""
 
-import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -9,15 +8,33 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 def get_env_files() -> tuple[str, ...]:
-    """Get the env files to load (in order of priority)."""
+    """Get the env files to load (in order of priority).
+
+    Loading order: .env (base) → .env.{ENV} (environment-specific) → .env.local (local overrides)
+    Later files override earlier ones.
+    """
     base_dir = Path(__file__).parent.parent
-    env_local = base_dir / ".env.local"
-    env_file = base_dir / ".env"
 
     files = []
-    # .env loaded first (base), .env.local loaded last (overrides)
+    env_file = base_dir / ".env"
     if env_file.exists():
         files.append(str(env_file))
+
+    # Load environment-specific file (.env.dev, .env.production, etc.)
+    # Read ENV from .env first to determine which file to load
+    env_value = ""
+    if env_file.exists():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            if line.startswith("ENV="):
+                env_value = line.split("=", 1)[1].strip()
+                break
+
+    if env_value:
+        env_specific = base_dir / f".env.{env_value}"
+        if env_specific.exists():
+            files.append(str(env_specific))
+
+    env_local = base_dir / ".env.local"
     if env_local.exists():
         files.append(str(env_local))
 
@@ -25,7 +42,13 @@ def get_env_files() -> tuple[str, ...]:
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
+    """Application settings loaded from environment variables.
+
+    All values should be defined in the appropriate .env file:
+      - .env           : base/production defaults
+      - .env.dev       : development overrides
+      - .env.local     : local machine overrides (gitignored)
+    """
 
     model_config = SettingsConfigDict(
         env_file=get_env_files(),
@@ -36,47 +59,50 @@ class Settings(BaseSettings):
 
     # Environment
     env: Literal["local", "dev", "development", "staging", "production"] = "development"
-    debug: bool = True
+    port: int = 8001
+    debug: bool = False
 
     # Database
-    database_url: str = "postgresql+asyncpg://user:password@localhost:5432/awaves"
+    database_url: str = ""
 
-    # Redis/Cache (Valkey in production, Redis in local)
+    # Redis/Cache
     cache_url: str = ""
 
     # AWS
-    aws_region: str = "ap-northeast-2"
+    aws_region: str = ""
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
 
     # DynamoDB
-    dynamodb_surf_data_table: str = "surf_info"
-    dynamodb_saved_spots_table: str = "awaves-saved-spots"
-    dynamodb_saved_list_table: str = "saved_list"
+    dynamodb_surf_data_table: str = ""
+    dynamodb_saved_spots_table: str = ""
+    dynamodb_saved_list_table: str = ""
+    dynamodb_locations_table: str = ""
     ddb_endpoint_url: str = ""
 
     # OpenSearch
-    opensearch_host: str = "localhost"
+    opensearch_host: str = ""
     opensearch_port: int = 9200
 
-    # DynamoDB locations table
-    dynamodb_locations_table: str = "locations"
+    # Cache TTL (seconds)
+    cache_ttl_saved_items: int = 600  # 10 minutes
+    cache_ttl_surf_spots: int = 1800  # 30 minutes
+    cache_ttl_inference: int = 86400  # 24 hours
+    redis_ttl_seconds: int = 10800  # 3 hours (surf info)
 
-    # Redis TTL for surf info cache (seconds)
-    redis_ttl_seconds: int = 10800  # 3 hours
-
-    # ML Inference - SageMaker local endpoint
-    inference_mode: str = "sagemaker"  # "sagemaker" (call endpoint) | "mock" (deterministic random fallback)
-    sagemaker_local_endpoint: str = "http://localhost:8080/invocations"
+    # ML Inference - SageMaker endpoint
+    inference_mode: str = "sagemaker"
+    sagemaker_local_endpoint: str = ""
+    sagemaker_endpoint_name: str = ""
 
     # JWT
-    jwt_secret_key: str = "your-super-secret-jwt-key-change-in-production"
+    jwt_secret_key: str = ""
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 30
     jwt_refresh_token_expire_days: int = 7
 
-    # CORS - comma-separated string
-    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    # CORS
+    cors_origins: str = ""
 
     @property
     def cors_origins_list(self) -> list[str]:

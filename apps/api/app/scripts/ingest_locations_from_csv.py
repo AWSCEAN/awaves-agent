@@ -15,26 +15,22 @@ Requirements:
 
 import csv
 import json
-import os
 import sys
 from decimal import Decimal
 from pathlib import Path
 
 import boto3
 from botocore.exceptions import ClientError
-from dotenv import load_dotenv
 from opensearchpy import OpenSearch
 
-# Load .env.local from apps/api
-_env_local = Path(__file__).resolve().parent.parent.parent / ".env.local"
-load_dotenv(_env_local)
+from app.config import settings
 
-# Configuration from environment
-DDB_ENDPOINT_URL = os.getenv("DDB_ENDPOINT_URL", "http://localhost:8000")
-LOCATIONS_TABLE = os.getenv("DYNAMODB_LOCATIONS_TABLE", "locations")
-REGION = os.getenv("AWS_REGION", "ap-northeast-2")
-OPENSEARCH_HOST = os.getenv("OPENSEARCH_HOST", "localhost")
-OPENSEARCH_PORT = int(os.getenv("OPENSEARCH_PORT", "9200"))
+# Configuration from shared settings
+DDB_ENDPOINT_URL = settings.ddb_endpoint_url
+LOCATIONS_TABLE = settings.dynamodb_locations_table
+REGION = settings.aws_region
+OPENSEARCH_HOST = settings.opensearch_host
+OPENSEARCH_PORT = settings.opensearch_port
 
 # CSV file path (relative to apps/api/)
 CSV_FILE = Path(__file__).resolve().parent.parent.parent.parent.parent / "mock_surf_data_geocode.csv"
@@ -290,8 +286,8 @@ def main():
     # DynamoDB setup
     ddb_kwargs = {
         "region_name": REGION,
-        "aws_access_key_id": os.getenv("AWS_ACCESS_KEY_ID", "dummy"),
-        "aws_secret_access_key": os.getenv("AWS_SECRET_ACCESS_KEY", "dummy"),
+        "aws_access_key_id": settings.aws_access_key_id or "dummy",
+        "aws_secret_access_key": settings.aws_secret_access_key or "dummy",
     }
     if DDB_ENDPOINT_URL:
         ddb_kwargs["endpoint_url"] = DDB_ENDPOINT_URL
