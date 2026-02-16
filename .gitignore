@@ -91,6 +91,14 @@ pnpm-debug.log*
 !.yarn/sdks
 !.yarn/versions
 
+# ML model files
+*.pkl
+*.pth
+*.joblib
+*.h5
+*.onnx
+model.tar.gz
+
 # DynamoDB Local
 .dynamodb/
 
