@@ -1,51 +1,18 @@
-"""DynamoDB service for saved_list table operations."""
+"""Repository for saved_list DynamoDB table operations."""
 
 import logging
 from typing import Optional
 
-import aioboto3
-from botocore.config import Config
-
 from app.config import settings
+from app.repositories.base_repository import BaseDynamoDBRepository
 
 logger = logging.getLogger(__name__)
 
 
-class DynamoDBService:
-    """Service for DynamoDB operations on saved_list table."""
+class SavedListRepository(BaseDynamoDBRepository):
+    """Repository for user saved items (saved_list table)."""
 
-    _session: Optional[aioboto3.Session] = None
-    _available: bool = True
     TABLE_NAME = settings.dynamodb_saved_list_table
-
-    @classmethod
-    def _get_session(cls) -> aioboto3.Session:
-        """Get or create aioboto3 session."""
-        if cls._session is None:
-            cls._session = aioboto3.Session(
-                aws_access_key_id=settings.aws_access_key_id,
-                aws_secret_access_key=settings.aws_secret_access_key,
-                region_name=settings.aws_region,
-            )
-        return cls._session
-
-    @classmethod
-    async def get_client(cls):
-        """Get DynamoDB client as async context manager."""
-        session = cls._get_session()
-        config = Config(
-            retries={"max_attempts": 3, "mode": "adaptive"},
-            connect_timeout=5,
-            read_timeout=10,
-        )
-
-        endpoint_url = settings.ddb_endpoint_url if settings.ddb_endpoint_url else None
-
-        return session.client(
-            "dynamodb",
-            endpoint_url=endpoint_url,
-            config=config,
-        )
 
     @classmethod
     async def create_table_if_not_exists(cls) -> bool:
@@ -61,8 +28,8 @@ class DynamoDBService:
                     await client.create_table(
                         TableName=cls.TABLE_NAME,
                         KeySchema=[
-                            {"AttributeName": "UserId", "KeyType": "HASH"},  # Partition Key
-                            {"AttributeName": "SortKey", "KeyType": "RANGE"},  # Sort Key (LocationSurfKey)
+                            {"AttributeName": "UserId", "KeyType": "HASH"},
+                            {"AttributeName": "SortKey", "KeyType": "RANGE"},
                         ],
                         AttributeDefinitions=[
                             {"AttributeName": "UserId", "AttributeType": "S"},
@@ -83,7 +50,6 @@ class DynamoDBService:
         if location_surf_key:
             parts = location_surf_key.split("#", 2)
             if len(parts) >= 3:
-                # Format: lat#lng#timestamp
                 loc_id = f"{parts[0]}#{parts[1]}"
                 ts = parts[2]
                 return loc_id, ts
@@ -127,7 +93,6 @@ class DynamoDBService:
             "flagChange": {"BOOL": False},
         }
 
-        # Add optional fields
         if address:
             item["Address"] = {"S": address}
         if region:
@@ -255,37 +220,3 @@ class DynamoDBService:
         except Exception as e:
             logger.error(f"Failed to acknowledge change: {e}")
             return False
-
-    @classmethod
-    def _deserialize_item(cls, item: dict) -> dict:
-        """Deserialize DynamoDB item to Python dict."""
-        result = {}
-        for key, value in item.items():
-            if "S" in value:
-                result[key] = value["S"]
-            elif "N" in value:
-                num_str = value["N"]
-                result[key] = float(num_str) if "." in num_str else int(num_str)
-            elif "BOOL" in value:
-                result[key] = value["BOOL"]
-            elif "NULL" in value:
-                result[key] = None
-            elif "L" in value:
-                result[key] = [cls._deserialize_value(v) for v in value["L"]]
-            elif "M" in value:
-                result[key] = cls._deserialize_item(value["M"])
-        return result
-
-    @classmethod
-    def _deserialize_value(cls, value: dict):
-        """Deserialize a single DynamoDB value."""
-        if "S" in value:
-            return value["S"]
-        elif "N" in value:
-            num_str = value["N"]
-            return float(num_str) if "." in num_str else int(num_str)
-        elif "BOOL" in value:
-            return value["BOOL"]
-        elif "NULL" in value:
-            return None
-        return value

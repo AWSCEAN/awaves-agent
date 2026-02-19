@@ -17,9 +17,9 @@ from app.db.session import close_db, init_db
 from app.routers import auth, feedback, register, saved, search, surf
 from app.graphql.schema import graphql_app
 from app.services.cache import CacheService
-from app.services.dynamodb import DynamoDBService
+from app.repositories.saved_list_repository import SavedListRepository
 from app.services.opensearch_service import OpenSearchService
-from app.services.surf_dynamodb import SurfDynamoDBService
+from app.repositories.surf_data_repository import SurfDataRepository
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +129,7 @@ async def _seed_locations_if_empty() -> None:
         return
 
     logger.info("OpenSearch locations index is empty. Seeding from DynamoDB surf_info...")
-    spots = await SurfDynamoDBService.get_all_spots_unpaginated()
+    spots = await SurfDataRepository.get_all_spots_unpaginated()
     if not spots:
         logger.warning("No spots found in DynamoDB surf_info, skipping seed.")
         return
@@ -165,7 +165,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager for startup and shutdown."""
     # Startup: Initialize database tables and DynamoDB
     await init_db()
-    await DynamoDBService.create_table_if_not_exists()
+    await SavedListRepository.create_table_if_not_exists()
     # Seed locations DynamoDB table with Korean address data from CSV
     await _seed_locations_table_if_empty()
     # Initialize OpenSearch index and auto-seed if empty
@@ -173,7 +173,7 @@ async def lifespan(app: FastAPI):
     await _seed_locations_if_empty()
     # Clear stale surf spots cache and pre-warm with fresh data (includes Korean fields)
     await CacheService.invalidate_surf_spots()
-    await SurfDynamoDBService._get_all_spots_raw()
+    await SurfDataRepository._get_all_spots_raw()
     yield
     # Shutdown: Close database, cache, and OpenSearch connections
     await close_db()

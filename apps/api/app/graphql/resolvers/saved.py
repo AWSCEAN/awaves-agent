@@ -12,8 +12,8 @@ from app.graphql.types.saved import (
     DeleteSavedItemInput,
     AcknowledgeChangeInput,
 )
-from app.services.dynamodb import DynamoDBService
-from app.services.cache import CacheService
+from app.repositories.saved_list_repository import SavedListRepository
+from app.services.cache import SavedItemsCacheService as CacheService
 
 
 async def get_saved_items(info: Info[GraphQLContext, None]) -> SavedListResult:
@@ -29,7 +29,7 @@ async def get_saved_items(info: Info[GraphQLContext, None]) -> SavedListResult:
         db_items = cached_items
     else:
         # Fallback to DynamoDB
-        db_items = await DynamoDBService.get_saved_list(user_id)
+        db_items = await SavedListRepository.get_saved_list(user_id)
         # Cache even empty lists to avoid repeated DynamoDB hits
         await CacheService.store_saved_items(user_id, db_items)
 
@@ -61,7 +61,7 @@ async def get_saved_item(
 
     user_id = str(info.context.user_id)
 
-    item = await DynamoDBService.get_saved_item(
+    item = await SavedListRepository.get_saved_item(
         user_id=user_id,
         location_id=location_id,
         surf_timestamp=surf_timestamp,
@@ -85,7 +85,7 @@ async def save_item(
     saved_at = datetime.utcnow().isoformat() + "Z"
 
     try:
-        result = await DynamoDBService.save_item(
+        result = await SavedListRepository.save_item(
             user_id=user_id,
             location_id=input.location_id,
             surf_timestamp=input.surf_timestamp,
@@ -126,7 +126,7 @@ async def delete_saved_item(
 
     user_id = str(info.context.user_id)
 
-    success = await DynamoDBService.delete_item(
+    success = await SavedListRepository.delete_item(
         user_id=user_id,
         location_surf_key=input.location_surf_key,
         location_id=input.location_id,
@@ -149,7 +149,7 @@ async def acknowledge_change(
 
     user_id = str(info.context.user_id)
 
-    success = await DynamoDBService.acknowledge_change(
+    success = await SavedListRepository.acknowledge_change(
         user_id=user_id,
         location_surf_key=input.location_surf_key,
         location_id=input.location_id,

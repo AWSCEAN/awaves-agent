@@ -3,7 +3,7 @@
 ## 현재 상태
 - **마일스톤**: M3 - 지도 & 스팟 기능
 - **상태**: 🟡 진행중
-- **마지막 업데이트**: 2026-02-11
+- **마지막 업데이트**: 2026-02-19
 
 ## 다음 작업
 1. [x] 사용자명 기반 회원가입 V2 구현 (t01_user-registration01)
@@ -21,6 +21,34 @@
 ---
 
 ## 작업 기록
+
+### 2026-02-19
+#### 완료
+- Redis 캐시 서비스 도메인별 분리 (리팩토링)
+  - 기존 `services/cache.py` 단일 파일을 `services/cache/` 패키지로 분리
+  - `BaseCacheService`: 공유 Redis 클라이언트 싱글턴 (base.py)
+  - `AuthCacheService`: 리프레시 토큰 관리 (auth_cache.py)
+  - `SavedItemsCacheService`: 사용자 저장 목록 캐시 (saved_cache.py)
+  - `SurfSpotsCacheService`: 서핑 스팟 데이터 캐시 (surf_cache.py)
+  - `InferenceCacheService`: ML 추론 예측 캐시 (inference_cache.py)
+  - `CacheService` 통합 클래스 유지 (하위 호환성)
+  - 소비자 파일 5개의 import를 도메인별 서비스로 업데이트
+
+- DynamoDB 서비스 리팩토링 (Repository 패턴 적용)
+  - `surf_info_service.py` 삭제 (미사용 dead code)
+  - `dynamodb.py` → `saved_list_repository.py` (`SavedListRepository`)
+  - `surf_dynamodb.py` → `surf_data_repository.py` (`SurfDataRepository`)
+  - `base_repository.py` 생성 (공유 aioboto3 세션/클라이언트 + 역직렬화)
+  - 소비자 파일 6개의 import 및 클래스명 업데이트
+  - Repository 파일을 `services/` → `repositories/` 디렉토리로 이동 (기존 `UserRepository`와 동일 위치)
+
+#### 결정 사항
+- 모든 도메인 캐시 서비스가 `BaseCacheService`를 상속하여 동일한 Redis 클라이언트 공유
+- `__init__.py`에서 `CacheService` 복합 클래스를 re-export하여 기존 import 호환 유지
+- DynamoDB 데이터 접근 계층에 Repository 패턴 명명 규칙 적용 (Service와 구분)
+- 두 Repository가 `BaseDynamoDBRepository`를 상속하여 세션/클라이언트 보일러플레이트 제거
+
+---
 
 ### 2026-02-11
 #### 완료

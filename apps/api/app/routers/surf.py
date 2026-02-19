@@ -10,7 +10,7 @@ from app.schemas.surf import (
     SurfInfoResponse,
 )
 from app.services.prediction_service import get_surf_prediction
-from app.services.surf_dynamodb import SurfDynamoDBService
+from app.repositories.surf_data_repository import SurfDataRepository
 
 
 class InferencePredictionRequest(BaseModel):
@@ -33,7 +33,7 @@ async def get_spots(
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
 ) -> PaginatedSurfInfoResponse:
     """Get paginated list of surf spots from DynamoDB."""
-    all_spots = await SurfDynamoDBService.get_spots_for_date(date, time)
+    all_spots = await SurfDataRepository.get_spots_for_date(date, time)
 
     if min_wave_height is not None:
         all_spots = [s for s in all_spots if s["conditions"]["waveHeight"] >= min_wave_height]
@@ -62,7 +62,7 @@ async def search_spots(
     time: Optional[str] = Query(None, description="Filter by time (HH:MM)"),
 ) -> list[SurfInfoResponse]:
     """Search surf spots by coordinate substring."""
-    results = await SurfDynamoDBService.search_spots(q, date, time)
+    results = await SurfDataRepository.search_spots(q, date, time)
     return [SurfInfoResponse(**s) for s in results]
 
 
@@ -75,7 +75,7 @@ async def get_nearby_spots(
     time: Optional[str] = Query(None, description="Filter by time (HH:MM)"),
 ) -> list[SurfInfoResponse]:
     """Get spots sorted by distance from given coordinates."""
-    results = await SurfDynamoDBService.get_nearby_spots(
+    results = await SurfDataRepository.get_nearby_spots(
         lat, lng, limit, date, time
     )
     return [SurfInfoResponse(**s) for s in results]
@@ -87,7 +87,7 @@ async def get_all_spots_unpaginated(
     time: Optional[str] = Query(None, description="Filter by time (HH:MM)"),
 ) -> list[SurfInfoResponse]:
     """Get ALL surf spots (unpaginated) for map marker display."""
-    spots = await SurfDynamoDBService.get_spots_for_date(date, time)
+    spots = await SurfDataRepository.get_spots_for_date(date, time)
     return [SurfInfoResponse(**s) for s in spots]
 
 
@@ -97,7 +97,7 @@ async def get_spot(
     date: Optional[str] = Query(None, description="Filter by date (YYYY-MM-DD)"),
 ) -> SurfInfoResponse:
     """Get a specific surf spot by LocationId."""
-    results = await SurfDynamoDBService.get_spot_data(spot_id, date)
+    results = await SurfDataRepository.get_spot_data(spot_id, date)
     if not results:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Spot not found")
 
@@ -112,9 +112,9 @@ async def get_recommendations(
 ) -> list[SurfInfoResponse]:
     """Get recommended surf spots."""
     if lat is not None and lng is not None:
-        results = await SurfDynamoDBService.get_nearby_spots(lat, lng, 10)
+        results = await SurfDataRepository.get_nearby_spots(lat, lng, 10)
     else:
-        results, _ = await SurfDynamoDBService.get_all_spots(1, 10)
+        results, _ = await SurfDataRepository.get_all_spots(1, 10)
 
     return [SurfInfoResponse(**s) for s in results]
 

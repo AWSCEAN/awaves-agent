@@ -16,8 +16,8 @@ from datetime import datetime, timedelta, timezone
 import httpx
 
 from app.config import settings
-from app.services.cache import CacheService
-from app.services.surf_dynamodb import SurfDynamoDBService
+from app.services.cache import InferenceCacheService as CacheService
+from app.repositories.surf_data_repository import SurfDataRepository
 
 logger = logging.getLogger(__name__)
 
@@ -210,7 +210,7 @@ def _add_week_info(prediction: dict, surf_date: str) -> None:
 
 async def _add_spot_name(prediction: dict, location_id: str) -> None:
     """Look up spot name from DynamoDB."""
-    all_spots = await SurfDynamoDBService.get_all_spots_unpaginated()
+    all_spots = await SurfDataRepository.get_all_spots_unpaginated()
     spot_name = location_id
     spot_name_ko = None
     for spot in all_spots:
