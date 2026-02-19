@@ -300,16 +300,22 @@ export default function SavedItemCard({
 
       {/* Change Notification Overlay */}
       {item.flag_change && (
-        <div className="absolute inset-0 flex items-center justify-center p-4 bg-black/20 rounded-lg">
-          <div className="bg-white rounded-xl shadow-lg p-5 max-w-[90%] text-center">
-            <div className="text-4xl mb-3">⚠️</div>
-            <h4 className="font-bold text-ocean-800 text-lg mb-2">{t.changeDetected}</h4>
+        <div className="absolute inset-0 flex items-center justify-center p-4 bg-black/30 backdrop-blur-[2px] rounded-lg z-10">
+          <div className="bg-white rounded-2xl shadow-xl p-5 max-w-[92%] w-full">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <svg className="w-4.5 h-4.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h4 className="font-bold text-ocean-800 text-base">{t.changeDetected}</h4>
+            </div>
             {item.change_message && (
-              <p className="text-ocean-600 text-sm mb-4">{item.change_message}</p>
+              <ChangeMessageDisplay message={item.change_message} lang={lang} />
             )}
             <button
               onClick={onAcknowledgeChange}
-              className="btn-primary px-6 py-2 text-sm"
+              className="btn-primary w-full py-2 text-sm mt-3"
             >
               {t.acknowledgeChange}
             </button>
@@ -351,4 +357,60 @@ export default function SavedItemCard({
       )}
     </div>
   );
+}
+
+const fieldLabels: Record<string, { ko: string; en: string; unit?: string }> = {
+  surfScore: { ko: '서핑 점수', en: 'Surf Score', unit: '/100' },
+  surfGrade: { ko: '등급', en: 'Grade' },
+  waveHeight: { ko: '파고', en: 'Wave Height', unit: 'm' },
+  wavePeriod: { ko: '파주기', en: 'Wave Period', unit: 's' },
+  windSpeed: { ko: '풍속', en: 'Wind Speed', unit: 'm/s' },
+  waterTemperature: { ko: '수온', en: 'Water Temp', unit: '°C' },
+};
+
+function formatValue(value: number | string, field: string): string {
+  if (typeof value === 'number') {
+    return Number.isInteger(value) ? String(value) : value.toFixed(1);
+  }
+  return String(value);
+}
+
+function ChangeMessageDisplay({ message, lang }: { message: string; lang: Language }) {
+  try {
+    const data = JSON.parse(message);
+    if (data.changes && Array.isArray(data.changes)) {
+      return (
+        <div className="space-y-2">
+          {data.changes.map((c: { field: string; old: number | string; new: number | string }, i: number) => {
+            const meta = fieldLabels[c.field];
+            const label = meta?.[lang] || c.field;
+            const unit = meta?.unit || '';
+            const oldVal = formatValue(c.old, c.field);
+            const newVal = formatValue(c.new, c.field);
+            const isScoreUp = c.field === 'surfScore' && typeof c.new === 'number' && typeof c.old === 'number' && c.new > c.old;
+            const isScoreDown = c.field === 'surfScore' && typeof c.new === 'number' && typeof c.old === 'number' && c.new < c.old;
+            return (
+              <div key={i} className="bg-sand-50 rounded-lg p-2.5">
+                <div className="text-xs text-ocean-500 font-medium mb-1.5">{label}</div>
+                <div className="flex items-center justify-center gap-3">
+                  <span className="text-sm text-ocean-400 line-through">
+                    {oldVal}{unit}
+                  </span>
+                  <svg className={`w-4 h-4 flex-shrink-0 ${isScoreUp ? 'text-green-500' : isScoreDown ? 'text-red-500' : 'text-ocean-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                  <span className={`text-lg font-bold ${isScoreUp ? 'text-green-600' : isScoreDown ? 'text-red-600' : 'text-ocean-800'}`}>
+                    {newVal}{unit}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+  } catch {
+    // Not JSON — render as plain text (backward compatible)
+  }
+  return <p className="text-ocean-600 text-sm">{message}</p>;
 }

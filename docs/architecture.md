@@ -82,13 +82,22 @@ awaves-agent/
 │       │   │   └── feedback.py   # 피드백
 │       │   ├── schemas/          # Pydantic 스키마
 │       │   ├── models/           # SQLAlchemy 모델
+│       │   ├── repositories/     # 데이터 접근 계층 (Repository 패턴)
+│       │   │   ├── base_repository.py       # BaseDynamoDBRepository (공유 DDB 클라이언트)
+│       │   │   ├── saved_list_repository.py # SavedListRepository (저장 목록 CRUD)
+│       │   │   ├── surf_data_repository.py  # SurfDataRepository (서핑 예보 데이터)
+│       │   │   └── user_repository.py       # UserRepository (사용자 CRUD, PostgreSQL)
 │       │   ├── services/         # 비즈니스 로직
-│       │   │   ├── opensearch_service.py  # OpenSearch 클라이언트
-│       │   │   ├── search_service.py      # 검색 오케스트레이션
-│       │   │   ├── surf_info_service.py   # surf_info DDB 조회
-│       │   │   ├── surf_dynamodb.py       # 기존 서핑 데이터 서비스
-│       │   │   ├── cache.py               # Redis 캐시
-│       │   │   └── dynamodb.py            # 저장 목록 DDB
+│       │   │   ├── opensearch_service.py    # OpenSearch 클라이언트
+│       │   │   ├── search_service.py        # 검색 오케스트레이션
+│       │   │   ├── prediction_service.py    # ML 추론 예측 서비스
+│       │   │   ├── cache/                   # Redis 캐시 (도메인별 분리)
+│       │   │   │   ├── __init__.py          # CacheService 통합 re-export
+│       │   │   │   ├── base.py              # BaseCacheService (공유 Redis 클라이언트)
+│       │   │   │   ├── auth_cache.py        # AuthCacheService (리프레시 토큰)
+│       │   │   │   ├── saved_cache.py       # SavedItemsCacheService (저장 목록)
+│       │   │   │   ├── surf_cache.py        # SurfSpotsCacheService (서핑 스팟)
+│       │   │   │   └── inference_cache.py   # InferenceCacheService (ML 예측)
 │       │   ├── scripts/          # 데이터 인제스션 스크립트
 │       │   └── db/               # DB 설정
 │       └── tests/                # 테스트

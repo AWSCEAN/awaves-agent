@@ -1,15 +1,13 @@
-"""DynamoDB service for surf_info table operations."""
+"""Repository for surf_info DynamoDB table operations."""
 
 import logging
 import math
 import time as _time
 from typing import Optional
 
-import aioboto3
-from botocore.config import Config
-
 from app.config import settings
-from app.services.cache import CacheService
+from app.repositories.base_repository import BaseDynamoDBRepository
+from app.services.cache import SurfSpotsCacheService as CacheService
 
 logger = logging.getLogger(__name__)
 
@@ -41,32 +39,10 @@ def _haversine(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-class SurfDynamoDBService:
-    """Service for DynamoDB operations on surf_info table."""
+class SurfDataRepository(BaseDynamoDBRepository):
+    """Repository for surf forecast data (surf_info table)."""
 
-    _session: Optional[aioboto3.Session] = None
     TABLE_NAME = settings.dynamodb_surf_data_table
-
-    @classmethod
-    def _get_session(cls) -> aioboto3.Session:
-        if cls._session is None:
-            cls._session = aioboto3.Session(
-                aws_access_key_id=settings.aws_access_key_id or "dummy",
-                aws_secret_access_key=settings.aws_secret_access_key or "dummy",
-                region_name=settings.aws_region,
-            )
-        return cls._session
-
-    @classmethod
-    async def get_client(cls):
-        session = cls._get_session()
-        config = Config(
-            retries={"max_attempts": 3, "mode": "adaptive"},
-            connect_timeout=5,
-            read_timeout=10,
-        )
-        endpoint_url = settings.ddb_endpoint_url if settings.ddb_endpoint_url else None
-        return session.client("dynamodb", endpoint_url=endpoint_url, config=config)
 
     @classmethod
     async def _scan_all_items(cls) -> list[dict]:
@@ -180,12 +156,7 @@ class SurfDynamoDBService:
     async def get_spots_for_date(
         cls, date: Optional[str] = None, time: Optional[str] = None
     ) -> list[dict]:
-        """Get one spot per location filtered by date and optionally time.
-
-        Args:
-            date: Date string in YYYY-MM-DD format.
-            time: Time string in HH:MM format (e.g. '06:00').
-        """
+        """Get one spot per location filtered by date and optionally time."""
         global _spots_for_date_cache, _spots_for_date_cache_time
 
         if not date:
@@ -210,7 +181,6 @@ class SurfDynamoDBService:
             return []
 
         if time:
-            # Try to find items matching the exact time (e.g. "2026-02-14T06:00")
             datetime_prefix = f"{date}T{time}"
             time_matched = [
                 item for item in filtered
@@ -218,7 +188,6 @@ class SurfDynamoDBService:
             ]
             if time_matched:
                 filtered = time_matched
-            # If no exact time match, fall back to closest time per location below
 
         # Pick one item per location: prefer closest to requested time
         location_map: dict[str, dict] = {}
@@ -231,14 +200,12 @@ class SurfDynamoDBService:
                 existing_ts = location_map[loc_id]["SurfTimestamp"]["S"]
                 if time:
                     target = f"{date}T{time}"
-                    # Compare full time portion (HH:MM) for proper closest-time selection
                     ts_time = ts[11:16] if len(ts) > 15 else ts[11:]
                     ex_time = existing_ts[11:16] if len(existing_ts) > 15 else existing_ts[11:]
                     tg_time = target[11:16] if len(target) > 15 else target[11:]
                     if abs(int(ts_time.replace(":", "")) - int(tg_time.replace(":", ""))) < abs(int(ex_time.replace(":", "")) - int(tg_time.replace(":", ""))):
                         location_map[loc_id] = item
                 else:
-                    # Without time, keep latest for the day
                     if ts > existing_ts:
                         location_map[loc_id] = item
 
@@ -248,7 +215,6 @@ class SurfDynamoDBService:
             key=lambda s: s["derivedMetrics"]["surfScore"], reverse=True
         )
 
-        # Cache the processed result
         _spots_for_date_cache[cache_key] = spots
         _spots_for_date_cache_time = _time.monotonic()
 
