@@ -111,10 +111,6 @@ function MapPageContent() {
   // Saved items from GraphQL (BE DynamoDB)
   const { items: savedItems, saveItem, deleteItem, refetch } = useSavedItems();
 
-  useEffect(() => {
-    refetch();
-  }, [refetch]);
-
   // Fetch all spots on mount for default map markers (today's date, current time slot)
   useEffect(() => {
     const loadAllSpots = async () => {
@@ -289,7 +285,7 @@ function MapPageContent() {
     } catch (err) {
       console.error('Failed to fetch spots:', err);
     }
-  }, []);
+  }, [locale]);
 
 
   const handleSearch = useCallback(async () => {
@@ -379,20 +375,25 @@ function MapPageContent() {
     // Use the display name as address so saved spots page shows the name
     const displayName = surfInfo.name || surfInfo.address || surfInfo.LocationId;
 
-    await saveItem({
-      locationId: surfInfo.LocationId,
-      surfTimestamp: surfInfo.SurfTimestamp,
-      surferLevel: surfInfo.derivedMetrics.surfingLevel,
-      surfScore: surfInfo.derivedMetrics.surfScore,
-      surfGrade: surfInfo.derivedMetrics.surfGrade,
-      address: displayName,
-      region: surfInfo.region,
-      country: surfInfo.country,
-      waveHeight: surfInfo.conditions.waveHeight,
-      wavePeriod: surfInfo.conditions.wavePeriod,
-      windSpeed: surfInfo.conditions.windSpeed,
-      waterTemperature: surfInfo.conditions.waterTemperature,
-    });
+    try {
+      await saveItem({
+        locationId: surfInfo.LocationId,
+        surfTimestamp: surfInfo.SurfTimestamp,
+        surferLevel: surfInfo.derivedMetrics.surfingLevel,
+        surfScore: surfInfo.derivedMetrics.surfScore,
+        surfGrade: surfInfo.derivedMetrics.surfGrade,
+        address: displayName,
+        region: surfInfo.region,
+        country: surfInfo.country,
+        waveHeight: surfInfo.conditions.waveHeight,
+        wavePeriod: surfInfo.conditions.wavePeriod,
+        windSpeed: surfInfo.conditions.windSpeed,
+        waterTemperature: surfInfo.conditions.waterTemperature,
+      });
+      await refetch();
+    } catch (err) {
+      console.error('Failed to save spot:', err);
+    }
   };
 
   const handleRemoveSpot = async (locationId: string, surfTimestamp?: string) => {
@@ -406,7 +407,6 @@ function MapPageContent() {
 
   const handleSpotClick = (spot: SearchResult) => {
     setShowResults(false);
-    setShowMobileSearch(false);
     setMapCenter({ lat: spot.geo.lat, lng: spot.geo.lng });
     setTimeSlotSelection(null);
     setSelectedSpotDetail({
@@ -418,10 +418,13 @@ function MapPageContent() {
   const handleMapSpotSelect = (data: SpotSelectionData) => {
     setTimeSlotSelection(null);
     setSelectedSpotDetail(data);
-    // On mobile, close search results when detail panel opens to avoid overlap
     if (isMobile) {
       setShowResults(false);
     }
+    // Always fly to the selected spot — centerOffset will shift the viewport
+    // so the marker appears above the bottom sheet (mobile) or in the map area
+    // left of the detail sidebar (desktop)
+    setMapCenter({ lat: data.coordinates.latitude, lng: data.coordinates.longitude });
   };
 
   const handleMultiSaveMarkerClick = useCallback((locationId: string, coordinates: { lat: number; lng: number }) => {
@@ -553,14 +556,15 @@ function MapPageContent() {
     setLocale(locale === 'ko' ? 'en' : 'ko');
   };
 
-  // Mobile search panel state
-  const [showMobileSearch, setShowMobileSearch] = useState(false);
-
-  // Mobile detection for layout decisions
-  const [isMobile, setIsMobile] = useState(false);
+  // Mobile detection — lazy init so isMobile is correct on the very first render,
+  // preventing a wrong centerOffset from firing on early spot clicks
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia('(max-width: 767px)').matches
+      : false
+  );
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
-    setIsMobile(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
@@ -573,47 +577,34 @@ function MapPageContent() {
     [savedSpots]
   );
 
+  // Stable centerOffset so EnhancedMapboxMap's flyTo effect doesn't re-trigger
+  // on every render (creating a new array each time would cause constant re-flights).
+  // Mobile: panel is a bottom sheet (~40vh) — shift target 220px above canvas
+  //         center so the marker lands in the top third of the visible area
+  // Desktop: panel is a 420px right sidebar → shift 210px left so the marker
+  //         lands in the center of the remaining visible map area
+  const hasDetailPanel = !!selectedSpotDetail;
+  const centerOffset = useMemo<[number, number] | undefined>(
+    () => {
+      if (!hasDetailPanel) return undefined;
+      return isMobile ? [0, -160] : [-210, 0];
+    },
+    [isMobile, hasDetailPanel]
+  );
+
   // Show search results when searching, otherwise show all spots
   const displaySpots = (hasSearched && showResults) ? visibleSpots : allSpots;
 
   return (
     <ProtectedRoute>
-    <div className="h-screen flex flex-col pb-14 md:pb-0">
+    <div className="flex flex-col pb-14 md:pb-0" style={{ height: '100dvh' }}>
       {/* Header with Search Bar */}
       <header className="glass z-50 px-3 py-2">
-        {/* ── MOBILE header row ── */}
-        <div className="flex items-center gap-2 md:hidden">
-          <LogoOverlay />
-          <div className="flex-1" />
-          {/* Mobile search toggle */}
-          <button
-            onClick={() => setShowMobileSearch((v) => !v)}
-            className={`p-2 rounded-lg transition-colors ${
-              showMobileSearch ? 'bg-ocean-500 text-white' : 'bg-sand-100 text-ocean-700'
-            }`}
-            aria-label="Search"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </button>
-          {/* Overlay toggles */}
-          <button
-            onClick={() => handleOverlayToggle('surf')}
-            className={`p-2 rounded-lg transition-colors ${
-              overlayMode === 'surf' ? 'bg-green-500 text-white' : 'bg-sand-100 text-ocean-700'
-            }`}
-            title={t('surfScore')}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </button>
-        </div>
-
-        {/* ── MOBILE search panel (slide down) ── */}
-        {showMobileSearch && (
-          <div className="md:hidden animate-slide-down pt-2 pb-1 flex flex-col gap-2 overflow-hidden">
+        {/* ── MOBILE header: always-visible search + filters (KakaoMap style) ── */}
+        <div className="md:hidden flex flex-col gap-1.5">
+          {/* Row 1: Logo + Location search bar */}
+          <div className="flex items-center gap-2">
+            <LogoOverlay />
             <LocationAutocomplete
               value={locationQuery}
               onChange={(val) => {
@@ -625,90 +616,110 @@ function MapPageContent() {
                 setPredictionErrors((prev) => ({ ...prev, location: false }));
               }}
               placeholder={tSearch('locationPlaceholder')}
-              className="w-full"
+              className="flex-1 min-w-0"
               hasError={!!predictionErrors.location}
               errorPlaceholder={tSearch('predictionLocationRequired')}
             />
-            <div className="flex gap-2">
-              <DatePickerInput
-                value={selectedDate}
-                onChange={setSelectedDate}
-                className="flex-1"
-              />
-              {!isPredictionMode && (
-                <select
-                  value={selectedTime}
-                  onChange={(e) => setSelectedTime(e.target.value)}
-                  className="flex-1 px-3 py-2 text-sm border border-sand-200 rounded-lg bg-white text-ocean-800
-                    focus:outline-none focus:ring-2 focus:ring-ocean-500/50"
-                >
-                  <option value="">{tSearch('allTimes')}</option>
-                  {TIME_SLOTS.map((time) => (
-                    <option key={time} value={time}>{time}</option>
-                  ))}
-                </select>
-              )}
-            </div>
-            <div className="flex gap-2">
+          </div>
+
+          {/* Row 2: Date (larger) | Time | Level */}
+          <div className="flex gap-1.5">
+            {/* Date takes 2× weight so it has room for yyyy-MM-dd without clipping */}
+            <DatePickerInput
+              value={selectedDate}
+              onChange={setSelectedDate}
+              className="flex-[2] min-w-0"
+            />
+            {!isPredictionMode && (
               <select
-                value={surferLevel}
-                onChange={(e) => {
-                  setSurferLevel(e.target.value as SurferLevel | '');
-                  setPredictionErrors((prev) => ({ ...prev, level: false }));
-                }}
-                className={`flex-1 px-3 py-2 text-sm border rounded-lg bg-white
-                  focus:outline-none focus:ring-2 ${
-                    predictionErrors.level
-                      ? 'border-red-400 text-red-400 focus:ring-red-500/50'
-                      : 'border-sand-200 text-ocean-800 focus:ring-ocean-500/50'
-                  }`}
+                value={selectedTime}
+                onChange={(e) => setSelectedTime(e.target.value)}
+                className="flex-1 min-w-0 px-1.5 py-2 text-xs border border-sand-200 rounded-lg bg-white text-ocean-800
+                  focus:outline-none focus:ring-2 focus:ring-ocean-500/50"
               >
-                <option value="">{predictionErrors.level ? tSearch('predictionLevelRequired') : tSearch('allLevels')}</option>
-                <option value="beginner">{tSearch('difficulty.beginner')}</option>
-                <option value="intermediate">{tSearch('difficulty.intermediate')}</option>
-                <option value="advanced">{tSearch('difficulty.advanced')}</option>
+                <option value="">{tSearch('allTimes')}</option>
+                {TIME_SLOTS.map((time) => (
+                  <option key={time} value={time}>{time}</option>
+                ))}
               </select>
-              <button
-                onClick={() => {
-                  (isPredictionMode ? handlePredictionSearch : handleSearch)();
-                  setShowMobileSearch(false);
-                }}
-                className={`flex-1 px-4 py-2 text-white text-sm font-medium rounded-lg flex items-center justify-center gap-1 ${
-                  isPredictionMode ? 'bg-indigo-500' : 'bg-ocean-500'
+            )}
+            <select
+              value={surferLevel}
+              onChange={(e) => {
+                setSurferLevel(e.target.value as SurferLevel | '');
+                setPredictionErrors((prev) => ({ ...prev, level: false }));
+              }}
+              className={`flex-1 min-w-0 px-1.5 py-2 text-xs border rounded-lg bg-white
+                focus:outline-none focus:ring-2 ${
+                  predictionErrors.level
+                    ? 'border-red-400 text-red-400 focus:ring-red-500/50'
+                    : 'border-sand-200 text-ocean-800 focus:ring-ocean-500/50'
                 }`}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                {isPredictionMode ? tSearch('predictButton') : tSearch('searchButton')}
-              </button>
-              <button
-                onClick={() => { handleSuggestByDistance(); setShowMobileSearch(false); }}
-                disabled={!userLocation}
-                className={`px-3 py-2 text-white text-sm font-medium rounded-lg ${
-                  userLocation ? 'bg-blue-500' : 'bg-blue-300 opacity-60 cursor-not-allowed'
-                }`}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </button>
-            </div>
-            {/* Wind toggle in mobile search panel */}
+            >
+              <option value="">{predictionErrors.level ? tSearch('predictionLevelRequired') : tSearch('allLevels')}</option>
+              <option value="beginner">{tSearch('difficulty.beginner')}</option>
+              <option value="intermediate">{tSearch('difficulty.intermediate')}</option>
+              <option value="advanced">{tSearch('difficulty.advanced')}</option>
+            </select>
+          </div>
+
+          {/* Row 3: Action chips */}
+          <div className="flex gap-1.5">
+            {/* Search / Predict */}
+            <button
+              onClick={isPredictionMode ? handlePredictionSearch : handleSearch}
+              className={`flex-1 px-3 py-1.5 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-1 ${
+                isPredictionMode ? 'bg-indigo-500' : 'bg-ocean-500'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              {isPredictionMode ? tSearch('predictButton') : tSearch('searchButton')}
+            </button>
+            {/* Nearby */}
+            <button
+              onClick={handleSuggestByDistance}
+              disabled={!userLocation}
+              title={!userLocation ? (locale === 'ko' ? '위치 권한 필요' : 'Location required') : (locale === 'ko' ? '주변 스팟' : 'Nearby')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${
+                userLocation ? 'bg-blue-500 text-white' : 'bg-blue-200 text-blue-400 cursor-not-allowed'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              {locale === 'ko' ? '주변' : 'Near'}
+            </button>
+            {/* Surf score overlay */}
+            <button
+              onClick={() => handleOverlayToggle('surf')}
+              title={t('surfScore')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${
+                overlayMode === 'surf' ? 'bg-green-500 text-white' : 'bg-sand-100 text-ocean-700'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              {locale === 'ko' ? '서프' : 'Surf'}
+            </button>
+            {/* Wind particles */}
             <button
               onClick={() => setShowWindParticles(!showWindParticles)}
-              className={`w-full px-4 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 ${
+              title={t('windParticles')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${
                 showWindParticles ? 'bg-ocean-500 text-white' : 'bg-sand-100 text-ocean-700'
               }`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5c1.104 0 2 .896 2 2s-.896 2-2 2H3M17 11c1.104 0 2 .896 2 2s-.896 2-2 2H3M9 17c1.104 0 2 .896 2 2s-.896 2-2 2H3" />
               </svg>
-              {t('windParticles')}
+              {locale === 'ko' ? '바람' : 'Wind'}
             </button>
           </div>
-        )}
+        </div>
 
         {/* ── DESKTOP header row (hidden on mobile) ── */}
         <div className="hidden md:flex items-center gap-3">
@@ -954,15 +965,17 @@ function MapPageContent() {
           showMeasureDistance={false}
           saveCountByLocation={saveCountByLocation}
           onMultiSaveMarkerClick={handleMultiSaveMarkerClick}
+          centerOffset={centerOffset}
         />
 
         {/* 10-Day Quick Date Selector - Bottom Center of visible map area */}
         <div
-          className="absolute bottom-16 md:bottom-3 z-30 transition-all duration-300 -translate-x-1/2"
+          className="absolute bottom-16 md:bottom-3 z-30 transition-all duration-300 left-2 right-2 md:left-auto md:right-auto md:-translate-x-1/2"
           style={{
-            left: isMobile
-              ? '50%'
-              : `calc(${showResults && hasSearched ? '384px' : '0px'} + (100% - ${showResults && hasSearched ? '384px' : '0px'} - ${selectedSpotDetail || timeSlotSelection ? '420px' : '0px'}) / 2)`,
+            // On desktop only: compute horizontal center between sidebars
+            left: !isMobile
+              ? `calc(${showResults && hasSearched ? '384px' : '0px'} + (100% - ${showResults && hasSearched ? '384px' : '0px'} - ${selectedSpotDetail || timeSlotSelection ? '420px' : '0px'}) / 2)`
+              : undefined,
           }}
         >
           {showQuickDateSelect ? (
@@ -981,8 +994,8 @@ function MapPageContent() {
                 {locale === 'ko' ? '접기' : 'Hide'}
               </button>
 
-              <div className="glass rounded-full shadow-lg px-2 py-1">
-                <div className="flex items-center gap-0.5">
+              <div className="glass rounded-2xl md:rounded-full shadow-lg px-2 py-1 overflow-x-auto hide-scrollbar">
+                <div className="flex items-center gap-0.5 flex-nowrap">
                   {dateOptions.map((date, index) => {
                     const isSelected = format(date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
                     const dayLabel = index === 0
@@ -1012,14 +1025,17 @@ function MapPageContent() {
               </div>
             </>
           ) : (
-            /* Minimized View - Only selected date */
+            /* Minimized View – compact calendar chip */
             <button
               onClick={() => setShowQuickDateSelect(true)}
-              className="glass rounded-full shadow-lg px-3 py-1.5 flex items-center gap-2
-                hover:bg-white/90 transition-colors cursor-pointer"
+              className="bg-white/75 backdrop-blur-sm rounded-full shadow px-2 py-0.5 flex items-center gap-1
+                hover:bg-white/95 transition-colors border border-white/40"
               title={locale === 'ko' ? '10일 예보 펼치기' : 'Expand 10-Day Forecast'}
             >
-              <span className="text-xs font-semibold text-ocean-700 whitespace-nowrap">
+              <svg className="w-3 h-3 text-ocean-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="text-[11px] font-medium text-ocean-700 whitespace-nowrap">
                 {daysFromToday === 0
                   ? (locale === 'ko' ? '오늘' : 'Today')
                   : daysFromToday === 1
@@ -1027,9 +1043,6 @@ function MapPageContent() {
                     : format(selectedDate, 'EEE', { locale: dateLocale })}{' '}
                 {format(selectedDate, 'd', { locale: dateLocale })}
               </span>
-              <svg className="w-3 h-3 text-ocean-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
             </button>
           )}
         </div>
@@ -1065,8 +1078,29 @@ function MapPageContent() {
                 && s.surfTimestamp === selectedSpotDetail.surfInfo.SurfTimestamp
             )}
             onClose={() => setSelectedSpotDetail(null)}
-            onSave={() => {
-              handleSaveSpot(selectedSpotDetail.surfInfo);
+            onSave={async () => {
+              const si = selectedSpotDetail.surfInfo;
+              try {
+                await saveItem({
+                  locationId: si.LocationId,
+                  surfTimestamp: si.SurfTimestamp,
+                  surferLevel: si.derivedMetrics.surfingLevel,
+                  surfScore: si.derivedMetrics.surfScore,
+                  surfGrade: si.derivedMetrics.surfGrade,
+                  address: si.name || si.address || si.LocationId,
+                  region: si.region,
+                  country: si.country,
+                  waveHeight: si.conditions.waveHeight,
+                  wavePeriod: si.conditions.wavePeriod,
+                  windSpeed: si.conditions.windSpeed,
+                  waterTemperature: si.conditions.waterTemperature,
+                });
+                // Force refetch to ensure isSaved updates even if Apollo cache
+                // update doesn't propagate (e.g. on first save or cache miss)
+                await refetch();
+              } catch (err) {
+                console.error('Failed to save spot:', err);
+              }
             }}
             onRemove={() => {
               handleRemoveSpot(

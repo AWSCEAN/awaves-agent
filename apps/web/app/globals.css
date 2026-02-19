@@ -179,6 +179,15 @@ body {
   border-top-color: #e8f4fd;
 }
 
+/* Hide scrollbar while keeping scroll functionality */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
@@ -634,14 +643,29 @@ body {
     padding-bottom: env(safe-area-inset-bottom, 16px);
   }
 
-  /* Bottom sheet drag handle */
+  /* Position mobile bottom sheets above the BottomNav, including safe-area (iOS home bar) */
+  .mobile-sheet-bottom {
+    bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Bottom sheet drag handle — full-width touch target, pill visual via ::after */
   .bottom-sheet-handle {
+    width: 100%;
+    padding: 10px 0 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    cursor: ns-resize;
+    touch-action: none;
+  }
+
+  .bottom-sheet-handle::after {
+    content: '';
     width: 40px;
     height: 4px;
     background: #cbd5e1;
     border-radius: 2px;
-    margin: 8px auto 4px;
-    flex-shrink: 0;
   }
 
   /* Prevent body scroll when bottom sheet is open */

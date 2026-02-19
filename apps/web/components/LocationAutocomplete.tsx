@@ -9,6 +9,7 @@ interface LocationOption {
   name: string;
   nameKo?: string;
   type: 'spot' | 'region' | 'country';
+  searchText?: string; // additional searchable fields (address, region, country, LocationId)
 }
 
 interface LocationAutocompleteProps {
@@ -49,7 +50,15 @@ export default function LocationAutocomplete({
       const countrySet = new Set<string>();
 
       spots.forEach((spot) => {
-        locations.push({ id: spot.LocationId, name: spot.name, nameKo: spot.nameKo, type: 'spot' });
+        locations.push({
+          id: spot.LocationId,
+          // Fallback to address or LocationId so the option always has a display name
+          name: spot.name || spot.address || spot.LocationId,
+          nameKo: spot.nameKo || spot.addressKo,
+          type: 'spot',
+          // Extra text searched against but not displayed
+          searchText: [spot.address, spot.region, spot.country, spot.LocationId].filter(Boolean).join(' '),
+        });
         if (spot.region && !regionSet.has(spot.region)) {
           regionSet.add(spot.region);
           locations.push({ id: `region-${spot.region}`, name: spot.region, nameKo: spot.regionKo, type: 'region' });
@@ -78,7 +87,8 @@ export default function LocationAutocomplete({
       return (
         name.toLowerCase().includes(lowerValue) ||
         loc.name.toLowerCase().includes(lowerValue) ||
-        (loc.nameKo && loc.nameKo.toLowerCase().includes(lowerValue))
+        (loc.nameKo && loc.nameKo.toLowerCase().includes(lowerValue)) ||
+        (loc.searchText && loc.searchText.toLowerCase().includes(lowerValue))
       );
     });
 

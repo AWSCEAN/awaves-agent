@@ -1,11 +1,10 @@
-"""Location search router using OpenSearch."""
+"""Location search router."""
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Query
 
 from app.schemas.surf import SurfInfoResponse
-from app.services.opensearch_service import OpenSearchService
 from app.services.search_service import SearchService
 
 router = APIRouter()
@@ -20,18 +19,11 @@ async def search_locations(
     surfer_level: Optional[str] = Query(None, description="Surfer level filter (BEGINNER, INTERMEDIATE, ADVANCED)"),
     language: Optional[str] = Query(None, description="Language hint (en or ko). Auto-detected if omitted."),
 ) -> list[SurfInfoResponse]:
-    """Search locations by keyword using OpenSearch.
+    """Search locations by keyword.
 
-    Searches across display_name, city, state, and country fields.
-    Supports Korean search when language=ko or Korean characters are detected.
-    Returns surf_info data filtered by date, time, and surfer level.
+    Uses OpenSearch when available; falls back to DynamoDB text search otherwise.
+    Searches across display_name, city, state, country and Korean variants.
     """
-    if not OpenSearchService._available:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Search service is not available. OpenSearch may be down.",
-        )
-
     results = await SearchService.search(
         q, size=size, date=date, time=time, surfer_level=surfer_level,
         language=language,

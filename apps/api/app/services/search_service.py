@@ -13,6 +13,51 @@ class SearchService:
     """Orchestrates keyword search via OpenSearch and surf_info retrieval."""
 
     @classmethod
+    async def _text_search_fallback(
+        cls,
+        query: str,
+        size: int = 50,
+        date: Optional[str] = None,
+        time: Optional[str] = None,
+        surfer_level: Optional[str] = None,
+    ) -> list[dict]:
+        """Text-search fallback used when OpenSearch is unavailable.
+
+        Loads all DynamoDB spots for the requested date/time and filters
+        them by matching the query string against name, address, region,
+        country and their Korean equivalents.
+        """
+        spots = await SurfDataRepository.get_spots_for_date(date, time)
+        query_lower = query.lower()
+        results: list[dict] = []
+        for spot in spots:
+            searchable = " ".join(filter(None, [
+                spot.get("name", ""),
+                spot.get("address", ""),
+                spot.get("region", ""),
+                spot.get("country", ""),
+                spot.get("nameKo", ""),
+                spot.get("addressKo", ""),
+                spot.get("regionKo", ""),
+                spot.get("countryKo", ""),
+                spot.get("LocationId", ""),
+            ])).lower()
+            if query_lower not in searchable:
+                continue
+            if surfer_level:
+                item_level = spot.get("derivedMetrics", {}).get("surfingLevel", "").upper()
+                if item_level and item_level != surfer_level.upper():
+                    continue
+            results.append(spot)
+            if len(results) >= size:
+                break
+        logger.info(
+            "OpenSearch unavailable; DynamoDB fallback returned %d results for query '%s'.",
+            len(results), query,
+        )
+        return results
+
+    @classmethod
     async def search(
         cls,
         query: str,
@@ -25,17 +70,22 @@ class SearchService:
         """Search locations by keyword and return enriched surf_info results.
 
         Flow:
-        1. Query OpenSearch for matching locations (keyword search only)
-        2. Batch-fetch surf data for the date/time from in-memory cache
-        3. Filter by surfer_level if specified
-        4. Return aggregated results enriched with location metadata
+        1. Query OpenSearch for matching locations (keyword search only).
+        2. If OpenSearch is unavailable or returns nothing, fall back to
+           DynamoDB text search against in-memory cached spot data.
+        3. Batch-fetch surf data for the date/time from in-memory cache.
+        4. Filter by surfer_level if specified.
+        5. Return aggregated results enriched with location metadata.
         """
         # Step 1: Search OpenSearch (location keyword search only)
         os_results = await OpenSearchService.search_locations(
             query, size=size, language=language
         )
         if not os_results:
-            return []
+            # OpenSearch unavailable or returned nothing — fall back to DynamoDB text search
+            return await cls._text_search_fallback(
+                query, size=size, date=date, time=time, surfer_level=surfer_level
+            )
 
         # Step 2: Batch-fetch all spots for the date/time (uses in-memory cache)
         # This is a single call instead of N individual DynamoDB queries

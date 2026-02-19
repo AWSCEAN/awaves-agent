@@ -1,11 +1,9 @@
 """Feedback router."""
 
-from typing import Literal, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel
-
 from app.schemas.feedback import FeedbackRequest, FeedbackResponse
 
 router = APIRouter()
@@ -31,7 +29,7 @@ async def submit_feedback(
     user_id: Optional[str] = Depends(get_optional_user_id),
 ) -> FeedbackResponse:
     """Submit user feedback."""
-    from datetime import datetime
+    from datetime import datetime, timezone
     import uuid
 
     feedback = {
@@ -40,7 +38,7 @@ async def submit_feedback(
         "spot_id": request.spot_id,
         "type": request.type,
         "message": request.message,
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
     MOCK_FEEDBACK.append(feedback)

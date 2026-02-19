@@ -79,12 +79,12 @@ export default function LandingPage() {
   return (
     <>
       <main className="h-screen flex flex-col overflow-hidden bg-sand-gradient">
-        {/* Header */}
-        <header className="flex-shrink-0 glass z-40">
+        {/* Header - desktop only (BottomNav handles mobile navigation) */}
+        <header className="flex-shrink-0 glass z-40 hidden md:block">
           <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
             <LogoOverlay />
-            <div className="flex items-center gap-3">
-              {/* Language Toggle (icon + label) */}
+            <div className="flex items-center gap-2">
+              {/* Language Toggle - always visible */}
               <button
                 onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
                 className="flex items-center gap-1 px-2 py-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
@@ -95,86 +95,89 @@ export default function LandingPage() {
                 </svg>
                 <span className="text-xs font-semibold text-ocean-700">{lang === 'ko' ? 'KO' : 'EN'}</span>
               </button>
-              {isLoading ? (
-                <span className="text-sm text-ocean-500">...</span>
-              ) : isAuthenticated ? (
-                <>
-                  {/* Saved Spots Link */}
-                  <Link href="/saved" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
-                    {lang === 'ko' ? '저장된 스팟' : 'Saved Spots'}
+              {/* Nav links - desktop only (BottomNav handles mobile navigation) */}
+              {!isLoading && (
+                isAuthenticated ? (
+                  <div className="hidden md:flex items-center gap-3">
+                    <Link href="/saved" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+                      {lang === 'ko' ? '저장된 스팟' : 'Saved Spots'}
+                    </Link>
+                    <Link href="/map" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+                      {lang === 'ko' ? '지도' : 'Map'}
+                    </Link>
+                    <Link
+                      href="/mypage"
+                      className="p-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
+                      title={lang === 'ko' ? '마이페이지' : 'My Page'}
+                    >
+                      <svg className="w-5 h-5 text-ocean-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </Link>
+                  </div>
+                ) : (
+                  <Link href="/login" className="btn-outline text-sm">
+                    {t.login}
                   </Link>
-                  {/* Map Link */}
-                  <Link href="/map" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
-                    {lang === 'ko' ? '지도' : 'Map'}
-                  </Link>
-                  {/* My Page Icon */}
-                  <Link
-                    href="/mypage"
-                    className="p-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
-                    title={lang === 'ko' ? '마이페이지' : 'My Page'}
-                  >
-                    <svg className="w-5 h-5 text-ocean-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                  </Link>
-                </>
-              ) : (
-                <Link href="/login" className="btn-outline text-sm">
-                  {t.login}
-                </Link>
+                )
               )}
             </div>
           </div>
         </header>
 
         {/* Hero Section */}
-        <section className="flex-1 flex flex-col items-center justify-center px-4 overflow-y-auto">
-          <div className="max-w-4xl mx-auto text-center">
-            <div className="flex justify-center mb-4">
-              <Image
-                src="/awaves_main.svg"
-                alt="AWAVES"
-                width={200}
-                height={200}
-                className="animate-ripple"
-                style={{ width: 'auto', height: 'auto', maxWidth: '140px' }}
-              />
+        <section className="flex-1 overflow-y-auto hide-scrollbar">
+          {/* Inner wrapper fills at least the full section height and centers content.
+              Using min-h-full + flex justify-center (not on the outer section) is the
+              correct pattern for "centered content that scrolls without clipping" */}
+          <div className="min-h-full flex flex-col items-center justify-center px-4 py-6 pb-20 md:pb-6">
+            <div className="max-w-4xl mx-auto text-center">
+              <div className="flex justify-center mb-4">
+                <Image
+                  src="/awaves_main.svg"
+                  alt="AWAVES"
+                  width={200}
+                  height={200}
+                  className="animate-ripple"
+                  style={{ width: 'auto', height: 'auto', maxWidth: '140px' }}
+                />
+              </div>
+              <h1 className="text-2xl md:text-4xl font-bold text-ocean-800 mb-3">
+                {t.tagline}
+              </h1>
+              <p className="text-base md:text-lg text-ocean-600 mb-6">
+                {t.subtitle}
+              </p>
+              <button onClick={handleGetStarted} className="btn-primary text-base md:text-lg px-6 md:px-8 py-3">
+                {t.cta}
+              </button>
             </div>
-            <h1 className="text-2xl md:text-4xl font-bold text-ocean-800 mb-3">
-              {t.tagline}
-            </h1>
-            <p className="text-base md:text-lg text-ocean-600 mb-6">
-              {t.subtitle}
-            </p>
-            <button onClick={handleGetStarted} className="btn-primary text-base md:text-lg px-6 md:px-8 py-3">
-              {t.cta}
-            </button>
-          </div>
 
-          {/* Features Row */}
-          <div className="max-w-5xl mx-auto mt-6 w-full">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-              <FeatureCard
-                icon="🌊"
-                title={t.features.realtime}
-                description={t.features.realtimeDesc}
-              />
-              <FeatureCard
-                icon="🤖"
-                title={t.features.ai}
-                description={t.features.aiDesc}
-              />
-              <FeatureCard
-                icon="💾"
-                title={t.features.save}
-                description={t.features.saveDesc}
-              />
+            {/* Features Row */}
+            <div className="max-w-5xl mx-auto mt-6 w-full">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+                <FeatureCard
+                  icon="🌊"
+                  title={t.features.realtime}
+                  description={t.features.realtimeDesc}
+                />
+                <FeatureCard
+                  icon="🤖"
+                  title={t.features.ai}
+                  description={t.features.aiDesc}
+                />
+                <FeatureCard
+                  icon="💾"
+                  title={t.features.save}
+                  description={t.features.saveDesc}
+                />
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Footer */}
-        <footer className="flex-shrink-0 py-3 px-4 bg-ocean-900 text-white/70">
+        {/* Footer - desktop only (BottomNav covers this area on mobile) */}
+        <footer className="flex-shrink-0 py-3 px-4 bg-ocean-900 text-white/70 hidden md:block">
           <div className="max-w-6xl mx-auto text-center">
             <p className="text-xs">
               © 2024 AWAVES. All rights reserved.

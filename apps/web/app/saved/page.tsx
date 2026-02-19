@@ -151,14 +151,13 @@ export default function SavedPage() {
 
   return (
     <ProtectedRoute>
-      <LogoOverlay />
       <div className="min-h-screen bg-sand-gradient">
-        {/* Header */}
-        <header className="fixed top-0 left-0 right-0 z-40 glass">
-          <div className="px-4 py-2 flex items-center justify-end">
-            {/* Desktop nav links - hidden on mobile (BottomNav handles mobile) */}
-            <div className="hidden md:flex items-center gap-3">
-              {/* Language Toggle (icon + label) */}
+        {/* Header - desktop only (BottomNav handles mobile navigation) */}
+        <header className="hidden md:block fixed top-0 left-0 right-0 z-40 glass">
+          <div className="px-4 py-2 flex items-center justify-between">
+            <LogoOverlay />
+            <div className="flex items-center gap-2">
+              {/* Language Toggle - always visible */}
               <button
                 onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
                 className="flex items-center gap-1 px-2 py-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
@@ -169,30 +168,30 @@ export default function SavedPage() {
                 </svg>
                 <span className="text-xs font-semibold text-ocean-700">{lang === 'ko' ? 'KO' : 'EN'}</span>
               </button>
-              {/* Saved Spots Link */}
-              <Link href="/saved" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
-                {t.title}
-              </Link>
-              {/* Map Link */}
-              <Link href="/map" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
-                {t.map}
-              </Link>
-              {/* My Page Icon */}
-              <Link
-                href="/mypage"
-                className="p-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
-                title={t.mypage}
-              >
-                <svg className="w-5 h-5 text-ocean-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </Link>
+              {/* Nav links - desktop only (BottomNav handles mobile) */}
+              <div className="hidden md:flex items-center gap-3">
+                <Link href="/saved" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+                  {t.title}
+                </Link>
+                <Link href="/map" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+                  {t.map}
+                </Link>
+                <Link
+                  href="/mypage"
+                  className="p-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
+                  title={t.mypage}
+                >
+                  <svg className="w-5 h-5 text-ocean-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </Link>
+              </div>
             </div>
           </div>
         </header>
 
         {/* Content */}
-        <main className="max-w-6xl mx-auto px-3 md:px-4 py-4 md:py-8 pt-14 md:pt-16 pb-20 md:pb-6">
+        <main className="max-w-6xl mx-auto px-3 md:px-4 py-4 md:py-8 pt-6 md:pt-16 pb-20 md:pb-6">
           <div className="flex flex-col items-center mb-3 md:mb-8">
             <h1 className="text-xl md:text-3xl font-bold text-ocean-700 tracking-tight">
               {t.title}

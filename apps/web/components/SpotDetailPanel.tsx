@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useLocale } from 'next-intl';
 import type { SurfInfo, SavedListItem } from '@/types';
 import { useSwipeDown } from '@/hooks/useSwipeDown';
@@ -51,6 +51,43 @@ export default function SpotDetailPanel({
   const [forecastView, setForecastView] = useState<'table' | 'chart'>('table');
   const swipe = useSwipeDown(onClose);
 
+  // Mobile drag-to-resize state (30–85 vh range, default 40vh)
+  const [panelHeight, setPanelHeight] = useState(40);
+  // Lazy init so maxHeight is applied on the very first render — avoids the
+  // panel flashing at full height before the useEffect fires on mobile
+  const [isSmallScreen, setIsSmallScreen] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia('(max-width: 767px)').matches
+      : false
+  );
+  const dragStartY = useRef<number | null>(null);
+  const dragStartHeight = useRef<number>(40);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const handler = (e: MediaQueryListEvent) => setIsSmallScreen(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  const handleResizeStart = useCallback((e: React.PointerEvent) => {
+    dragStartY.current = e.clientY;
+    dragStartHeight.current = panelHeight;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }, [panelHeight]);
+
+  const handleResizeMove = useCallback((e: React.PointerEvent) => {
+    if (dragStartY.current === null) return;
+    const delta = dragStartY.current - e.clientY; // positive = dragged up = expand
+    const deltaVh = (delta / window.innerHeight) * 100;
+    const newHeight = Math.min(85, Math.max(30, dragStartHeight.current + deltaVh));
+    setPanelHeight(newHeight);
+  }, []);
+
+  const handleResizeEnd = useCallback(() => {
+    dragStartY.current = null;
+  }, []);
+
   const displayName = locale === 'ko' && surfInfo.nameKo ? surfInfo.nameKo : surfInfo.name;
   const { surfScore, surfGrade, surfingLevel } = surfInfo.derivedMetrics;
   const { waveHeight, wavePeriod, windSpeed, waterTemperature } = surfInfo.conditions;
@@ -90,18 +127,28 @@ export default function SpotDetailPanel({
   return (
     <div
       className={`
-        fixed bottom-14 left-0 right-0 z-40 flex flex-col bg-white shadow-xl overflow-hidden
-        animate-slide-up rounded-t-2xl max-h-[60vh]
+        mobile-sheet-bottom fixed left-0 right-0 z-40 flex flex-col bg-white shadow-xl overflow-hidden
+        animate-slide-up rounded-t-2xl
         md:bottom-0 md:animate-none md:animate-slide-in-right md:rounded-none md:left-auto md:right-0 md:max-h-none md:w-[420px]
-        transition-all duration-300
+        transition-[left,right,bottom,width] duration-300
         ${showLocationPrompt ? 'md:top-[100px]' : 'md:top-14'}
       `}
+      style={isSmallScreen ? { maxHeight: `${panelHeight}vh` } : undefined}
       onTouchStart={swipe.onTouchStart}
       onTouchMove={swipe.onTouchMove}
       onTouchEnd={swipe.onTouchEnd}
     >
-      {/* Mobile drag handle */}
-      <div className="md:hidden bottom-sheet-handle" />
+      {/* Mobile drag handle — drag up to expand, down to shrink */}
+      <div
+        className="md:hidden bottom-sheet-handle"
+        onPointerDown={handleResizeStart}
+        onPointerMove={handleResizeMove}
+        onPointerUp={handleResizeEnd}
+        onPointerCancel={handleResizeEnd}
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => e.stopPropagation()}
+      />
 
       {/* Header */}
       <div className="bg-ocean-gradient px-4 py-3">
@@ -153,9 +200,10 @@ export default function SpotDetailPanel({
                   const addr = locale === 'ko'
                     ? (surfInfo.addressKo || surfInfo.address || displayName)
                     : (surfInfo.address || displayName);
-                  navigator.clipboard.writeText(addr);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
+                  navigator.clipboard.writeText(addr).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }).catch(() => {});
                 }}
                 className="p-0.5 rounded text-white/50 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0"
                 title={locale === 'ko' ? '주소 복사' : 'Copy address'}
