@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useLocale } from 'next-intl';
 import type { SurfInfo, SavedListItem } from '@/types';
 import { getGradeBgColor, getGradeTextColor, getGradeBorderColor } from '@/lib/services/surfInfoService';
+import BottomSheet from '@/components/BottomSheet';
 
 interface SpotDetailPanelProps {
   surfInfo: SurfInfo;
@@ -68,7 +69,15 @@ export default function SpotDetailPanel({
   };
 
   return (
-    <div className={`fixed right-0 bottom-0 w-[420px] bg-white shadow-xl z-40 flex flex-col animate-slide-in-right transition-all duration-300 ${showLocationPrompt ? 'top-[100px]' : 'top-14'}`}>
+    <BottomSheet
+      isOpen={true}
+      onClose={onClose}
+      side="right"
+      desktopWidth="w-[420px]"
+      mobileMaxHeight="max-h-[60vh]"
+      showLocationPrompt={showLocationPrompt}
+      desktopAnimation="animate-slide-in-right"
+    >
       {/* Header */}
       <div className="bg-ocean-gradient px-4 py-3">
         <div className="flex justify-between items-start">
@@ -285,11 +294,11 @@ export default function SpotDetailPanel({
             <span className="text-base">📊</span>
             {locale === 'ko' ? '시간대별 예보' : 'Hourly Forecast'}
           </h4>
-          <div>
-            <table className="w-full text-xs">
+          <div className="overflow-x-auto -mx-1">
+            <table className="w-full text-xs min-w-[300px]">
               <thead>
                 <tr className="text-ocean-600 border-b border-ocean-200">
-                  <th className="py-0.5 px-1.5 text-left font-medium w-20"></th>
+                  <th className="py-0.5 px-1.5 text-left font-medium w-16"></th>
                   {[6, 9, 12, 15, 18].map((hour) => (
                     <th key={hour} className="py-0.5 px-1.5 text-center font-medium">
                       {hour.toString().padStart(2, '0')}:00
@@ -300,35 +309,45 @@ export default function SpotDetailPanel({
               <tbody className="text-ocean-800">
                 {/* Wave Height Row */}
                 <tr className="border-b border-ocean-100">
-                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '파고' : 'Wave Height'} <span className="text-ocean-400 font-normal">(m)</span></td>
+                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">
+                    {locale === 'ko' ? '파고' : <><span className="hidden md:inline">Wave </span>Height</>} <span className="text-ocean-400 font-normal">(m)</span>
+                  </td>
                   {[0.9, 0.95, 1.0, 1.05, 0.98].map((v, idx) => (
                     <td key={idx} className="py-1 px-1.5 text-center">{(waveHeight * v).toFixed(1)}</td>
                   ))}
                 </tr>
                 {/* Wave Period Row */}
                 <tr className="border-b border-ocean-100">
-                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '파주기' : 'Wave Period'} <span className="text-ocean-400 font-normal">(s)</span></td>
+                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">
+                    {locale === 'ko' ? '파주기' : <><span className="hidden md:inline">Wave </span>Period</>} <span className="text-ocean-400 font-normal">(s)</span>
+                  </td>
                   {[0.9, 0.95, 1.0, 1.05, 0.98].map((v, idx) => (
                     <td key={idx} className="py-1 px-1.5 text-center">{(wavePeriod * v).toFixed(1)}</td>
                   ))}
                 </tr>
                 {/* Wind Speed Row */}
                 <tr className="border-b border-ocean-100">
-                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '풍속' : 'Wind Speed'} <span className="text-ocean-400 font-normal">(m/s)</span></td>
+                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">
+                    {locale === 'ko' ? '풍속' : <><span className="hidden md:inline">Wind </span>Speed</>} <span className="text-ocean-400 font-normal">(m/s)</span>
+                  </td>
                   {[0.9, 0.95, 1.0, 1.05, 0.98].map((v, idx) => (
                     <td key={idx} className="py-1 px-1.5 text-center">{(windSpeed * v).toFixed(1)}</td>
                   ))}
                 </tr>
                 {/* Water Temperature Row */}
                 <tr className="border-b border-ocean-100">
-                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '수온' : 'Water Temp'} <span className="text-ocean-400 font-normal">(°C)</span></td>
+                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">
+                    {locale === 'ko' ? '수온' : <>Water<span className="hidden md:inline"> Temp</span></>} <span className="text-ocean-400 font-normal">(°C)</span>
+                  </td>
                   {[0, 0, 0, 0, 0].map((_, idx) => (
                     <td key={idx} className="py-1 px-1.5 text-center">{waterTemperature.toFixed(1)}</td>
                   ))}
                 </tr>
                 {/* Air Temperature Row */}
                 <tr className="border-b border-ocean-100">
-                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '기온' : 'Air Temp'} <span className="text-ocean-400 font-normal">(°C)</span></td>
+                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">
+                    {locale === 'ko' ? '기온' : <>Air<span className="hidden md:inline"> Temp</span></>} <span className="text-ocean-400 font-normal">(°C)</span>
+                  </td>
                   {[0.95, 1.0, 1.1, 1.15, 1.05].map((v, idx) => (
                     <td key={idx} className="py-1 px-1.5 text-center">{((waterTemperature + 5) * v).toFixed(1)}</td>
                   ))}
@@ -353,7 +372,7 @@ export default function SpotDetailPanel({
 
       {/* Delete Confirmation Modal */}
       {showConfirmDelete && (
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-xl p-6 m-4 max-w-sm shadow-xl">
             <h3 className="text-lg font-semibold text-ocean-800 mb-2">
               {locale === 'ko' ? '저장 취소' : 'Remove from Saved'}
@@ -387,7 +406,7 @@ export default function SpotDetailPanel({
           </div>
         </div>
       )}
-    </div>
+    </BottomSheet>
   );
 }
 

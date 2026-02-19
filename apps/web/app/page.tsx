@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import LogoOverlay from '@/components/LogoOverlay';
+import MobileTabBar from '@/components/MobileTabBar';
 import SurfLoadingScreen from '@/components/SurfLoadingScreen';
 import { getSavedLocale, saveLocale } from '@/lib/i18n';
 
@@ -79,7 +80,7 @@ export default function LandingPage() {
   return (
     <>
       <LogoOverlay />
-      <main className="h-screen flex flex-col overflow-hidden bg-sand-gradient">
+      <main className="h-screen overflow-hidden flex flex-col bg-sand-gradient">
         {/* Header */}
         <header className="flex-shrink-0 glass z-40">
           <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-end">
@@ -98,7 +99,7 @@ export default function LandingPage() {
               {isLoading ? (
                 <span className="text-sm text-ocean-500">...</span>
               ) : isAuthenticated ? (
-                <>
+                <div className="hidden md:flex items-center gap-3">
                   {/* Saved Spots Link */}
                   <Link href="/saved" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
                     {lang === 'ko' ? '저장된 스팟' : 'Saved Spots'}
@@ -117,7 +118,7 @@ export default function LandingPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </Link>
-                </>
+                </div>
               ) : (
                 <Link href="/login" className="btn-outline text-sm">
                   {t.login}
@@ -128,32 +129,32 @@ export default function LandingPage() {
         </header>
 
         {/* Hero Section */}
-        <section className="flex-1 flex flex-col items-center justify-center px-4">
+        <section className="flex-1 min-h-0 flex flex-col items-center justify-center px-4 py-2">
           <div className="max-w-4xl mx-auto text-center">
-            <div className="flex justify-center mb-4">
+            <div className="flex justify-center mb-2 md:mb-4">
               <Image
                 src="/awaves_main.svg"
                 alt="AWAVES"
                 width={200}
                 height={200}
                 className="animate-ripple"
-                style={{ width: 'auto', height: 'auto', maxWidth: '200px' }}
+                style={{ width: 'auto', height: 'auto', maxWidth: '90px', maxHeight: '90px' }}
               />
             </div>
-            <h1 className="text-4xl font-bold text-ocean-800 mb-3">
+            <h1 className="text-xl md:text-4xl font-bold text-ocean-800 mb-2 md:mb-3">
               {t.tagline}
             </h1>
-            <p className="text-lg text-ocean-600 mb-6">
+            <p className="text-sm md:text-lg text-ocean-600 mb-3 md:mb-6">
               {t.subtitle}
             </p>
-            <button onClick={handleGetStarted} className="btn-primary text-lg px-8 py-3">
+            <button onClick={handleGetStarted} className="btn-primary text-base md:text-lg px-6 md:px-8 py-2 md:py-3">
               {t.cta}
             </button>
           </div>
 
           {/* Features Row */}
-          <div className="max-w-5xl mx-auto mt-8 w-full">
-            <div className="grid grid-cols-3 gap-4">
+          <div className="max-w-5xl mx-auto mt-3 md:mt-8 w-full">
+            <div className="grid grid-cols-3 gap-2 md:gap-4">
               <FeatureCard
                 icon="🌊"
                 title={t.features.realtime}
@@ -181,6 +182,13 @@ export default function LandingPage() {
             </p>
           </div>
         </footer>
+        {/* Mobile Tab Bar */}
+        {isAuthenticated && (
+          <MobileTabBar
+            locale={lang}
+            onLocaleToggle={() => setLang(lang === 'ko' ? 'en' : 'ko')}
+          />
+        )}
       </main>
     </>
   );
@@ -196,10 +204,10 @@ function FeatureCard({
   description: string;
 }) {
   return (
-    <div className="card text-center py-4 px-3">
-      <div className="text-2xl mb-2">{icon}</div>
-      <h3 className="text-sm font-semibold text-ocean-800 mb-1">{title}</h3>
-      <p className="text-xs text-ocean-600">{description}</p>
+    <div className="card text-center py-2 px-2 md:py-4 md:px-3">
+      <div className="text-xl md:text-2xl mb-0.5 md:mb-2">{icon}</div>
+      <h3 className="text-[10px] leading-tight md:text-sm font-semibold text-ocean-800 mb-0 md:mb-1">{title}</h3>
+      <p className="hidden md:block text-xs text-ocean-600">{description}</p>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import LogoOverlay from '@/components/LogoOverlay';
+import MobileTabBar from '@/components/MobileTabBar';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { getSavedLocale, saveLocale } from '@/lib/i18n';
@@ -163,30 +164,30 @@ export default function MyPage() {
               </svg>
               <span className="text-xs font-semibold text-ocean-700">{lang === 'ko' ? 'KO' : 'EN'}</span>
             </button>
-            {/* Saved Spots Link */}
-            <Link href="/saved" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
-              {t.savedSpots}
-            </Link>
-            {/* Map Link */}
-            <Link href="/map" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
-              {t.map}
-            </Link>
-            {/* My Page Icon */}
-            <Link
-              href="/mypage"
-              className="p-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
-              title={t.title}
-            >
-              <svg className="w-5 h-5 text-ocean-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </Link>
+            {/* Desktop nav links */}
+            <div className="hidden md:flex items-center gap-3">
+              <Link href="/saved" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+                {t.savedSpots}
+              </Link>
+              <Link href="/map" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+                {t.map}
+              </Link>
+              <Link
+                href="/mypage"
+                className="p-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
+                title={t.title}
+              >
+                <svg className="w-5 h-5 text-ocean-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </Link>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Content */}
-      <main className="max-w-2xl mx-auto px-4 pt-24 pb-8">
+      <main className="max-w-2xl mx-auto px-4 pt-24 pb-8 mobile-bottom-spacing">
         <h1 className="text-3xl font-bold text-ocean-700 tracking-tight text-center mb-8">{t.title}</h1>
 
         {/* Profile Section */}
@@ -263,6 +264,12 @@ export default function MyPage() {
           </div>
         </section>
       </main>
+
+      {/* Mobile Tab Bar */}
+      <MobileTabBar
+        locale={lang}
+        onLocaleToggle={() => setLang(lang === 'ko' ? 'en' : 'ko')}
+      />
     </div>
     </ProtectedRoute>
   );

@@ -72,7 +72,8 @@ class Settings(BaseSettings):
     jwt_refresh_token_expire_days: int = 7
 
     # CORS - comma-separated string
-    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    # capacitor://localhost is required for iOS WebView (Capacitor apps)
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000,capacitor://localhost,http://localhost"
 
     @property
     def cors_origins_list(self) -> list[str]:

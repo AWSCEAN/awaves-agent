@@ -3,6 +3,7 @@
 import { useLocale } from 'next-intl';
 import type { PredictionResult } from '@/types';
 import { getGradeBgColor, getGradeTextColor, getGradeBorderColor } from '@/lib/services/surfInfoService';
+import BottomSheet from '@/components/BottomSheet';
 
 interface PredictionResultPanelProps {
   result: PredictionResult;
@@ -46,7 +47,14 @@ export default function PredictionResultPanel({
   const dateStr = result.surfTimestamp.split('T')[0];
 
   return (
-    <div className={`fixed left-0 bottom-0 w-96 bg-white shadow-xl z-40 flex flex-col transition-all duration-300 ${showLocationPrompt ? 'top-[100px]' : 'top-14'}`}>
+    <BottomSheet
+      isOpen={isOpen}
+      onClose={onClose}
+      side="left"
+      desktopWidth="w-96"
+      mobileMaxHeight="max-h-[60vh]"
+      showLocationPrompt={showLocationPrompt}
+    >
       {/* Header - Indigo/Purple gradient for prediction branding */}
       <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-5 py-4">
         <div className="flex justify-between items-start">
@@ -117,6 +125,6 @@ export default function PredictionResultPanel({
           </div>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   );
 }

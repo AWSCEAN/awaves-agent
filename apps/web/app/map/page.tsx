@@ -8,6 +8,8 @@ import { format, addDays, differenceInDays } from 'date-fns';
 import { ko, enUS } from 'date-fns/locale';
 import { useTranslations, useLocale } from 'next-intl';
 import LogoOverlay from '@/components/LogoOverlay';
+import MobileTabBar from '@/components/MobileTabBar';
+import MobileSearchOverlay from '@/components/MobileSearchOverlay';
 import LocationAutocomplete from '@/components/LocationAutocomplete';
 import SearchResultsList from '@/components/SearchResultsList';
 import type { SearchResult } from '@/components/SearchResultsList';
@@ -22,6 +24,7 @@ import type { OverlayMode, SpotSelectionData } from '@/components/EnhancedMapbox
 import { TIME_SLOTS, getCurrentTimeSlot, localToUTC } from '@/lib/services/surfInfoService';
 import { surfService } from '@/lib/apiServices';
 import { useSavedItems } from '@/hooks/useSavedItems';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import SurfLoadingScreen from '@/components/SurfLoadingScreen';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -107,6 +110,10 @@ function MapPageContent() {
 
   // Quick date selector state
   const [showQuickDateSelect, setShowQuickDateSelect] = useState(true);
+
+  // Mobile search overlay state
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
+  const isMobile = useIsMobile();
 
   // Saved items from GraphQL (BE DynamoDB)
   const { items: savedItems, saveItem, deleteItem, refetch } = useSavedItems();
@@ -408,6 +415,7 @@ function MapPageContent() {
   const handleSpotClick = (spot: SearchResult) => {
     setMapCenter({ lat: spot.geo.lat, lng: spot.geo.lng });
     setTimeSlotSelection(null);
+    if (isMobile) setShowResults(false);
     setSelectedSpotDetail({
       surfInfo: spot,
       coordinates: { latitude: spot.geo.lat, longitude: spot.geo.lng },
@@ -522,8 +530,21 @@ function MapPageContent() {
           {/* Logo */}
           <LogoOverlay />
 
-          {/* Search Inputs - ml-48 to avoid LogoOverlay overlap */}
-          <div className="flex-1 flex items-center gap-2 flex-wrap ml-48">
+          {/* Mobile: compact search bar */}
+          <div className="flex-1 flex items-center gap-2 ml-12 md:hidden">
+            <button
+              onClick={() => setShowMobileSearch(true)}
+              className="flex-1 flex items-center gap-2 px-3 py-2 bg-white border border-sand-200 rounded-lg text-sm text-ocean-600"
+            >
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <span className="truncate">{locationQuery || tSearch('locationPlaceholder')}</span>
+            </button>
+          </div>
+
+          {/* Desktop: full search inputs - ml-48 to avoid LogoOverlay overlap */}
+          <div className="flex-1 hidden md:flex items-center gap-2 flex-wrap ml-48">
             {/* Location */}
             <LocationAutocomplete
               value={locationQuery}
@@ -666,7 +687,7 @@ function MapPageContent() {
           </div>
 
           {/* Right side controls */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="hidden md:flex items-center gap-2 flex-shrink-0">
             {/* Language Toggle (icon + label) */}
             <button
               onClick={toggleLocale}
@@ -807,13 +828,15 @@ function MapPageContent() {
           showMeasureDistance={false}
           saveCountByLocation={saveCountByLocation}
           onMultiSaveMarkerClick={handleMultiSaveMarkerClick}
+          bottomPadding={isMobile && selectedSpotDetail ? Math.round(typeof window !== 'undefined' ? window.innerHeight * 0.6 : 0) : 0}
         />
 
         {/* 10-Day Quick Date Selector - Bottom Center of visible map area */}
         <div
-          className="absolute bottom-3 z-30 transition-all duration-300 -translate-x-1/2"
-          style={{
+          className="absolute bottom-[4.5rem] md:bottom-3 z-30 transition-all duration-300 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 max-w-[calc(100%-1rem)]"
+          style={isMobile ? undefined : {
             left: `calc(${showResults && hasSearched ? '384px' : '0px'} + (100% - ${showResults && hasSearched ? '384px' : '0px'} - ${selectedSpotDetail || timeSlotSelection ? '420px' : '0px'}) / 2)`,
+            transform: 'translateX(-50%)',
           }}
         >
           {showQuickDateSelect ? (
@@ -832,7 +855,7 @@ function MapPageContent() {
                 {locale === 'ko' ? '접기' : 'Hide'}
               </button>
 
-              <div className="glass rounded-full shadow-lg px-2 py-1">
+              <div className="glass rounded-full shadow-lg px-2 py-1 overflow-x-auto">
                 <div className="flex items-center gap-0.5">
                   {dateOptions.map((date, index) => {
                     const isSelected = format(date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
@@ -847,7 +870,7 @@ function MapPageContent() {
                       <button
                         key={date.toISOString()}
                         onClick={() => setSelectedDate(date)}
-                        className={`flex-shrink-0 px-2.5 py-1.5 rounded-full
+                        className={`flex-shrink-0 px-1.5 md:px-2.5 py-1 md:py-1.5 rounded-full
                           transition-all duration-200 ${
                           isSelected
                             ? 'bg-ocean-500 text-white shadow-sm'
@@ -938,6 +961,63 @@ function MapPageContent() {
           />
         )}
       </div>
+
+      {/* Mobile Search Overlay */}
+      <MobileSearchOverlay
+        isOpen={showMobileSearch}
+        onClose={() => setShowMobileSearch(false)}
+        locationQuery={locationQuery}
+        onLocationChange={(val) => {
+          setLocationQuery(val);
+          setPredictionErrors((prev) => ({ ...prev, location: false }));
+        }}
+        onLocationSelect={(option) => {
+          setSelectedLocationId(option.type === 'spot' ? option.id : null);
+          setPredictionErrors((prev) => ({ ...prev, location: false }));
+        }}
+        locationPlaceholder={tSearch('locationPlaceholder')}
+        locationHasError={!!predictionErrors.location}
+        locationErrorPlaceholder={tSearch('predictionLocationRequired')}
+        selectedDate={selectedDate}
+        onDateChange={setSelectedDate}
+        selectedTime={selectedTime}
+        onTimeChange={setSelectedTime}
+        timeSlots={TIME_SLOTS}
+        isPredictionMode={isPredictionMode}
+        surferLevel={surferLevel}
+        onLevelChange={(level) => {
+          setSurferLevel(level);
+          setPredictionErrors((prev) => ({ ...prev, level: false }));
+        }}
+        levelHasError={!!predictionErrors.level}
+        onSearch={isPredictionMode ? handlePredictionSearch : handleSearch}
+        onNearby={handleSuggestByDistance}
+        userLocationAvailable={!!userLocation}
+        overlayMode={overlayMode}
+        onOverlayToggle={handleOverlayToggle}
+        showWindParticles={showWindParticles}
+        onWindToggle={() => setShowWindParticles(!showWindParticles)}
+        labels={{
+          allTimes: tSearch('allTimes'),
+          allLevels: tSearch('allLevels'),
+          beginner: tSearch('difficulty.beginner'),
+          intermediate: tSearch('difficulty.intermediate'),
+          advanced: tSearch('difficulty.advanced'),
+          search: tSearch('searchButton'),
+          predict: tSearch('predictButton'),
+          nearby: locale === 'ko' ? '주변' : 'Nearby',
+          surfScore: t('surfScore'),
+          windParticles: t('windParticles'),
+          levelRequired: tSearch('predictionLevelRequired'),
+          cancel: locale === 'ko' ? '취소' : 'Cancel',
+        }}
+      />
+
+      {/* Mobile Tab Bar */}
+      <MobileTabBar
+        locale={locale as 'en' | 'ko'}
+        onLocaleToggle={toggleLocale}
+      />
     </div>
     </ProtectedRoute>
   );

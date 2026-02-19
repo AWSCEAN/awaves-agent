@@ -6,6 +6,7 @@ import { ko, enUS } from 'date-fns/locale';
 import { useTranslations, useLocale } from 'next-intl';
 import type { SurfInfo, SurferLevel } from '@/types';
 import { getGradeBgColor, getGradeTextColor, getGradeBorderColor } from '@/lib/services/surfInfoService';
+import BottomSheet from '@/components/BottomSheet';
 
 export interface SearchResult extends SurfInfo {
   distance?: number;
@@ -115,7 +116,14 @@ export default function SearchResultsList({
   };
 
   return (
-    <div className={`fixed left-0 bottom-0 w-96 bg-white shadow-xl z-40 flex flex-col transition-all duration-300 ${showLocationPrompt ? 'top-[100px]' : 'top-14'}`}>
+    <BottomSheet
+      isOpen={true}
+      onClose={onClose}
+      side="left"
+      desktopWidth="w-96"
+      mobileMaxHeight="max-h-[calc(100vh-3.5rem)]"
+      showLocationPrompt={showLocationPrompt}
+    >
       {/* Header */}
       <div className="p-4 border-b border-sand-200">
         <div className="flex items-center justify-between mb-3">
@@ -317,7 +325,7 @@ export default function SearchResultsList({
 
       {/* Delete Confirmation Modal */}
       {confirmDelete && (
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-xl p-6 m-4 max-w-sm shadow-xl">
             <h3 className="text-lg font-semibold text-ocean-800 mb-2">
               {locale === 'ko' ? '저장 취소' : 'Remove from Saved'}
@@ -351,6 +359,6 @@ export default function SearchResultsList({
           </div>
         </div>
       )}
-    </div>
+    </BottomSheet>
   );
 }

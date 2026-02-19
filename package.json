@@ -8,7 +8,10 @@
     "lint": "turbo run lint",
     "clean": "turbo run clean",
     "web:dev": "pnpm --filter web dev",
-    "web:build": "pnpm --filter web build"
+    "web:build": "pnpm --filter web build",
+    "mobile:build": "pnpm --filter mobile build",
+    "mobile:ios": "pnpm --filter mobile dev:ios",
+    "mobile:android": "pnpm --filter mobile dev:android"
   },
   "devDependencies": {
     "turbo": "^2.0.0",

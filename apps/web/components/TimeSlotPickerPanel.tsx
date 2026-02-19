@@ -2,6 +2,7 @@
 
 import type { SavedListItem, SurfInfo } from '@/types';
 import { getGradeBgColor, getGradeTextColor, getGradeBorderColor } from '@/lib/services/surfInfoService';
+import BottomSheet from '@/components/BottomSheet';
 
 interface TimeSlotPickerPanelProps {
   locationId: string;
@@ -53,7 +54,15 @@ export default function TimeSlotPickerPanel({
   const displayName = sorted[0]?.name || locationId;
 
   return (
-    <div className={`fixed right-0 bottom-0 w-[420px] bg-white shadow-xl z-40 flex flex-col animate-slide-in-right transition-all duration-300 ${showLocationPrompt ? 'top-[100px]' : 'top-14'}`}>
+    <BottomSheet
+      isOpen={true}
+      onClose={onClose}
+      side="right"
+      desktopWidth="w-[420px]"
+      mobileMaxHeight="max-h-[60vh]"
+      showLocationPrompt={showLocationPrompt}
+      desktopAnimation="animate-slide-in-right"
+    >
       {/* Header */}
       <div className="bg-ocean-gradient px-4 py-3">
         <div className="flex justify-between items-start">
@@ -167,6 +176,6 @@ export default function TimeSlotPickerPanel({
           {locale === 'ko' ? '시간대를 선택하세요' : 'Select a time slot'}
         </span>
       </div>
-    </div>
+    </BottomSheet>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import LogoOverlay from '@/components/LogoOverlay';
+import MobileTabBar from '@/components/MobileTabBar';
 import SavedItemCard from '@/components/SavedItemCard';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import SurfLoadingScreen from '@/components/SurfLoadingScreen';
@@ -168,30 +169,30 @@ export default function SavedPage() {
                 </svg>
                 <span className="text-xs font-semibold text-ocean-700">{lang === 'ko' ? 'KO' : 'EN'}</span>
               </button>
-              {/* Saved Spots Link */}
-              <Link href="/saved" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
-                {t.title}
-              </Link>
-              {/* Map Link */}
-              <Link href="/map" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
-                {t.map}
-              </Link>
-              {/* My Page Icon */}
-              <Link
-                href="/mypage"
-                className="p-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
-                title={t.mypage}
-              >
-                <svg className="w-5 h-5 text-ocean-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </Link>
+              {/* Desktop nav links */}
+              <div className="hidden md:flex items-center gap-3">
+                <Link href="/saved" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+                  {t.title}
+                </Link>
+                <Link href="/map" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+                  {t.map}
+                </Link>
+                <Link
+                  href="/mypage"
+                  className="p-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
+                  title={t.mypage}
+                >
+                  <svg className="w-5 h-5 text-ocean-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </Link>
+              </div>
             </div>
           </div>
         </header>
 
         {/* Content */}
-        <main className="max-w-6xl mx-auto px-4 py-8 pt-16">
+        <main className="max-w-6xl mx-auto px-4 py-8 pt-16 mobile-bottom-spacing">
           <div className="flex flex-col items-center mb-8">
             <h1 className="text-3xl font-bold text-ocean-700 tracking-tight">
               {t.title}
@@ -227,7 +228,7 @@ export default function SavedPage() {
 
           {/* Saved Items Grid */}
           {!isLoading && !error && savedItems.length > 0 && (
-            <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
+            <div className="columns-1 md:columns-2 lg:columns-3 gap-3 space-y-3 md:gap-6 md:space-y-6">
               {savedItems.map((item) => {
                 const feedbackKey = item.location_surf_key;
                 return (
@@ -246,6 +247,12 @@ export default function SavedPage() {
             </div>
           )}
         </main>
+
+        {/* Mobile Tab Bar */}
+        <MobileTabBar
+          locale={lang}
+          onLocaleToggle={() => setLang(lang === 'ko' ? 'en' : 'ko')}
+        />
       </div>
     </ProtectedRoute>
   );

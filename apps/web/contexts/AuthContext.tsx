@@ -9,7 +9,7 @@ interface AuthContextType {
   user: UserV2 | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (username: string, password: string) => Promise<boolean>;
+  login: (username: string, password: string) => Promise<string | null>;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
 }
@@ -53,13 +53,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshAuth();
   }, [refreshAuth]);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const login = async (username: string, password: string): Promise<string | null> => {
     const result = await authService.login({ username, password });
     if (result.success && result.data?.user) {
       setUser(result.data.user);
-      return true;
+      return null;
     }
-    return false;
+    return result.error || 'Login failed';
   };
 
   const logout = async () => {

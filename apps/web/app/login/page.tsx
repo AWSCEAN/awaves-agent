@@ -60,20 +60,21 @@ export default function LoginPage() {
     setIsLoading(true);
     setError('');
 
-    const success = await login(username, password);
+    const errorMsg = await login(username, password);
 
-    if (success) {
+    if (errorMsg === null) {
       router.push('/map');
     } else {
-      setError(t.errorInvalid);
+      const isNetworkError = /fetch|network|connect|ECONNREFUSED/i.test(errorMsg);
+      setError(isNetworkError ? t.errorNetwork : t.errorInvalid);
       setIsLoading(false);
     }
   };
 
   return (
     <main className="min-h-screen bg-sand-gradient flex items-center justify-center px-4">
-      <div className="flex items-center gap-24">
-        <div className="flex-shrink-0">
+      <div className="flex flex-col md:flex-row items-center gap-8 md:gap-24 w-full max-w-[680px]">
+        <div className="flex-shrink-0 hidden md:block">
           <Link href="/">
             <Image
               src="/awaves_main.svg"
@@ -86,7 +87,7 @@ export default function LoginPage() {
           </Link>
         </div>
 
-        <div className="w-[480px] card">
+        <div className="w-full max-w-[480px] card">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-ocean-800">{t.title}</h1>
             <button

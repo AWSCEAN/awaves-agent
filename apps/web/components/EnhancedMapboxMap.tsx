@@ -38,6 +38,7 @@ interface EnhancedMapboxMapProps {
   showMeasureDistance?: boolean;
   saveCountByLocation?: Map<string, number>;
   onMultiSaveMarkerClick?: (locationId: string, coordinates: { lat: number; lng: number }) => void;
+  bottomPadding?: number;
 }
 
 function getSurfScoreColor(score: number): string {
@@ -61,6 +62,7 @@ export default function EnhancedMapboxMap({
   showMeasureDistance = true,
   saveCountByLocation,
   onMultiSaveMarkerClick,
+  bottomPadding = 0,
 }: EnhancedMapboxMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -313,8 +315,9 @@ export default function EnhancedMapboxMap({
       center: [center.lng, center.lat],
       zoom: 12,
       duration: 1500,
+      padding: { top: 0, bottom: bottomPadding, left: 0, right: 0 },
     });
-  }, [center, isMapLoaded]);
+  }, [center, isMapLoaded, bottomPadding]);
 
   useEffect(() => {
     if (!map.current) return;

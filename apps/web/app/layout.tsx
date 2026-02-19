@@ -1,6 +1,13 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import Providers from '@/components/Providers';
+import CapacitorInit from '@/components/CapacitorInit';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
 
 export const metadata: Metadata = {
   title: 'AWAVES - Find Your Perfect Wave',
@@ -16,7 +23,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen bg-sand-50">
-        <Providers>{children}</Providers>
+        <Providers>
+          <CapacitorInit />
+          {children}
+        </Providers>
       </body>
     </html>
   );

@@ -137,10 +137,10 @@ export default function SavedItemCard({
       {/* Card Content - Dimmed when flag_change is true */}
       <div className={item.flag_change ? 'opacity-40 pointer-events-none' : ''}>
         {/* Header with location and remove button */}
-        <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start justify-between mb-1.5 md:mb-3">
           <div>
-            <h3 className="font-semibold text-ocean-800 text-lg line-clamp-1">{locationName}</h3>
-            <div className="flex items-center gap-2 text-sm text-ocean-600">
+            <h3 className="font-semibold text-ocean-800 text-sm md:text-lg line-clamp-1">{locationName}</h3>
+            <div className="flex items-center gap-2 text-xs md:text-sm text-ocean-600">
               {(item.region || spotName?.region) && (
                 <span>{lang === 'ko' && spotName?.regionKo ? spotName.regionKo : (item.region || spotName?.region)}</span>
               )}
@@ -178,70 +178,75 @@ export default function SavedItemCard({
         </div>
 
         {/* Score and Grade - Prominent Display */}
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-2 md:gap-3 mb-1 md:mb-4">
           {/* Surf Score */}
-          <div className="flex-1 bg-gradient-to-br from-ocean-50 to-sand-50 rounded-xl p-3 border border-ocean-100">
-            <div className="text-xs text-ocean-500 font-medium mb-1">{t.surfScore}</div>
+          <div className="flex-1 bg-gradient-to-br from-ocean-50 to-sand-50 rounded-xl p-2 md:p-3 border border-ocean-100">
+            <div className="text-xs text-ocean-500 font-medium mb-0.5 md:mb-1">{t.surfScore}</div>
             <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-bold text-ocean-800">{item.surf_score.toFixed(0)}</span>
-              <span className="text-sm text-ocean-400">/100</span>
+              <span className="text-xl md:text-3xl font-bold text-ocean-800">{item.surf_score.toFixed(0)}</span>
+              <span className="text-xs md:text-sm text-ocean-400">/100</span>
             </div>
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden mt-2">
+            <div className="h-1.5 md:h-2 bg-gray-200 rounded-full overflow-hidden mt-1 md:mt-2">
               <div
                 className="h-full bg-gradient-to-r from-ocean-400 to-ocean-600 rounded-full transition-all"
                 style={{ width: `${item.surf_score}%` }}
               />
             </div>
           </div>
-          {/* Grade Badge */}
-          <div className={`w-16 h-16 rounded-xl flex flex-col items-center justify-center shadow-sm ${gradeColors[item.surf_grade] || 'bg-gray-100'}`}>
-            <span className="text-2xl font-bold">{item.surf_grade}</span>
-            <span className="text-[10px] opacity-80">{t.surfGrade}</span>
+          {/* Grade + Level inline on mobile */}
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-12 h-12 md:w-16 md:h-16 rounded-xl flex flex-col items-center justify-center shadow-sm ${gradeColors[item.surf_grade] || 'bg-gray-100'}`}>
+              <span className="text-lg md:text-2xl font-bold">{item.surf_grade}</span>
+              <span className="text-[9px] md:text-[10px] opacity-80">{t.surfGrade}</span>
+            </div>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-ocean-100 text-ocean-700 font-medium whitespace-nowrap md:hidden">
+              {getLevelLabel(item.surfer_level)}
+            </span>
           </div>
         </div>
 
-        {/* Level Badge */}
-        <div className="flex items-center gap-2 mb-3">
+        {/* Level Badge - desktop only (mobile shows inline above) */}
+        <div className="hidden md:flex items-center gap-2 mb-3">
           <span className="text-sm px-3 py-1 rounded-lg bg-ocean-100 text-ocean-700 font-medium">
             {t.level}: {getLevelLabel(item.surfer_level)}
           </span>
         </div>
 
         {/* Conditions Grid */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-1 md:gap-2 mt-1 md:mt-0">
           {item.wave_height !== undefined && (
-            <div className="flex items-center gap-2 bg-sand-50 rounded-lg px-2.5 py-1.5">
-              <span className="text-lg">🌊</span>
+            <div className="flex items-center gap-1 md:gap-2 bg-sand-50 rounded-lg px-1.5 md:px-2.5 py-1 md:py-1.5">
+              <span className="text-sm md:text-lg">🌊</span>
               <div>
-                <div className="text-xs text-ocean-500">{t.waveHeight}</div>
-                <div className="font-semibold text-ocean-800">{Number(item.wave_height).toFixed(1)}m</div>
+                <div className="text-[10px] md:text-xs text-ocean-500">{t.waveHeight}</div>
+                <div className="text-xs md:text-sm font-semibold text-ocean-800">{Number(item.wave_height).toFixed(1)}m</div>
               </div>
             </div>
           )}
           {item.wave_period !== undefined && (
-            <div className="flex items-center gap-2 bg-sand-50 rounded-lg px-2.5 py-1.5">
-              <span className="text-lg">⏱️</span>
+            <div className="flex items-center gap-1 md:gap-2 bg-sand-50 rounded-lg px-1.5 md:px-2.5 py-1 md:py-1.5">
+              <span className="text-sm md:text-lg">⏱️</span>
               <div>
-                <div className="text-xs text-ocean-500">{t.wavePeriod}</div>
-                <div className="font-semibold text-ocean-800">{Number(item.wave_period).toFixed(1)}s</div>
+                <div className="text-[10px] md:text-xs text-ocean-500">{t.wavePeriod}</div>
+                <div className="text-xs md:text-sm font-semibold text-ocean-800">{Number(item.wave_period).toFixed(1)}s</div>
               </div>
             </div>
           )}
           {item.wind_speed !== undefined && (
-            <div className="flex items-center gap-2 bg-sand-50 rounded-lg px-2.5 py-1.5">
-              <span className="text-lg">💨</span>
+            <div className="flex items-center gap-1 md:gap-2 bg-sand-50 rounded-lg px-1.5 md:px-2.5 py-1 md:py-1.5">
+              <span className="text-sm md:text-lg">💨</span>
               <div>
-                <div className="text-xs text-ocean-500">{t.windSpeed}</div>
-                <div className="font-semibold text-ocean-800">{Number(item.wind_speed).toFixed(1)}m/s</div>
+                <div className="text-[10px] md:text-xs text-ocean-500">{t.windSpeed}</div>
+                <div className="text-xs md:text-sm font-semibold text-ocean-800">{Number(item.wind_speed).toFixed(1)}m/s</div>
               </div>
             </div>
           )}
           {item.water_temperature !== undefined && (
-            <div className="flex items-center gap-2 bg-sand-50 rounded-lg px-2.5 py-1.5">
-              <span className="text-lg">🌡️</span>
+            <div className="flex items-center gap-1 md:gap-2 bg-sand-50 rounded-lg px-1.5 md:px-2.5 py-1 md:py-1.5">
+              <span className="text-sm md:text-lg">🌡️</span>
               <div>
-                <div className="text-xs text-ocean-500">{t.waterTemp}</div>
-                <div className="font-semibold text-ocean-800">{Number(item.water_temperature).toFixed(1)}°C</div>
+                <div className="text-[10px] md:text-xs text-ocean-500">{t.waterTemp}</div>
+                <div className="text-xs md:text-sm font-semibold text-ocean-800">{Number(item.water_temperature).toFixed(1)}°C</div>
               </div>
             </div>
           )}
@@ -254,9 +259,9 @@ export default function SavedItemCard({
           </div>
         )}
 
-        {/* Feedback Section - only show when no feedback given yet and date is in the past */}
+        {/* Feedback Section - desktop only; hidden on mobile to keep cards compact */}
         {!feedbackStatus && new Date(item.surf_timestamp) < new Date() && (
-          <div className="border-t pt-3 mt-3">
+          <div className="hidden md:block border-t pt-3 mt-3">
             <p className="text-sm text-ocean-600 mb-2">{t.feedbackQuestion}</p>
             <div className="flex items-center gap-2">
               <button
