@@ -1,0 +1,223 @@
+"""Shared prediction service used by both REST and GraphQL endpoints.
+
+Flow:
+  1. Check Redis cache
+  2. Call SageMaker endpoint (localhost:8080/invocations)
+  3. Fallback to mock if SageMaker is unavailable
+  4. Cache result in Redis
+  5. Add week info + spot name
+"""
+
+import hashlib
+import logging
+import random
+from datetime import datetime, timedelta, timezone
+
+import httpx
+
+from app.config import settings
+from app.services.cache import InferenceCacheService as CacheService
+from app.repositories.surf_data_repository import SurfDataRepository
+
+logger = logging.getLogger(__name__)
+
+
+async def get_surf_prediction(
+    location_id: str,
+    surf_date: str,
+    surfer_level: str,
+) -> dict:
+    """Core prediction logic shared by REST and GraphQL.
+
+    Returns full prediction dict ready for API response.
+    """
+    # 1. Check Redis cache
+    cached = await CacheService.get_inference_prediction(location_id, surf_date)
+    if cached:
+        prediction = cached
+    else:
+        # Parse location
+        parts = location_id.split("#")
+        lat = float(parts[0]) if len(parts) >= 2 else 0.0
+        lng = float(parts[1]) if len(parts) >= 2 else 0.0
+
+        # 2. Call SageMaker endpoint
+        sagemaker_result = await _call_sagemaker(
+            location_id, surf_date, surfer_level, lat, lng
+        )
+
+        if sagemaker_result:
+            prediction = _build_prediction(
+                location_id, surf_date, lat, lng, surfer_level, sagemaker_result
+            )
+        else:
+            # 3. Fallback to mock if SageMaker unavailable
+            prediction = _generate_mock_prediction(
+                location_id, surf_date, surfer_level, lat, lng
+            )
+
+        # 4. Cache the result
+        await CacheService.store_inference_prediction(
+            location_id, surf_date, prediction
+        )
+
+    # 5. Add week info + spot name
+    _add_week_info(prediction, surf_date)
+    await _add_spot_name(prediction, location_id)
+
+    return prediction
+
+
+async def _call_sagemaker(
+    location_id: str,
+    surf_date: str,
+    surfer_level: str,
+    lat: float,
+    lng: float,
+) -> dict | None:
+    """Call SageMaker local endpoint and return inference result.
+
+    Returns dict with surfGrade, surfScore, etc. or None on failure.
+    """
+    endpoint = settings.sagemaker_local_endpoint
+    payload = {
+        "location": location_id,
+        "date": surf_date,
+        "level": surfer_level,
+        "lat": lat,
+        "lng": lng,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                endpoint,
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            resp.raise_for_status()
+            return resp.json()
+    except httpx.ConnectError:
+        logger.warning("SageMaker endpoint not reachable at %s", endpoint)
+        return None
+    except httpx.HTTPStatusError as e:
+        logger.warning("SageMaker endpoint returned error: %s", e)
+        return None
+    except Exception as e:
+        logger.warning("SageMaker call failed: %s", e)
+        return None
+
+
+def _build_prediction(
+    location_id: str,
+    surf_date: str,
+    lat: float,
+    lng: float,
+    surfer_level: str,
+    sagemaker_result: dict,
+) -> dict:
+    """Build prediction response from SageMaker inference result."""
+    # SageMaker returns surfGrade + surfScore
+    surf_score = sagemaker_result.get("surfScore", 0)
+    surf_grade = sagemaker_result.get("surfGrade", "D")
+
+    level_map = {
+        "beginner": "BEGINNER",
+        "intermediate": "INTERMEDIATE",
+        "advanced": "ADVANCED",
+    }
+    surfing_level = level_map.get(surfer_level.lower(), "INTERMEDIATE")
+
+    return {
+        "locationId": location_id,
+        "surfTimestamp": f"{surf_date}T06:00:00Z",
+        "geo": {"lat": lat, "lng": lng},
+        "derivedMetrics": {
+            "surfScore": surf_score,
+            "surfGrade": surf_grade,
+            "surfingLevel": surfing_level,
+        },
+        "metadata": {
+            "modelVersion": sagemaker_result.get("modelVersion", "sagemaker-awaves-v1.0"),
+            "dataSource": "open-meteo",
+            "predictionType": "FORECAST",
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+            "cacheSource": "SEARCH_INFERENCE",
+        },
+    }
+
+
+def _generate_mock_prediction(
+    location_id: str,
+    surf_date: str,
+    surfer_level: str,
+    lat: float,
+    lng: float,
+) -> dict:
+    """Generate deterministic mock prediction (fallback when SageMaker is down)."""
+    seed_str = f"{location_id}-{surf_date}-{surfer_level}"
+    seed = int(hashlib.md5(seed_str.encode()).hexdigest()[:8], 16)
+    rng = random.Random(seed)
+
+    surf_score = round(rng.uniform(30, 95), 1)
+    grade = (
+        "A"
+        if surf_score >= 80
+        else "B" if surf_score >= 60 else "C" if surf_score >= 40 else "D"
+    )
+    level_map = {
+        "beginner": "BEGINNER",
+        "intermediate": "INTERMEDIATE",
+        "advanced": "ADVANCED",
+    }
+    surfing_level = level_map.get(surfer_level, "INTERMEDIATE")
+
+    return {
+        "locationId": location_id,
+        "surfTimestamp": f"{surf_date}T06:00:00Z",
+        "geo": {"lat": lat, "lng": lng},
+        "derivedMetrics": {
+            "surfScore": surf_score,
+            "surfGrade": grade,
+            "surfingLevel": surfing_level,
+        },
+        "metadata": {
+            "modelVersion": "mock-v1.0",
+            "dataSource": "mock",
+            "predictionType": "FORECAST",
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+            "cacheSource": "SEARCH_INFERENCE",
+        },
+    }
+
+
+def _add_week_info(prediction: dict, surf_date: str) -> None:
+    """Add week number and range to prediction dict."""
+    dt = datetime.strptime(surf_date, "%Y-%m-%d")
+    days_since_sunday = (dt.weekday() + 1) % 7
+    week_start = dt - timedelta(days=days_since_sunday)
+    week_end = week_start + timedelta(days=6)
+    jan1 = datetime(dt.year, 1, 1)
+    days_since_jan1_sunday = (jan1.weekday() + 1) % 7
+    first_sunday = jan1 - timedelta(days=days_since_jan1_sunday)
+    week_number = ((week_start - first_sunday).days // 7) + 1
+
+    prediction["weekNumber"] = week_number
+    prediction["weekRange"] = (
+        f"{week_start.strftime('%b %d')} - {week_end.strftime('%b %d')}"
+    )
+
+
+async def _add_spot_name(prediction: dict, location_id: str) -> None:
+    """Look up spot name from DynamoDB."""
+    all_spots = await SurfDataRepository.get_all_spots_unpaginated()
+    spot_name = location_id
+    spot_name_ko = None
+    for spot in all_spots:
+        if spot.get("LocationId") == location_id:
+            spot_name = spot.get("name", location_id)
+            spot_name_ko = spot.get("nameKo")
+            break
+
+    prediction["spotName"] = spot_name
+    prediction["spotNameKo"] = spot_name_ko

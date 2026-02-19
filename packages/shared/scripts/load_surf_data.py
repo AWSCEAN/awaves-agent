@@ -15,14 +15,15 @@ import redis
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 
-# Load .env.local from apps/api
-_env_local = Path(__file__).resolve().parent.parent.parent.parent / "apps" / "api" / ".env.local"
-load_dotenv(_env_local)
+# Load .env and .env.local from apps/api (.env.local overrides .env)
+_api_dir = Path(__file__).resolve().parent.parent.parent.parent / "apps" / "api"
+load_dotenv(_api_dir / ".env")
+load_dotenv(_api_dir / ".env.local", override=True)
 
 ENDPOINT_URL = "http://localhost:8000"
 TABLE_NAME = "surf_info"
 REGION = "ap-northeast-2"
-CSV_FILE = "data/mock_surf_prediction_20260211.csv"
+CSV_FILE = "data/mock_surf_prediction_20260219.csv"
 
 REDIS_URL = os.getenv("CACHE_URL")
 if not REDIS_URL:
@@ -183,7 +184,7 @@ def main():
     delete_all_items(dynamodb, table)
 
     # 필요할 때 주석 해제하고 사용
-    # clear_redis_cache()
+    clear_redis_cache()
 
     # 2. Insert new data from CSV
     count = 0
@@ -268,7 +269,7 @@ def main():
 
     # 필요할 때 주석 해제하고 사용
     # 3. Save latest per location to Redis cache
-    # save_latest_to_redis(latest_map)
+    save_latest_to_redis(latest_map)
 
 
 if __name__ == "__main__":

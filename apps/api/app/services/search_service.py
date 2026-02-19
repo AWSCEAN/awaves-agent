@@ -4,7 +4,7 @@ import logging
 from typing import Optional
 
 from app.services.opensearch_service import OpenSearchService
-from app.services.surf_dynamodb import SurfDynamoDBService
+from app.repositories.surf_data_repository import SurfDataRepository
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class SearchService:
 
         # Step 2: Batch-fetch all spots for the date/time (uses in-memory cache)
         # This is a single call instead of N individual DynamoDB queries
-        all_spots = await SurfDynamoDBService.get_spots_for_date(date, time)
+        all_spots = await SurfDataRepository.get_spots_for_date(date, time)
         spots_by_id: dict[str, dict] = {s["LocationId"]: s for s in all_spots}
 
         # Step 3: Match OpenSearch results with surf data

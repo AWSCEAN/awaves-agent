@@ -267,14 +267,8 @@ export default function EnhancedMapboxMap({
           '\u2764\uFE0F',
           '#ffffff',
           () => {
-            if (count > 1 && onMultiSaveMarkerClick) {
+            if (onMultiSaveMarkerClick) {
               onMultiSaveMarkerClick(savedSpot.locationId, { lat, lng });
-            } else {
-              const allAvailable = allSpotsRef.current.length > 0 ? allSpotsRef.current : spotsRef.current;
-              const matchingSpot = allAvailable.find(s => s.LocationId === savedSpot.locationId);
-              if (matchingSpot) {
-                showSurfInfoAtCoords(lng, lat, matchingSpot, selectedDateRef.current);
-              }
             }
           },
           '#e74c3c',

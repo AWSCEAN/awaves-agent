@@ -19,6 +19,23 @@ services:
     networks:
       - awaves-net
 
+  # Optional: SageMaker local inference container (for production-compatible testing)
+  # Requires: docker login to ECR or use direct model loading instead (INFERENCE_MODE=direct)
+  # To use: set INFERENCE_MODE=sagemaker_local in .env.local
+  sagemaker-inference:
+    image: 763104351884.dkr.ecr.us-east-1.amazonaws.com/sagemaker-scikit-learn-inference:1.2-1
+    container_name: awaves-sagemaker-local
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./app/ml_models:/opt/ml/model
+    environment:
+      - SAGEMAKER_PROGRAM=inference.py
+    networks:
+      - awaves-net
+    profiles:
+      - sagemaker  # Only starts with: docker compose --profile sagemaker up
+
 volumes:
   opensearch-data:
 

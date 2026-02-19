@@ -13,9 +13,11 @@ from app.graphql.types.user import User
 from app.graphql.types.auth import AuthResponse, LoginInput, RegisterInput, RefreshTokenInput
 from app.graphql.types.saved import SavedItem, SavedListResult, SavedItemResponse, SaveItemInput, DeleteSavedItemInput, AcknowledgeChangeInput
 from app.graphql.types.feedback import FeedbackResult, FeedbackResponse, FeedbackInput
+from app.graphql.types.surf import SurfPredictionInput, SurfPredictionResult
 from app.graphql.resolvers import auth as auth_resolvers
 from app.graphql.resolvers import saved as saved_resolvers
 from app.graphql.resolvers import feedback as feedback_resolvers
+from app.graphql.resolvers import surf as surf_resolvers
 
 
 @strawberry.type
@@ -51,6 +53,15 @@ class Query:
     ) -> Optional[FeedbackResult]:
         """Get feedback for a saved item."""
         return await feedback_resolvers.get_feedback(info, location_id, surf_timestamp)
+
+    @strawberry.field
+    async def predict_surf(
+        self,
+        info: strawberry.Info[GraphQLContext, None],
+        input: SurfPredictionInput,
+    ) -> SurfPredictionResult:
+        """Get ML inference prediction for surf conditions."""
+        return await surf_resolvers.predict_surf(info, input)
 
 
 @strawberry.type

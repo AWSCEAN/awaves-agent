@@ -421,9 +421,54 @@ function MapPageContent() {
 
   const handleMultiSaveMarkerClick = useCallback((locationId: string, coordinates: { lat: number; lng: number }) => {
     const saves = savesByLocation.get(locationId) || [];
-    setSelectedSpotDetail(null);
-    setTimeSlotSelection({ locationId, coordinates, saves });
-  }, [savesByLocation]);
+    if (saves.length === 1) {
+      // Single save: prefer current forecast, fall back to saved data
+      const currentSpot = allSpots.find(s => s.LocationId === locationId);
+      if (currentSpot) {
+        setTimeSlotSelection(null);
+        setSelectedSpotDetail({
+          surfInfo: currentSpot,
+          coordinates: { latitude: coordinates.lat, longitude: coordinates.lng },
+        });
+      } else {
+        // No current forecast available — construct from saved data
+        const save = saves[0];
+        const surfInfo: SurfInfo = {
+          LocationId: save.locationId,
+          SurfTimestamp: save.surfTimestamp,
+          geo: { lat: coordinates.lat, lng: coordinates.lng },
+          conditions: {
+            waveHeight: save.waveHeight,
+            wavePeriod: save.wavePeriod,
+            windSpeed: save.windSpeed,
+            waterTemperature: save.waterTemperature,
+          },
+          derivedMetrics: {
+            surfScore: save.surfScore,
+            surfGrade: save.surfGrade,
+            surfingLevel: (save.surfingLevel || 'BEGINNER') as SurfingLevel,
+          },
+          metadata: { modelVersion: '', dataSource: '', predictionType: 'FORECAST', createdAt: '' },
+          name: save.name || save.locationId,
+          nameKo: save.nameKo,
+          region: save.region,
+          country: save.country,
+          address: save.address,
+          waveType: '',
+          bestSeason: [],
+        };
+        setTimeSlotSelection(null);
+        setSelectedSpotDetail({
+          surfInfo,
+          coordinates: { latitude: coordinates.lat, longitude: coordinates.lng },
+        });
+      }
+    } else {
+      // Multiple saves: show TimeSlotPickerPanel
+      setSelectedSpotDetail(null);
+      setTimeSlotSelection({ locationId, coordinates, saves });
+    }
+  }, [savesByLocation, allSpots]);
 
   const handleTimeSlotSelect = useCallback((save: SavedListItem) => {
     const [latStr, lngStr] = save.locationId.split('#');

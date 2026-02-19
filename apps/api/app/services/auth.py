@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
-from app.services.cache import CacheService
+from app.services.cache import AuthCacheService as CacheService
 
 
 @dataclass
