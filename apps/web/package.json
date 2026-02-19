@@ -14,6 +14,9 @@
   },
   "dependencies": {
     "@apollo/client": "^4.1.4",
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/cli": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
     "@mapbox/mapbox-gl-geocoder": "^5.0.2",
     "@shared/types": "workspace:*",
     "@turf/helpers": "^7.1.0",

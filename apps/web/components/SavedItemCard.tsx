@@ -118,15 +118,36 @@ export default function SavedItemCard({
     }
   };
 
-  // Resolve display name: spotName from surf data > address from save > coordinates fallback
+  const handleFeedbackClick = (status: FeedbackStatus) => {
+    onFeedback(status);
+    setShowFeedbackToast(true);
+    setShowFeedback(false);
+    setTimeout(() => setShowFeedbackToast(false), 2000);
+  };
+
+  // Resolve display name
   const resolvedSpotName = spotName
     ? (lang === 'ko' && spotName.nameKo ? spotName.nameKo : spotName.name)
     : null;
   const locationName = resolvedSpotName || item.address || `${item.location_id.replace('#', ', ')}`;
   const regionLabel = lang === 'ko' && spotName?.regionKo ? spotName.regionKo : (item.region || spotName?.region);
+  const countryLabel = lang === 'ko' && spotName?.countryKo ? spotName.countryKo : (item.country || spotName?.country);
 
-  // Compact timestamp: MM/DD HH:mm
-  const formatTimestamp = (ts: string) => {
+  const mapHref = `/map?lat=${item.location_id.split('#')[0]}&lng=${item.location_id.split('#')[1]}`;
+
+  // Full timestamp for desktop
+  const formatFullTimestamp = (ts: string) => {
+    const date = new Date(ts);
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+  };
+
+  // Compact timestamp for mobile
+  const formatCompactTimestamp = (ts: string) => {
     const d = new Date(ts);
     const mm = (d.getMonth() + 1).toString().padStart(2, '0');
     const dd = d.getDate().toString().padStart(2, '0');
@@ -135,167 +156,304 @@ export default function SavedItemCard({
     return `${mm}/${dd} ${hh}:${min}`;
   };
 
+  const showFeedbackSection = !feedbackStatus && new Date(item.surf_timestamp) < new Date();
+
   return (
     <div className="card relative overflow-hidden break-inside-avoid">
       {/* Card Content - Dimmed when flag_change is true */}
       <div className={item.flag_change ? 'opacity-40 pointer-events-none' : ''}>
 
-        {/* ── Row 1: name + region/timestamp + remove ── */}
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-ocean-800 text-sm truncate leading-tight">{locationName}</h3>
-            <div className="flex items-center gap-1.5 text-xs text-ocean-500 min-w-0 mt-0.5">
-              {(regionLabel || spotName?.country || item.country) && (
-                <span className="truncate">
-                  {regionLabel}{(regionLabel && (spotName?.country || item.country)) ? ' · ' : ''}{lang === 'ko' && spotName?.countryKo ? spotName.countryKo : (item.country || spotName?.country)}
-                </span>
-              )}
-              {item.surf_timestamp && (
-                <span className="flex-shrink-0 text-ocean-400">· {formatTimestamp(item.surf_timestamp)}</span>
-              )}
+        {/* ═══════════════════════════════════════════════════ */}
+        {/* MOBILE LAYOUT (compact, everything visible at once) */}
+        {/* ═══════════════════════════════════════════════════ */}
+        <div className="md:hidden p-2.5">
+          {/* Row 1: name + region/timestamp + remove */}
+          <div className="flex items-start justify-between gap-2 mb-1.5">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-ocean-800 text-sm truncate leading-tight">{locationName}</h3>
+              <div className="flex items-center gap-1.5 text-xs text-ocean-500 min-w-0 mt-0.5">
+                {(regionLabel || countryLabel) && (
+                  <span className="truncate">
+                    {regionLabel}{(regionLabel && countryLabel) ? ' · ' : ''}{countryLabel}
+                  </span>
+                )}
+                {item.surf_timestamp && (
+                  <span className="flex-shrink-0 text-ocean-400">· {formatCompactTimestamp(item.surf_timestamp)}</span>
+                )}
+              </div>
             </div>
-          </div>
-          <button
-            onClick={() => setShowConfirmDelete(true)}
-            className="text-sunset-500 hover:text-sunset-600 text-sm p-0.5 flex-shrink-0"
-            title={t.remove}
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* ── Row 2: score + grade + level + progress bar ── */}
-        <div className="flex items-center gap-2 mb-2">
-          <div className="flex items-baseline gap-0.5 flex-shrink-0">
-            <span className="text-2xl font-bold text-ocean-800">{item.surf_score.toFixed(0)}</span>
-            <span className="text-xs text-ocean-400">/100</span>
-          </div>
-          <span className={`text-sm font-bold px-1.5 py-0.5 rounded-md flex-shrink-0 ${gradeColors[item.surf_grade] || 'bg-gray-100 text-gray-700'}`}>
-            {item.surf_grade}
-          </span>
-          <span className="text-xs px-1.5 py-0.5 rounded bg-ocean-100 text-ocean-700 font-medium flex-shrink-0">
-            {t.level}: {getLevelLabel(item.surfer_level)}
-          </span>
-          <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-ocean-400 to-ocean-600 rounded-full transition-all"
-              style={{ width: `${item.surf_score}%` }}
-            />
-          </div>
-        </div>
-
-        {/* ── Row 3: 4-column conditions ── */}
-        <div className="grid grid-cols-4 gap-1 mb-2">
-          {item.wave_height !== undefined && (
-            <div className="flex flex-col items-center bg-sand-50 rounded px-1 py-1.5">
-              <span className="text-sm leading-none">🌊</span>
-              <span className="text-[10px] text-ocean-500 mt-0.5 truncate w-full text-center">{t.waveHeight}</span>
-              <span className="text-xs font-semibold text-ocean-800">{Number(item.wave_height).toFixed(1)}m</span>
-            </div>
-          )}
-          {item.wave_period !== undefined && (
-            <div className="flex flex-col items-center bg-sand-50 rounded px-1 py-1.5">
-              <span className="text-sm leading-none">⏱️</span>
-              <span className="text-[10px] text-ocean-500 mt-0.5 truncate w-full text-center">{t.wavePeriod}</span>
-              <span className="text-xs font-semibold text-ocean-800">{Number(item.wave_period).toFixed(1)}s</span>
-            </div>
-          )}
-          {item.wind_speed !== undefined && (
-            <div className="flex flex-col items-center bg-sand-50 rounded px-1 py-1.5">
-              <span className="text-sm leading-none">💨</span>
-              <span className="text-[10px] text-ocean-500 mt-0.5 truncate w-full text-center">{t.windSpeed}</span>
-              <span className="text-xs font-semibold text-ocean-800">{Number(item.wind_speed).toFixed(1)}m/s</span>
-            </div>
-          )}
-          {item.water_temperature !== undefined && (
-            <div className="flex flex-col items-center bg-sand-50 rounded px-1 py-1.5">
-              <span className="text-sm leading-none">🌡️</span>
-              <span className="text-[10px] text-ocean-500 mt-0.5 truncate w-full text-center">{t.waterTemp}</span>
-              <span className="text-xs font-semibold text-ocean-800">{Number(item.water_temperature).toFixed(1)}°C</span>
-            </div>
-          )}
-        </div>
-
-        {/* ── Row 4: departure + feedback toggle + map link ── */}
-        <div className="flex items-center gap-2">
-          {item.departure_date && (
-            <span className="text-[10px] text-ocean-400 flex-shrink-0">
-              {t.departureDate}: {formatDate(item.departure_date)}
-            </span>
-          )}
-          {!feedbackStatus && new Date(item.surf_timestamp) < new Date() && (
             <button
-              onClick={() => setShowFeedback(!showFeedback)}
-              className="text-[10px] text-ocean-400 hover:text-ocean-600 flex-shrink-0 underline"
+              onClick={() => setShowConfirmDelete(true)}
+              className="text-sunset-500 hover:text-sunset-600 text-sm p-0.5 flex-shrink-0"
+              title={t.remove}
             >
-              {lang === 'ko' ? '평가하기' : 'Rate'}
+              ✕
             </button>
+          </div>
+
+          {/* Row 2: score + grade + level + progress bar */}
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <div className="flex items-baseline gap-0.5 flex-shrink-0">
+              <span className="text-xl font-bold text-ocean-800">{item.surf_score.toFixed(0)}</span>
+              <span className="text-[10px] text-ocean-400">/100</span>
+            </div>
+            <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md flex-shrink-0 ${gradeColors[item.surf_grade] || 'bg-gray-100 text-gray-700'}`}>
+              {item.surf_grade}
+            </span>
+            <span className="text-[10px] px-1 py-0.5 rounded bg-ocean-100 text-ocean-700 font-medium flex-shrink-0">
+              {getLevelLabel(item.surfer_level)}
+            </span>
+            <div className="flex-1 h-1 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-ocean-400 to-ocean-600 rounded-full"
+                style={{ width: `${item.surf_score}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Row 3: 4-column conditions (ultra compact) */}
+          <div className="grid grid-cols-4 gap-1 mb-1.5">
+            {item.wave_height !== undefined && (
+              <div className="flex flex-col items-center bg-sand-50 rounded px-0.5 py-1">
+                <span className="text-xs leading-none">🌊</span>
+                <span className="text-[9px] text-ocean-500 mt-0.5">{t.waveHeight}</span>
+                <span className="text-[11px] font-semibold text-ocean-800">{Number(item.wave_height).toFixed(1)}m</span>
+              </div>
+            )}
+            {item.wave_period !== undefined && (
+              <div className="flex flex-col items-center bg-sand-50 rounded px-0.5 py-1">
+                <span className="text-xs leading-none">⏱️</span>
+                <span className="text-[9px] text-ocean-500 mt-0.5">{t.wavePeriod}</span>
+                <span className="text-[11px] font-semibold text-ocean-800">{Number(item.wave_period).toFixed(1)}s</span>
+              </div>
+            )}
+            {item.wind_speed !== undefined && (
+              <div className="flex flex-col items-center bg-sand-50 rounded px-0.5 py-1">
+                <span className="text-xs leading-none">💨</span>
+                <span className="text-[9px] text-ocean-500 mt-0.5">{t.windSpeed}</span>
+                <span className="text-[11px] font-semibold text-ocean-800">{Number(item.wind_speed).toFixed(1)}m/s</span>
+              </div>
+            )}
+            {item.water_temperature !== undefined && (
+              <div className="flex flex-col items-center bg-sand-50 rounded px-0.5 py-1">
+                <span className="text-xs leading-none">🌡️</span>
+                <span className="text-[9px] text-ocean-500 mt-0.5">{t.waterTemp}</span>
+                <span className="text-[11px] font-semibold text-ocean-800">{Number(item.water_temperature).toFixed(1)}°C</span>
+              </div>
+            )}
+          </div>
+
+          {/* Row 4: departure + feedback + map link */}
+          <div className="flex items-center gap-2 text-[10px]">
+            {item.departure_date && (
+              <span className="text-ocean-400 flex-shrink-0">
+                {t.departureDate}: {formatDate(item.departure_date)}
+              </span>
+            )}
+            {showFeedbackSection && (
+              <button
+                onClick={() => setShowFeedback(!showFeedback)}
+                className="text-ocean-400 hover:text-ocean-600 flex-shrink-0 underline"
+              >
+                {lang === 'ko' ? '평가하기' : 'Rate'}
+              </button>
+            )}
+            {feedbackStatus && (
+              <span className="text-green-600 flex-shrink-0">✓ {t.feedbackThanks}</span>
+            )}
+            <Link href={mapHref} className="ml-auto text-xs font-medium text-ocean-600 hover:text-ocean-800 flex-shrink-0">
+              {t.viewOnMap} →
+            </Link>
+          </div>
+
+          {/* Inline feedback (mobile toggle) */}
+          {showFeedback && !feedbackStatus && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-1.5 pt-1.5 border-t border-sand-100">
+              <span className="text-[10px] text-ocean-500">{t.feedbackQuestion}</span>
+              <button onClick={() => handleFeedbackClick('POSITIVE')} className="flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-green-50 hover:bg-green-100 text-green-700">
+                <span>👍</span> {t.feedbackYes}
+              </button>
+              <button onClick={() => handleFeedbackClick('NEGATIVE')} className="flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-red-50 hover:bg-red-100 text-red-700">
+                <span>👎</span> {t.feedbackNo}
+              </button>
+              <button onClick={() => { onFeedback('DEFERRED'); setShowFeedback(false); }} className="px-2 py-0.5 rounded text-xs bg-gray-50 hover:bg-gray-100 text-gray-600">
+                {t.feedbackLater}
+              </button>
+            </div>
           )}
+        </div>
+
+        {/* ═══════════════════════════════════════════════════ */}
+        {/* DESKTOP LAYOUT (origin/main full card)             */}
+        {/* ═══════════════════════════════════════════════════ */}
+        <div className="hidden md:block">
+          {/* Header with location and remove button */}
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <h3 className="font-semibold text-ocean-800 text-lg line-clamp-1">{locationName}</h3>
+              <div className="flex items-center gap-2 text-sm text-ocean-600">
+                {regionLabel && <span>{regionLabel}</span>}
+                {regionLabel && countryLabel && <span>•</span>}
+                {countryLabel && <span>{countryLabel}</span>}
+              </div>
+              {item.surf_timestamp && (
+                <div className="inline-flex items-center gap-1.5 mt-1.5 px-2 py-0.5 rounded-md shadow-sm border border-ocean-200">
+                  <svg className="w-3.5 h-3.5 text-ocean-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-sm font-medium text-ocean-700">
+                    {formatFullTimestamp(item.surf_timestamp)}
+                  </span>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setShowConfirmDelete(true)}
+              className="text-sunset-500 hover:text-sunset-600 text-sm p-1"
+              title={t.remove}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Score and Grade - Prominent Display */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex-1 bg-gradient-to-br from-ocean-50 to-sand-50 rounded-xl p-3 border border-ocean-100">
+              <div className="text-xs text-ocean-500 font-medium mb-1">{t.surfScore}</div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl font-bold text-ocean-800">{item.surf_score.toFixed(0)}</span>
+                <span className="text-sm text-ocean-400">/100</span>
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden mt-2">
+                <div
+                  className="h-full bg-gradient-to-r from-ocean-400 to-ocean-600 rounded-full transition-all"
+                  style={{ width: `${item.surf_score}%` }}
+                />
+              </div>
+            </div>
+            <div className={`w-16 h-16 rounded-xl flex flex-col items-center justify-center shadow-sm ${gradeColors[item.surf_grade] || 'bg-gray-100'}`}>
+              <span className="text-2xl font-bold">{item.surf_grade}</span>
+              <span className="text-[10px] opacity-80">{t.surfGrade}</span>
+            </div>
+          </div>
+
+          {/* Level Badge */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-sm px-3 py-1 rounded-lg bg-ocean-100 text-ocean-700 font-medium">
+              {t.level}: {getLevelLabel(item.surfer_level)}
+            </span>
+          </div>
+
+          {/* Conditions Grid */}
+          <div className="grid grid-cols-2 gap-2">
+            {item.wave_height !== undefined && (
+              <div className="flex items-center gap-2 bg-sand-50 rounded-lg px-2.5 py-1.5">
+                <span className="text-lg">🌊</span>
+                <div>
+                  <div className="text-xs text-ocean-500">{t.waveHeight}</div>
+                  <div className="font-semibold text-ocean-800">{Number(item.wave_height).toFixed(1)}m</div>
+                </div>
+              </div>
+            )}
+            {item.wave_period !== undefined && (
+              <div className="flex items-center gap-2 bg-sand-50 rounded-lg px-2.5 py-1.5">
+                <span className="text-lg">⏱️</span>
+                <div>
+                  <div className="text-xs text-ocean-500">{t.wavePeriod}</div>
+                  <div className="font-semibold text-ocean-800">{Number(item.wave_period).toFixed(1)}s</div>
+                </div>
+              </div>
+            )}
+            {item.wind_speed !== undefined && (
+              <div className="flex items-center gap-2 bg-sand-50 rounded-lg px-2.5 py-1.5">
+                <span className="text-lg">💨</span>
+                <div>
+                  <div className="text-xs text-ocean-500">{t.windSpeed}</div>
+                  <div className="font-semibold text-ocean-800">{Number(item.wind_speed).toFixed(1)}m/s</div>
+                </div>
+              </div>
+            )}
+            {item.water_temperature !== undefined && (
+              <div className="flex items-center gap-2 bg-sand-50 rounded-lg px-2.5 py-1.5">
+                <span className="text-lg">🌡️</span>
+                <div>
+                  <div className="text-xs text-ocean-500">{t.waterTemp}</div>
+                  <div className="font-semibold text-ocean-800">{Number(item.water_temperature).toFixed(1)}°C</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Departure Date */}
+          {item.departure_date && (
+            <div className="text-xs text-ocean-500 mt-3">
+              <span>{t.departureDate}: {formatDate(item.departure_date)}</span>
+            </div>
+          )}
+
+          {/* Feedback Section */}
+          {showFeedbackSection && (
+            <div className="border-t pt-3 mt-3">
+              <p className="text-sm text-ocean-600 mb-2">{t.feedbackQuestion}</p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleFeedbackClick('POSITIVE')}
+                  className="flex-1 flex items-center justify-center gap-1 py-1.5 px-3 rounded-lg bg-green-50 hover:bg-green-100 text-green-700 text-sm font-medium transition-colors"
+                >
+                  <span>👍</span> {t.feedbackYes}
+                </button>
+                <button
+                  onClick={() => handleFeedbackClick('NEGATIVE')}
+                  className="flex-1 flex items-center justify-center gap-1 py-1.5 px-3 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-sm font-medium transition-colors"
+                >
+                  <span>👎</span> {t.feedbackNo}
+                </button>
+                <button
+                  onClick={() => onFeedback('DEFERRED')}
+                  className="py-1.5 px-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-600 text-sm transition-colors"
+                >
+                  {t.feedbackLater}
+                </button>
+              </div>
+            </div>
+          )}
+
           {feedbackStatus && (
-            <span className="text-[10px] text-green-600 flex-shrink-0">✓ {t.feedbackThanks}</span>
+            <div className="text-sm text-green-600 mt-3">✓ {t.feedbackThanks}</div>
           )}
+
+          {/* View on Map Button */}
           <Link
-            href={`/map?lat=${item.location_id.split('#')[0]}&lng=${item.location_id.split('#')[1]}`}
-            className="ml-auto text-xs font-medium text-ocean-600 hover:text-ocean-800 flex-shrink-0"
+            href={mapHref}
+            className="btn-primary w-full text-center block text-sm mt-3"
           >
-            {t.viewOnMap} →
+            {t.viewOnMap}
           </Link>
         </div>
-
-        {/* ── Inline feedback (shown on toggle) ── */}
-        {showFeedback && !feedbackStatus && (
-          <div className="flex flex-wrap items-center gap-1.5 mt-1.5 pt-1.5 border-t border-sand-100">
-            <span className="text-[10px] text-ocean-500">{t.feedbackQuestion}</span>
-            <button
-              onClick={() => {
-                onFeedback('POSITIVE');
-                setShowFeedbackToast(true);
-                setShowFeedback(false);
-                setTimeout(() => setShowFeedbackToast(false), 2000);
-              }}
-              className="flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-green-50 hover:bg-green-100 text-green-700"
-            >
-              <span>👍</span> {t.feedbackYes}
-            </button>
-            <button
-              onClick={() => {
-                onFeedback('NEGATIVE');
-                setShowFeedbackToast(true);
-                setShowFeedback(false);
-                setTimeout(() => setShowFeedbackToast(false), 2000);
-              }}
-              className="flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-red-50 hover:bg-red-100 text-red-700"
-            >
-              <span>👎</span> {t.feedbackNo}
-            </button>
-            <button
-              onClick={() => { onFeedback('DEFERRED'); setShowFeedback(false); }}
-              className="px-2 py-0.5 rounded text-xs bg-gray-50 hover:bg-gray-100 text-gray-600"
-            >
-              {t.feedbackLater}
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* ═══════════════════════════════ */}
+      {/* SHARED OVERLAYS                */}
+      {/* ═══════════════════════════════ */}
 
       {/* Change Notification Overlay */}
       {item.flag_change && (
-        <div className="absolute inset-0 flex items-center justify-center p-3 bg-black/30 backdrop-blur-[2px] rounded-lg z-10">
-          <div className="bg-white rounded-2xl shadow-xl p-4 max-w-[92%] w-full">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-                <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="absolute inset-0 flex items-center justify-center p-2 md:p-4 bg-black/30 backdrop-blur-[2px] rounded-lg z-10">
+          <div className="bg-white rounded-xl md:rounded-2xl shadow-xl p-2.5 md:p-5 max-w-[96%] md:max-w-[92%] w-full md:max-h-full md:overflow-y-auto overflow-hidden">
+            <div className="flex items-center gap-1.5 md:gap-2 mb-1.5 md:mb-3">
+              <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <svg className="w-3.5 h-3.5 md:w-4.5 md:h-4.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h4 className="font-bold text-ocean-800 text-sm">{t.changeDetected}</h4>
+              <h4 className="font-bold text-ocean-800 text-xs md:text-base">{t.changeDetected}</h4>
             </div>
             {item.change_message && (
               <ChangeMessageDisplay message={item.change_message} lang={lang} />
             )}
             <button
               onClick={onAcknowledgeChange}
-              className="btn-primary w-full py-1.5 text-sm mt-2"
+              className="btn-primary w-full py-1 md:py-2 text-xs md:text-sm mt-1.5 md:mt-3"
             >
               {t.acknowledgeChange}
             </button>
@@ -306,8 +464,8 @@ export default function SavedItemCard({
       {/* Feedback Thank You Overlay */}
       {showFeedbackToast && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/10 rounded-xl z-10">
-          <div className="bg-white rounded-xl shadow-xl px-5 py-4 text-center">
-            <div className="text-3xl mb-1">🤙</div>
+          <div className="bg-white rounded-xl shadow-xl px-4 py-3 md:px-6 md:py-5 text-center">
+            <div className="text-2xl md:text-3xl mb-1 md:mb-2">🤙</div>
             <p className="text-sm font-semibold text-ocean-800">{t.feedbackThanks}</p>
           </div>
         </div>
@@ -315,9 +473,9 @@ export default function SavedItemCard({
 
       {/* Delete Confirmation Modal */}
       {showConfirmDelete && (
-        <div className="absolute inset-0 bg-white/95 rounded-lg flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-white/95 rounded-lg flex items-center justify-center p-3 md:p-4">
           <div className="text-center">
-            <p className="text-ocean-800 text-sm mb-4">{t.confirmRemove}</p>
+            <p className="text-ocean-800 text-sm mb-3 md:mb-4">{t.confirmRemove}</p>
             <div className="flex items-center gap-2 justify-center">
               <button
                 onClick={() => setShowConfirmDelete(false)}
@@ -360,7 +518,7 @@ function ChangeMessageDisplay({ message, lang }: { message: string; lang: Langua
     const data = JSON.parse(message);
     if (data.changes && Array.isArray(data.changes)) {
       return (
-        <div className="space-y-1.5">
+        <div className="space-y-1 md:space-y-2">
           {data.changes.map((c: { field: string; old: number | string; new: number | string }, i: number) => {
             const meta = fieldLabels[c.field];
             const label = meta?.[lang] || c.field;
@@ -370,16 +528,16 @@ function ChangeMessageDisplay({ message, lang }: { message: string; lang: Langua
             const isScoreUp = c.field === 'surfScore' && typeof c.new === 'number' && typeof c.old === 'number' && c.new > c.old;
             const isScoreDown = c.field === 'surfScore' && typeof c.new === 'number' && typeof c.old === 'number' && c.new < c.old;
             return (
-              <div key={i} className="bg-sand-50 rounded-lg p-2">
-                <div className="text-xs text-ocean-500 font-medium mb-1">{label}</div>
-                <div className="flex items-center justify-center gap-3">
-                  <span className="text-sm text-ocean-400 line-through">
+              <div key={i} className="bg-sand-50 rounded-lg p-1.5 md:p-2.5">
+                <div className="text-[10px] md:text-xs text-ocean-500 font-medium mb-0.5 md:mb-1.5">{label}</div>
+                <div className="flex items-center justify-center gap-2 md:gap-3">
+                  <span className="text-xs md:text-sm text-ocean-400 line-through">
                     {oldVal}{unit}
                   </span>
-                  <svg className={`w-4 h-4 flex-shrink-0 ${isScoreUp ? 'text-green-500' : isScoreDown ? 'text-red-500' : 'text-ocean-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className={`w-3.5 h-3.5 md:w-4 md:h-4 flex-shrink-0 ${isScoreUp ? 'text-green-500' : isScoreDown ? 'text-red-500' : 'text-ocean-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                   </svg>
-                  <span className={`text-lg font-bold ${isScoreUp ? 'text-green-600' : isScoreDown ? 'text-red-600' : 'text-ocean-800'}`}>
+                  <span className={`text-sm md:text-lg font-bold ${isScoreUp ? 'text-green-600' : isScoreDown ? 'text-red-600' : 'text-ocean-800'}`}>
                     {newVal}{unit}
                   </span>
                 </div>

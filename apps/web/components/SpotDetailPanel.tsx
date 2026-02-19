@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { useLocale } from 'next-intl';
 import type { SurfInfo, SavedListItem } from '@/types';
 import { useSwipeDown } from '@/hooks/useSwipeDown';
@@ -90,9 +90,9 @@ export default function SpotDetailPanel({
   return (
     <div
       className={`
-        fixed bottom-0 left-0 right-0 z-40 flex flex-col bg-white shadow-xl
-        animate-slide-up rounded-t-2xl max-h-[85vh]
-        md:animate-none md:animate-slide-in-right md:rounded-none md:left-auto md:right-0 md:max-h-none md:w-[420px]
+        fixed bottom-14 left-0 right-0 z-40 flex flex-col bg-white shadow-xl overflow-hidden
+        animate-slide-up rounded-t-2xl max-h-[60vh]
+        md:bottom-0 md:animate-none md:animate-slide-in-right md:rounded-none md:left-auto md:right-0 md:max-h-none md:w-[420px]
         transition-all duration-300
         ${showLocationPrompt ? 'md:top-[100px]' : 'md:top-14'}
       `}
@@ -142,8 +142,8 @@ export default function SpotDetailPanel({
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-1.5">
-              <p className="text-sm text-white/80">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <p className="text-sm text-white/80 truncate">
                 {locale === 'ko' && surfInfo.cityKo ? surfInfo.cityKo : surfInfo.city ? surfInfo.city : null}
                 {(locale === 'ko' ? surfInfo.cityKo : surfInfo.city) && ', '}
                 {locale === 'ko' && surfInfo.regionKo ? surfInfo.regionKo : surfInfo.region}, {locale === 'ko' && surfInfo.countryKo ? surfInfo.countryKo : surfInfo.country}
@@ -515,6 +515,25 @@ type SingleMetric = typeof metricKeys[number];
 function ForecastChart({ hours, data, locale }: ForecastChartProps) {
   const [activeMetric, setActiveMetric] = useState<ChartMetric>('overview');
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  // Touch handler: map touch X position to the nearest data point index
+  const handleTouchOnChart = useCallback((e: React.TouchEvent<SVGSVGElement>) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const touchX = e.touches[0].clientX - rect.left;
+    const svgWidth = rect.width;
+    // Map touch position to data index
+    const ratio = touchX / svgWidth;
+    const idx = Math.round(ratio * (hours.length - 1));
+    const clampedIdx = Math.max(0, Math.min(hours.length - 1, idx));
+    setHoveredIdx(clampedIdx);
+  }, [hours.length]);
+
+  const handleTouchEnd = useCallback(() => {
+    setHoveredIdx(null);
+  }, []);
 
   const metrics: Record<SingleMetric, MetricDef> = {
     score: {
@@ -647,7 +666,15 @@ function ForecastChart({ hours, data, locale }: ForecastChartProps) {
 
         <div className="relative">
           {/* Overview SVG Chart */}
-          <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: H }}>
+          <svg
+            ref={svgRef}
+            viewBox={`0 0 ${W} ${H}`}
+            className="w-full touch-none"
+            style={{ height: H }}
+            onTouchStart={handleTouchOnChart}
+            onTouchMove={handleTouchOnChart}
+            onTouchEnd={handleTouchEnd}
+          >
             {/* Horizontal grid lines */}
             {[0, 0.25, 0.5, 0.75, 1].map((n, i) => (
               <line
@@ -779,7 +806,15 @@ function ForecastChart({ hours, data, locale }: ForecastChartProps) {
 
       <div className="relative">
         {/* SVG Chart */}
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: H }}>
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${W} ${H}`}
+          className="w-full touch-none"
+          style={{ height: H }}
+          onTouchStart={handleTouchOnChart}
+          onTouchMove={handleTouchOnChart}
+          onTouchEnd={handleTouchEnd}
+        >
           {/* Grid lines */}
           {yTicks.map((tick, i) => (
             <g key={i}>

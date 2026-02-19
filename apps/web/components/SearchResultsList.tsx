@@ -119,9 +119,9 @@ export default function SearchResultsList({
   return (
     <div
       className={`
-        fixed bottom-0 left-0 right-0 z-40 flex flex-col bg-white shadow-xl
-        animate-slide-up rounded-t-2xl max-h-[80vh]
-        md:animate-none md:animate-slide-in-left md:rounded-none md:right-auto md:left-0 md:max-h-none md:w-96
+        fixed bottom-14 left-0 right-0 z-40 flex flex-col bg-white shadow-xl overflow-hidden
+        animate-slide-up rounded-t-2xl max-h-[60vh]
+        md:bottom-0 md:animate-none md:animate-slide-in-left md:rounded-none md:right-auto md:left-0 md:max-h-none md:w-96
         transition-all duration-300
         ${showLocationPrompt ? 'md:top-[100px]' : 'md:top-14'}
       `}
@@ -236,8 +236,8 @@ export default function SearchResultsList({
                       </div>
 
                       {/* Location and Level */}
-                      <div className="flex items-center gap-2 text-xs text-ocean-500 mb-2 min-w-0">
-                        <span className="truncate min-w-0">{locale === 'ko' && spot.regionKo ? spot.regionKo : spot.region}, {locale === 'ko' && spot.countryKo ? spot.countryKo : spot.country}</span>
+                      <div className="flex items-center gap-2 text-xs text-ocean-500 mb-2 min-w-0 overflow-hidden">
+                        <span className="truncate min-w-0 flex-shrink">{locale === 'ko' && spot.regionKo ? spot.regionKo : spot.region}, {locale === 'ko' && spot.countryKo ? spot.countryKo : spot.country}</span>
                         {getLevelLabel(spot) && (
                           <span className="px-1.5 py-0.5 bg-sand-100 rounded text-ocean-600">
                             {getLevelLabel(spot)}
