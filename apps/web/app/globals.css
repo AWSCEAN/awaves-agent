@@ -583,3 +583,81 @@ body {
 .bg-sunset-gradient {
   background: linear-gradient(135deg, var(--sunset-yellow) 0%, var(--sunset-orange) 100%);
 }
+
+/* ===== Mobile / WebView Styles ===== */
+
+/* Slide-up animation for mobile bottom sheets */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out forwards;
+}
+
+/* Mobile search drawer slide down */
+@keyframes slide-down {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-down {
+  animation: slide-down 0.25s ease-out forwards;
+}
+
+/* Touch-friendly minimum tap targets (exclude compact chart/toggle buttons) */
+@media (max-width: 767px) {
+  select, input {
+    min-height: 40px;
+  }
+  /* Apply to navigation-level buttons/links only, not compact UI elements */
+  header button, header a,
+  .btn-primary, .btn-secondary, .btn-outline, .btn-accent {
+    min-height: 40px;
+  }
+
+  /* Safe area padding for modern phones (notch/home indicator) */
+  .mobile-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+  }
+
+  /* Bottom sheet drag handle */
+  .bottom-sheet-handle {
+    width: 40px;
+    height: 4px;
+    background: #cbd5e1;
+    border-radius: 2px;
+    margin: 8px auto 4px;
+    flex-shrink: 0;
+  }
+
+  /* Prevent body scroll when bottom sheet is open */
+  body.sheet-open {
+    overflow: hidden;
+  }
+}
+
+/* Mapbox controls - position adjustments for mobile */
+@media (max-width: 767px) {
+  .mapboxgl-ctrl-top-right {
+    top: 8px;
+    right: 8px;
+  }
+
+  .mapboxgl-ctrl-bottom-right {
+    bottom: 80px; /* above bottom sheets */
+  }
+}

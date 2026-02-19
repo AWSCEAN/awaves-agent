@@ -122,7 +122,7 @@ export default function LocationAutocomplete({
   };
 
   return (
-    <div ref={containerRef} className={`relative ${className}`}>
+    <div ref={containerRef} className={`relative overflow-hidden ${className}`}>
       <input
         ref={inputRef}
         type="text"
@@ -130,7 +130,7 @@ export default function LocationAutocomplete({
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => value.length >= 1 && options.length > 0 && setIsOpen(true)}
         placeholder={hasError && errorPlaceholder ? errorPlaceholder : (placeholder || t('locationPlaceholder'))}
-        className={`w-full px-3 py-2 text-sm border rounded-lg
+        className={`w-full px-3 py-2 text-sm border rounded-lg truncate
           focus:outline-none focus:ring-2 bg-white text-ocean-800 ${
             hasError
               ? 'border-red-400 focus:ring-red-500/50 focus:border-red-500 placeholder:text-red-400'
@@ -140,7 +140,7 @@ export default function LocationAutocomplete({
 
       {isOpen && options.length > 0 && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg
-          border border-sand-200 max-h-64 overflow-y-auto z-50">
+          border border-sand-200 max-h-64 overflow-y-auto overflow-x-hidden z-50">
           {options.map((option) => {
             const displayName = locale === 'ko' && option.nameKo ? option.nameKo : option.name;
             const secondaryName = locale === 'ko' && option.nameKo ? option.name : option.nameKo;

@@ -146,11 +146,11 @@ export default function MyPage() {
 
   return (
     <ProtectedRoute>
-    <LogoOverlay />
-    <div className="min-h-screen bg-sand-gradient">
+    <div className="min-h-screen bg-sand-gradient flex flex-col">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-40 glass">
-        <div className="px-4 py-2 flex items-center justify-end">
+        <div className="px-4 py-2 flex items-center justify-between">
+          <LogoOverlay />
           <div className="flex items-center gap-3">
             {/* Language Toggle (icon + label) */}
             <button
@@ -163,18 +163,16 @@ export default function MyPage() {
               </svg>
               <span className="text-xs font-semibold text-ocean-700">{lang === 'ko' ? 'KO' : 'EN'}</span>
             </button>
-            {/* Saved Spots Link */}
-            <Link href="/saved" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+            {/* Desktop nav links - hidden on mobile (BottomNav handles mobile) */}
+            <Link href="/saved" className="hidden md:inline text-sm font-medium text-ocean-700 hover:text-ocean-500">
               {t.savedSpots}
             </Link>
-            {/* Map Link */}
-            <Link href="/map" className="text-sm font-medium text-ocean-700 hover:text-ocean-500">
+            <Link href="/map" className="hidden md:inline text-sm font-medium text-ocean-700 hover:text-ocean-500">
               {t.map}
             </Link>
-            {/* My Page Icon */}
             <Link
               href="/mypage"
-              className="p-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
+              className="hidden md:inline-block p-1.5 rounded-full bg-sand-100 hover:bg-sand-200 transition-colors"
               title={t.title}
             >
               <svg className="w-5 h-5 text-ocean-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -186,11 +184,11 @@ export default function MyPage() {
       </header>
 
       {/* Content */}
-      <main className="max-w-2xl mx-auto px-4 pt-24 pb-8">
-        <h1 className="text-3xl font-bold text-ocean-700 tracking-tight text-center mb-8">{t.title}</h1>
+      <main className="flex-1 flex flex-col justify-center max-w-2xl w-full mx-auto px-4 pt-16 pb-20 md:pb-8">
+        <h1 className="text-2xl md:text-3xl font-bold text-ocean-700 tracking-tight text-center mb-6">{t.title}</h1>
 
         {/* Profile Section */}
-        <section className="card mb-8">
+        <section className="card mb-6">
           <h2 className="text-xl font-semibold text-ocean-800 mb-4">{t.profile}</h2>
 
           <div className="space-y-4">

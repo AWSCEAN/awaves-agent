@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import LogoOverlay from '@/components/LogoOverlay';
 import SavedItemCard from '@/components/SavedItemCard';
@@ -156,7 +156,8 @@ export default function SavedPage() {
         {/* Header */}
         <header className="fixed top-0 left-0 right-0 z-40 glass">
           <div className="px-4 py-2 flex items-center justify-end">
-            <div className="flex items-center gap-3">
+            {/* Desktop nav links - hidden on mobile (BottomNav handles mobile) */}
+            <div className="hidden md:flex items-center gap-3">
               {/* Language Toggle (icon + label) */}
               <button
                 onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
@@ -191,13 +192,13 @@ export default function SavedPage() {
         </header>
 
         {/* Content */}
-        <main className="max-w-6xl mx-auto px-4 py-8 pt-16">
-          <div className="flex flex-col items-center mb-8">
-            <h1 className="text-3xl font-bold text-ocean-700 tracking-tight">
+        <main className="max-w-6xl mx-auto px-3 md:px-4 py-4 md:py-8 pt-14 md:pt-16 pb-20 md:pb-6">
+          <div className="flex flex-col items-center mb-3 md:mb-8">
+            <h1 className="text-xl md:text-3xl font-bold text-ocean-700 tracking-tight">
               {t.title}
             </h1>
             {savedItems.length > 0 && (
-              <span className="text-sm text-ocean-500 mt-2">
+              <span className="text-xs md:text-sm text-ocean-500 mt-1 md:mt-2">
                 {t.total.replace('{count}', String(savedItems.length))}
               </span>
             )}
@@ -225,25 +226,46 @@ export default function SavedPage() {
             </div>
           )}
 
-          {/* Saved Items Grid */}
+          {/* Saved Items - Mobile: tight grid, Desktop: masonry columns (origin/main) */}
           {!isLoading && !error && savedItems.length > 0 && (
-            <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
-              {savedItems.map((item) => {
-                const feedbackKey = item.location_surf_key;
-                return (
-                  <SavedItemCard
-                    key={item.location_surf_key}
-                    item={item}
-                    lang={lang}
-                    spotName={spotNameMap.get(item.location_id)}
-                    onRemove={() => handleRemove(item)}
-                    onAcknowledgeChange={() => handleAcknowledgeChange(item)}
-                    onFeedback={(status) => handleFeedback(item, status)}
-                    feedbackStatus={feedbackMap[feedbackKey]}
-                  />
-                );
-              })}
-            </div>
+            <>
+              {/* Mobile grid */}
+              <div className="flex flex-col gap-2 md:hidden">
+                {savedItems.map((item) => {
+                  const feedbackKey = item.location_surf_key;
+                  return (
+                    <SavedItemCard
+                      key={item.location_surf_key}
+                      item={item}
+                      lang={lang}
+                      spotName={spotNameMap.get(item.location_id)}
+                      onRemove={() => handleRemove(item)}
+                      onAcknowledgeChange={() => handleAcknowledgeChange(item)}
+                      onFeedback={(status) => handleFeedback(item, status)}
+                      feedbackStatus={feedbackMap[feedbackKey]}
+                    />
+                  );
+                })}
+              </div>
+              {/* Desktop masonry columns */}
+              <div className="hidden md:block columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
+                {savedItems.map((item) => {
+                  const feedbackKey = item.location_surf_key;
+                  return (
+                    <SavedItemCard
+                      key={item.location_surf_key}
+                      item={item}
+                      lang={lang}
+                      spotName={spotNameMap.get(item.location_id)}
+                      onRemove={() => handleRemove(item)}
+                      onAcknowledgeChange={() => handleAcknowledgeChange(item)}
+                      onFeedback={(status) => handleFeedback(item, status)}
+                      feedbackStatus={feedbackMap[feedbackKey]}
+                    />
+                  );
+                })}
+              </div>
+            </>
           )}
         </main>
       </div>

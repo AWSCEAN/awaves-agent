@@ -78,11 +78,11 @@ export default function LandingPage() {
 
   return (
     <>
-      <LogoOverlay />
       <main className="h-screen flex flex-col overflow-hidden bg-sand-gradient">
         {/* Header */}
         <header className="flex-shrink-0 glass z-40">
-          <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-end">
+          <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
+            <LogoOverlay />
             <div className="flex items-center gap-3">
               {/* Language Toggle (icon + label) */}
               <button
@@ -128,7 +128,7 @@ export default function LandingPage() {
         </header>
 
         {/* Hero Section */}
-        <section className="flex-1 flex flex-col items-center justify-center px-4">
+        <section className="flex-1 flex flex-col items-center justify-center px-4 overflow-y-auto">
           <div className="max-w-4xl mx-auto text-center">
             <div className="flex justify-center mb-4">
               <Image
@@ -137,23 +137,23 @@ export default function LandingPage() {
                 width={200}
                 height={200}
                 className="animate-ripple"
-                style={{ width: 'auto', height: 'auto', maxWidth: '200px' }}
+                style={{ width: 'auto', height: 'auto', maxWidth: '140px' }}
               />
             </div>
-            <h1 className="text-4xl font-bold text-ocean-800 mb-3">
+            <h1 className="text-2xl md:text-4xl font-bold text-ocean-800 mb-3">
               {t.tagline}
             </h1>
-            <p className="text-lg text-ocean-600 mb-6">
+            <p className="text-base md:text-lg text-ocean-600 mb-6">
               {t.subtitle}
             </p>
-            <button onClick={handleGetStarted} className="btn-primary text-lg px-8 py-3">
+            <button onClick={handleGetStarted} className="btn-primary text-base md:text-lg px-6 md:px-8 py-3">
               {t.cta}
             </button>
           </div>
 
           {/* Features Row */}
-          <div className="max-w-5xl mx-auto mt-8 w-full">
-            <div className="grid grid-cols-3 gap-4">
+          <div className="max-w-5xl mx-auto mt-6 w-full">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
               <FeatureCard
                 icon="🌊"
                 title={t.features.realtime}

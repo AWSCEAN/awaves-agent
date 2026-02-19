@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { useLocale } from 'next-intl';
 import type { SurfInfo, SavedListItem } from '@/types';
+import { useSwipeDown } from '@/hooks/useSwipeDown';
 import { getGradeBgColor, getGradeTextColor, getGradeBorderColor } from '@/lib/services/surfInfoService';
 
 interface SpotDetailPanelProps {
@@ -48,6 +49,7 @@ export default function SpotDetailPanel({
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [copied, setCopied] = useState(false);
   const [forecastView, setForecastView] = useState<'table' | 'chart'>('table');
+  const swipe = useSwipeDown(onClose);
 
   const displayName = locale === 'ko' && surfInfo.nameKo ? surfInfo.nameKo : surfInfo.name;
   const { surfScore, surfGrade, surfingLevel } = surfInfo.derivedMetrics;
@@ -86,7 +88,21 @@ export default function SpotDetailPanel({
   };
 
   return (
-    <div className={`fixed right-0 bottom-0 w-[420px] bg-white shadow-xl z-40 flex flex-col animate-slide-in-right transition-all duration-300 ${showLocationPrompt ? 'top-[100px]' : 'top-14'}`}>
+    <div
+      className={`
+        fixed bottom-14 left-0 right-0 z-40 flex flex-col bg-white shadow-xl overflow-hidden
+        animate-slide-up rounded-t-2xl max-h-[60vh]
+        md:bottom-0 md:animate-none md:animate-slide-in-right md:rounded-none md:left-auto md:right-0 md:max-h-none md:w-[420px]
+        transition-all duration-300
+        ${showLocationPrompt ? 'md:top-[100px]' : 'md:top-14'}
+      `}
+      onTouchStart={swipe.onTouchStart}
+      onTouchMove={swipe.onTouchMove}
+      onTouchEnd={swipe.onTouchEnd}
+    >
+      {/* Mobile drag handle */}
+      <div className="md:hidden bottom-sheet-handle" />
+
       {/* Header */}
       <div className="bg-ocean-gradient px-4 py-3">
         <div className="flex justify-between items-start">
@@ -126,8 +142,8 @@ export default function SpotDetailPanel({
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-1.5">
-              <p className="text-sm text-white/80">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <p className="text-sm text-white/80 truncate">
                 {locale === 'ko' && surfInfo.cityKo ? surfInfo.cityKo : surfInfo.city ? surfInfo.city : null}
                 {(locale === 'ko' ? surfInfo.cityKo : surfInfo.city) && ', '}
                 {locale === 'ko' && surfInfo.regionKo ? surfInfo.regionKo : surfInfo.region}, {locale === 'ko' && surfInfo.countryKo ? surfInfo.countryKo : surfInfo.country}
@@ -244,7 +260,7 @@ export default function SpotDetailPanel({
       )}
 
       {/* Content */}
-      <div className="p-3 space-y-3">
+      <div className="p-3 space-y-3 overflow-y-auto flex-1">
         {/* Score + Grade + Level - Three boxes horizontally */}
         <div className="flex gap-2">
           {/* Score Box */}
@@ -499,6 +515,25 @@ type SingleMetric = typeof metricKeys[number];
 function ForecastChart({ hours, data, locale }: ForecastChartProps) {
   const [activeMetric, setActiveMetric] = useState<ChartMetric>('overview');
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  // Touch handler: map touch X position to the nearest data point index
+  const handleTouchOnChart = useCallback((e: React.TouchEvent<SVGSVGElement>) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const touchX = e.touches[0].clientX - rect.left;
+    const svgWidth = rect.width;
+    // Map touch position to data index
+    const ratio = touchX / svgWidth;
+    const idx = Math.round(ratio * (hours.length - 1));
+    const clampedIdx = Math.max(0, Math.min(hours.length - 1, idx));
+    setHoveredIdx(clampedIdx);
+  }, [hours.length]);
+
+  const handleTouchEnd = useCallback(() => {
+    setHoveredIdx(null);
+  }, []);
 
   const metrics: Record<SingleMetric, MetricDef> = {
     score: {
@@ -631,7 +666,15 @@ function ForecastChart({ hours, data, locale }: ForecastChartProps) {
 
         <div className="relative">
           {/* Overview SVG Chart */}
-          <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: H }}>
+          <svg
+            ref={svgRef}
+            viewBox={`0 0 ${W} ${H}`}
+            className="w-full touch-none"
+            style={{ height: H }}
+            onTouchStart={handleTouchOnChart}
+            onTouchMove={handleTouchOnChart}
+            onTouchEnd={handleTouchEnd}
+          >
             {/* Horizontal grid lines */}
             {[0, 0.25, 0.5, 0.75, 1].map((n, i) => (
               <line
@@ -763,7 +806,15 @@ function ForecastChart({ hours, data, locale }: ForecastChartProps) {
 
       <div className="relative">
         {/* SVG Chart */}
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: H }}>
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${W} ${H}`}
+          className="w-full touch-none"
+          style={{ height: H }}
+          onTouchStart={handleTouchOnChart}
+          onTouchMove={handleTouchOnChart}
+          onTouchEnd={handleTouchEnd}
+        >
           {/* Grid lines */}
           {yTicks.map((tick, i) => (
             <g key={i}>

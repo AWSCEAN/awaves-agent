@@ -71,9 +71,10 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen bg-sand-gradient flex items-center justify-center px-4">
-      <div className="flex items-center gap-24">
-        <div className="flex-shrink-0">
+    <main className="min-h-screen bg-sand-gradient flex items-center justify-center px-4 py-8">
+      <div className="flex flex-col md:flex-row items-center gap-8 md:gap-24 w-full max-w-3xl">
+        {/* Logo - hidden on small screens to save vertical space */}
+        <div className="hidden md:flex flex-shrink-0">
           <Link href="/">
             <Image
               src="/awaves_main.svg"
@@ -85,8 +86,21 @@ export default function LoginPage() {
             />
           </Link>
         </div>
+        {/* Small logo for mobile only */}
+        <div className="flex md:hidden">
+          <Link href="/">
+            <Image
+              src="/awaves_main.svg"
+              alt="AWAVES"
+              width={80}
+              height={80}
+              className="animate-ripple"
+              style={{ width: 'auto', height: 'auto', maxWidth: '80px' }}
+            />
+          </Link>
+        </div>
 
-        <div className="w-[480px] card">
+        <div className="w-full md:w-[480px] card">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-ocean-800">{t.title}</h1>
             <button
@@ -150,3 +164,4 @@ export default function LoginPage() {
     </main>
   );
 }
+

@@ -4,8 +4,9 @@ import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { ko, enUS } from 'date-fns/locale';
 import { useTranslations, useLocale } from 'next-intl';
-import type { SurfInfo, SurferLevel } from '@/types';
+import type { SurfInfo } from '@/types';
 import { getGradeBgColor, getGradeTextColor, getGradeBorderColor } from '@/lib/services/surfInfoService';
+import { useSwipeDown } from '@/hooks/useSwipeDown';
 
 export interface SearchResult extends SurfInfo {
   distance?: number;
@@ -54,6 +55,7 @@ export default function SearchResultsList({
   const [currentPage, setCurrentPage] = useState(1);
   const [sortMode, setSortMode] = useState<SortMode>('surfScore');
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; surfTimestamp: string; name: string } | null>(null);
+  const swipe = useSwipeDown(onClose);
 
   // Reset to page 1 when results change
   useEffect(() => {
@@ -115,7 +117,21 @@ export default function SearchResultsList({
   };
 
   return (
-    <div className={`fixed left-0 bottom-0 w-96 bg-white shadow-xl z-40 flex flex-col transition-all duration-300 ${showLocationPrompt ? 'top-[100px]' : 'top-14'}`}>
+    <div
+      className={`
+        fixed bottom-14 left-0 right-0 z-40 flex flex-col bg-white shadow-xl overflow-hidden
+        animate-slide-up rounded-t-2xl max-h-[60vh]
+        md:bottom-0 md:animate-none md:animate-slide-in-left md:rounded-none md:right-auto md:left-0 md:max-h-none md:w-96
+        transition-all duration-300
+        ${showLocationPrompt ? 'md:top-[100px]' : 'md:top-14'}
+      `}
+      onTouchStart={swipe.onTouchStart}
+      onTouchMove={swipe.onTouchMove}
+      onTouchEnd={swipe.onTouchEnd}
+    >
+      {/* Mobile drag handle */}
+      <div className="md:hidden bottom-sheet-handle" />
+
       {/* Header */}
       <div className="p-4 border-b border-sand-200">
         <div className="flex items-center justify-between mb-3">
@@ -220,8 +236,8 @@ export default function SearchResultsList({
                       </div>
 
                       {/* Location and Level */}
-                      <div className="flex items-center gap-2 text-xs text-ocean-500 mb-2">
-                        <span>{locale === 'ko' && spot.regionKo ? spot.regionKo : spot.region}, {locale === 'ko' && spot.countryKo ? spot.countryKo : spot.country}</span>
+                      <div className="flex items-center gap-2 text-xs text-ocean-500 mb-2 min-w-0 overflow-hidden">
+                        <span className="truncate min-w-0 flex-shrink">{locale === 'ko' && spot.regionKo ? spot.regionKo : spot.region}, {locale === 'ko' && spot.countryKo ? spot.countryKo : spot.country}</span>
                         {getLevelLabel(spot) && (
                           <span className="px-1.5 py-0.5 bg-sand-100 rounded text-ocean-600">
                             {getLevelLabel(spot)}

@@ -23,7 +23,7 @@ load_dotenv(_api_dir / ".env.local", override=True)
 ENDPOINT_URL = "http://localhost:8000"
 TABLE_NAME = "surf_info"
 REGION = "ap-northeast-2"
-CSV_FILE = "data/mock_surf_prediction_20260219.csv"
+CSV_FILE = "data/mock_surf_prediction_current.csv"
 
 REDIS_URL = os.getenv("CACHE_URL")
 if not REDIS_URL:
