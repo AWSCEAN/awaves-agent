@@ -91,6 +91,7 @@ export default function SavedItemCard({
 }: SavedItemCardProps) {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [showFeedbackToast, setShowFeedbackToast] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   const t = translations[lang];
 
   const getLevelLabel = (level: string): string => {
@@ -117,205 +118,184 @@ export default function SavedItemCard({
     }
   };
 
-  const handleRemoveClick = () => {
-    setShowConfirmDelete(true);
-  };
-
-  const handleConfirmRemove = () => {
-    setShowConfirmDelete(false);
-    onRemove();
-  };
-
   // Resolve display name: spotName from surf data > address from save > coordinates fallback
   const resolvedSpotName = spotName
     ? (lang === 'ko' && spotName.nameKo ? spotName.nameKo : spotName.name)
     : null;
   const locationName = resolvedSpotName || item.address || `${item.location_id.replace('#', ', ')}`;
+  const regionLabel = lang === 'ko' && spotName?.regionKo ? spotName.regionKo : (item.region || spotName?.region);
+
+  // Compact timestamp: MM/DD HH:mm
+  const formatTimestamp = (ts: string) => {
+    const d = new Date(ts);
+    const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+    const dd = d.getDate().toString().padStart(2, '0');
+    const hh = d.getHours().toString().padStart(2, '0');
+    const min = d.getMinutes().toString().padStart(2, '0');
+    return `${mm}/${dd} ${hh}:${min}`;
+  };
 
   return (
     <div className="card relative overflow-hidden break-inside-avoid">
       {/* Card Content - Dimmed when flag_change is true */}
       <div className={item.flag_change ? 'opacity-40 pointer-events-none' : ''}>
-        {/* Header with location and remove button */}
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <h3 className="font-semibold text-ocean-800 text-lg line-clamp-1">{locationName}</h3>
-            <div className="flex items-center gap-2 text-sm text-ocean-600">
-              {(item.region || spotName?.region) && (
-                <span>{lang === 'ko' && spotName?.regionKo ? spotName.regionKo : (item.region || spotName?.region)}</span>
+
+        {/* ── Row 1: name + region/timestamp + remove ── */}
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-ocean-800 text-sm truncate leading-tight">{locationName}</h3>
+            <div className="flex items-center gap-1.5 text-xs text-ocean-500 min-w-0 mt-0.5">
+              {(regionLabel || spotName?.country || item.country) && (
+                <span className="truncate">
+                  {regionLabel}{(regionLabel && (spotName?.country || item.country)) ? ' · ' : ''}{lang === 'ko' && spotName?.countryKo ? spotName.countryKo : (item.country || spotName?.country)}
+                </span>
               )}
-              {(item.region || spotName?.region) && (item.country || spotName?.country) && <span>•</span>}
-              {(item.country || spotName?.country) && (
-                <span>{lang === 'ko' && spotName?.countryKo ? spotName.countryKo : (item.country || spotName?.country)}</span>
+              {item.surf_timestamp && (
+                <span className="flex-shrink-0 text-ocean-400">· {formatTimestamp(item.surf_timestamp)}</span>
               )}
             </div>
-            {item.surf_timestamp && (
-              <div className="inline-flex items-center gap-1.5 mt-1.5 px-2 py-0.5 rounded-md shadow-sm border border-ocean-200">
-                <svg className="w-3.5 h-3.5 text-ocean-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <span className="text-sm font-medium text-ocean-700">
-                  {(() => {
-                    const date = new Date(item.surf_timestamp);
-                    const year = date.getFullYear();
-                    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-                    const day = date.getDate().toString().padStart(2, '0');
-                    const hours = date.getHours().toString().padStart(2, '0');
-                    const minutes = date.getMinutes().toString().padStart(2, '0');
-                    return `${year}-${month}-${day} ${hours}:${minutes}`;
-                  })()}
-                </span>
-              </div>
-            )}
           </div>
           <button
-            onClick={handleRemoveClick}
-            className="text-sunset-500 hover:text-sunset-600 text-sm p-1"
+            onClick={() => setShowConfirmDelete(true)}
+            className="text-sunset-500 hover:text-sunset-600 text-sm p-0.5 flex-shrink-0"
             title={t.remove}
           >
             ✕
           </button>
         </div>
 
-        {/* Score and Grade - Prominent Display */}
-        <div className="flex items-center gap-3 mb-4">
-          {/* Surf Score */}
-          <div className="flex-1 bg-gradient-to-br from-ocean-50 to-sand-50 rounded-xl p-3 border border-ocean-100">
-            <div className="text-xs text-ocean-500 font-medium mb-1">{t.surfScore}</div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-bold text-ocean-800">{item.surf_score.toFixed(0)}</span>
-              <span className="text-sm text-ocean-400">/100</span>
-            </div>
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden mt-2">
-              <div
-                className="h-full bg-gradient-to-r from-ocean-400 to-ocean-600 rounded-full transition-all"
-                style={{ width: `${item.surf_score}%` }}
-              />
-            </div>
+        {/* ── Row 2: score + grade + level + progress bar ── */}
+        <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-baseline gap-0.5 flex-shrink-0">
+            <span className="text-2xl font-bold text-ocean-800">{item.surf_score.toFixed(0)}</span>
+            <span className="text-xs text-ocean-400">/100</span>
           </div>
-          {/* Grade Badge */}
-          <div className={`w-16 h-16 rounded-xl flex flex-col items-center justify-center shadow-sm ${gradeColors[item.surf_grade] || 'bg-gray-100'}`}>
-            <span className="text-2xl font-bold">{item.surf_grade}</span>
-            <span className="text-[10px] opacity-80">{t.surfGrade}</span>
-          </div>
-        </div>
-
-        {/* Level Badge */}
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-sm px-3 py-1 rounded-lg bg-ocean-100 text-ocean-700 font-medium">
+          <span className={`text-sm font-bold px-1.5 py-0.5 rounded-md flex-shrink-0 ${gradeColors[item.surf_grade] || 'bg-gray-100 text-gray-700'}`}>
+            {item.surf_grade}
+          </span>
+          <span className="text-xs px-1.5 py-0.5 rounded bg-ocean-100 text-ocean-700 font-medium flex-shrink-0">
             {t.level}: {getLevelLabel(item.surfer_level)}
           </span>
+          <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-ocean-400 to-ocean-600 rounded-full transition-all"
+              style={{ width: `${item.surf_score}%` }}
+            />
+          </div>
         </div>
 
-        {/* Conditions Grid */}
-        <div className="grid grid-cols-2 gap-2">
+        {/* ── Row 3: 4-column conditions ── */}
+        <div className="grid grid-cols-4 gap-1 mb-2">
           {item.wave_height !== undefined && (
-            <div className="flex items-center gap-2 bg-sand-50 rounded-lg px-2.5 py-1.5">
-              <span className="text-lg">🌊</span>
-              <div>
-                <div className="text-xs text-ocean-500">{t.waveHeight}</div>
-                <div className="font-semibold text-ocean-800">{Number(item.wave_height).toFixed(1)}m</div>
-              </div>
+            <div className="flex flex-col items-center bg-sand-50 rounded px-1 py-1.5">
+              <span className="text-sm leading-none">🌊</span>
+              <span className="text-[10px] text-ocean-500 mt-0.5 truncate w-full text-center">{t.waveHeight}</span>
+              <span className="text-xs font-semibold text-ocean-800">{Number(item.wave_height).toFixed(1)}m</span>
             </div>
           )}
           {item.wave_period !== undefined && (
-            <div className="flex items-center gap-2 bg-sand-50 rounded-lg px-2.5 py-1.5">
-              <span className="text-lg">⏱️</span>
-              <div>
-                <div className="text-xs text-ocean-500">{t.wavePeriod}</div>
-                <div className="font-semibold text-ocean-800">{Number(item.wave_period).toFixed(1)}s</div>
-              </div>
+            <div className="flex flex-col items-center bg-sand-50 rounded px-1 py-1.5">
+              <span className="text-sm leading-none">⏱️</span>
+              <span className="text-[10px] text-ocean-500 mt-0.5 truncate w-full text-center">{t.wavePeriod}</span>
+              <span className="text-xs font-semibold text-ocean-800">{Number(item.wave_period).toFixed(1)}s</span>
             </div>
           )}
           {item.wind_speed !== undefined && (
-            <div className="flex items-center gap-2 bg-sand-50 rounded-lg px-2.5 py-1.5">
-              <span className="text-lg">💨</span>
-              <div>
-                <div className="text-xs text-ocean-500">{t.windSpeed}</div>
-                <div className="font-semibold text-ocean-800">{Number(item.wind_speed).toFixed(1)}m/s</div>
-              </div>
+            <div className="flex flex-col items-center bg-sand-50 rounded px-1 py-1.5">
+              <span className="text-sm leading-none">💨</span>
+              <span className="text-[10px] text-ocean-500 mt-0.5 truncate w-full text-center">{t.windSpeed}</span>
+              <span className="text-xs font-semibold text-ocean-800">{Number(item.wind_speed).toFixed(1)}m/s</span>
             </div>
           )}
           {item.water_temperature !== undefined && (
-            <div className="flex items-center gap-2 bg-sand-50 rounded-lg px-2.5 py-1.5">
-              <span className="text-lg">🌡️</span>
-              <div>
-                <div className="text-xs text-ocean-500">{t.waterTemp}</div>
-                <div className="font-semibold text-ocean-800">{Number(item.water_temperature).toFixed(1)}°C</div>
-              </div>
+            <div className="flex flex-col items-center bg-sand-50 rounded px-1 py-1.5">
+              <span className="text-sm leading-none">🌡️</span>
+              <span className="text-[10px] text-ocean-500 mt-0.5 truncate w-full text-center">{t.waterTemp}</span>
+              <span className="text-xs font-semibold text-ocean-800">{Number(item.water_temperature).toFixed(1)}°C</span>
             </div>
           )}
         </div>
 
-        {/* Departure Date */}
-        {item.departure_date && (
-          <div className="text-xs text-ocean-500 mt-3">
-            <span>{t.departureDate}: {formatDate(item.departure_date)}</span>
+        {/* ── Row 4: departure + feedback toggle + map link ── */}
+        <div className="flex items-center gap-2">
+          {item.departure_date && (
+            <span className="text-[10px] text-ocean-400 flex-shrink-0">
+              {t.departureDate}: {formatDate(item.departure_date)}
+            </span>
+          )}
+          {!feedbackStatus && new Date(item.surf_timestamp) < new Date() && (
+            <button
+              onClick={() => setShowFeedback(!showFeedback)}
+              className="text-[10px] text-ocean-400 hover:text-ocean-600 flex-shrink-0 underline"
+            >
+              {lang === 'ko' ? '평가하기' : 'Rate'}
+            </button>
+          )}
+          {feedbackStatus && (
+            <span className="text-[10px] text-green-600 flex-shrink-0">✓ {t.feedbackThanks}</span>
+          )}
+          <Link
+            href={`/map?lat=${item.location_id.split('#')[0]}&lng=${item.location_id.split('#')[1]}`}
+            className="ml-auto text-xs font-medium text-ocean-600 hover:text-ocean-800 flex-shrink-0"
+          >
+            {t.viewOnMap} →
+          </Link>
+        </div>
+
+        {/* ── Inline feedback (shown on toggle) ── */}
+        {showFeedback && !feedbackStatus && (
+          <div className="flex flex-wrap items-center gap-1.5 mt-1.5 pt-1.5 border-t border-sand-100">
+            <span className="text-[10px] text-ocean-500">{t.feedbackQuestion}</span>
+            <button
+              onClick={() => {
+                onFeedback('POSITIVE');
+                setShowFeedbackToast(true);
+                setShowFeedback(false);
+                setTimeout(() => setShowFeedbackToast(false), 2000);
+              }}
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-green-50 hover:bg-green-100 text-green-700"
+            >
+              <span>👍</span> {t.feedbackYes}
+            </button>
+            <button
+              onClick={() => {
+                onFeedback('NEGATIVE');
+                setShowFeedbackToast(true);
+                setShowFeedback(false);
+                setTimeout(() => setShowFeedbackToast(false), 2000);
+              }}
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-red-50 hover:bg-red-100 text-red-700"
+            >
+              <span>👎</span> {t.feedbackNo}
+            </button>
+            <button
+              onClick={() => { onFeedback('DEFERRED'); setShowFeedback(false); }}
+              className="px-2 py-0.5 rounded text-xs bg-gray-50 hover:bg-gray-100 text-gray-600"
+            >
+              {t.feedbackLater}
+            </button>
           </div>
         )}
-
-        {/* Feedback Section - only show when no feedback given yet and date is in the past */}
-        {!feedbackStatus && new Date(item.surf_timestamp) < new Date() && (
-          <div className="border-t pt-3 mt-3">
-            <p className="text-sm text-ocean-600 mb-2">{t.feedbackQuestion}</p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  onFeedback('POSITIVE');
-                  setShowFeedbackToast(true);
-                  setTimeout(() => setShowFeedbackToast(false), 2000);
-                }}
-                className="flex-1 flex items-center justify-center gap-1 py-1.5 px-3 rounded-lg bg-green-50 hover:bg-green-100 text-green-700 text-sm font-medium transition-colors"
-              >
-                <span>👍</span> {t.feedbackYes}
-              </button>
-              <button
-                onClick={() => {
-                  onFeedback('NEGATIVE');
-                  setShowFeedbackToast(true);
-                  setTimeout(() => setShowFeedbackToast(false), 2000);
-                }}
-                className="flex-1 flex items-center justify-center gap-1 py-1.5 px-3 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-sm font-medium transition-colors"
-              >
-                <span>👎</span> {t.feedbackNo}
-              </button>
-              <button
-                onClick={() => onFeedback('DEFERRED')}
-                className="py-1.5 px-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-600 text-sm transition-colors"
-              >
-                {t.feedbackLater}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* View on Map Button */}
-        <Link
-          href={`/map?lat=${item.location_id.split('#')[0]}&lng=${item.location_id.split('#')[1]}`}
-          className="btn-primary w-full text-center block text-sm mt-3"
-        >
-          {t.viewOnMap}
-        </Link>
       </div>
 
       {/* Change Notification Overlay */}
       {item.flag_change && (
-        <div className="absolute inset-0 flex items-center justify-center p-4 bg-black/30 backdrop-blur-[2px] rounded-lg z-10">
-          <div className="bg-white rounded-2xl shadow-xl p-5 max-w-[92%] w-full">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-                <svg className="w-4.5 h-4.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="absolute inset-0 flex items-center justify-center p-3 bg-black/30 backdrop-blur-[2px] rounded-lg z-10">
+          <div className="bg-white rounded-2xl shadow-xl p-4 max-w-[92%] w-full">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h4 className="font-bold text-ocean-800 text-base">{t.changeDetected}</h4>
+              <h4 className="font-bold text-ocean-800 text-sm">{t.changeDetected}</h4>
             </div>
             {item.change_message && (
               <ChangeMessageDisplay message={item.change_message} lang={lang} />
             )}
             <button
               onClick={onAcknowledgeChange}
-              className="btn-primary w-full py-2 text-sm mt-3"
+              className="btn-primary w-full py-1.5 text-sm mt-2"
             >
               {t.acknowledgeChange}
             </button>
@@ -326,8 +306,8 @@ export default function SavedItemCard({
       {/* Feedback Thank You Overlay */}
       {showFeedbackToast && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/10 rounded-xl z-10">
-          <div className="bg-white rounded-xl shadow-xl px-6 py-5 text-center">
-            <div className="text-3xl mb-2">🤙</div>
+          <div className="bg-white rounded-xl shadow-xl px-5 py-4 text-center">
+            <div className="text-3xl mb-1">🤙</div>
             <p className="text-sm font-semibold text-ocean-800">{t.feedbackThanks}</p>
           </div>
         </div>
@@ -337,7 +317,7 @@ export default function SavedItemCard({
       {showConfirmDelete && (
         <div className="absolute inset-0 bg-white/95 rounded-lg flex items-center justify-center p-4">
           <div className="text-center">
-            <p className="text-ocean-800 mb-4">{t.confirmRemove}</p>
+            <p className="text-ocean-800 text-sm mb-4">{t.confirmRemove}</p>
             <div className="flex items-center gap-2 justify-center">
               <button
                 onClick={() => setShowConfirmDelete(false)}
@@ -346,7 +326,7 @@ export default function SavedItemCard({
                 {t.cancel}
               </button>
               <button
-                onClick={handleConfirmRemove}
+                onClick={() => { setShowConfirmDelete(false); onRemove(); }}
                 className="bg-sunset-500 hover:bg-sunset-600 text-white px-4 py-2 rounded-lg text-sm font-medium"
               >
                 {t.remove}
@@ -368,7 +348,7 @@ const fieldLabels: Record<string, { ko: string; en: string; unit?: string }> = {
   waterTemperature: { ko: '수온', en: 'Water Temp', unit: '°C' },
 };
 
-function formatValue(value: number | string, field: string): string {
+function formatValue(value: number | string, _field: string): string {
   if (typeof value === 'number') {
     return Number.isInteger(value) ? String(value) : value.toFixed(1);
   }
@@ -380,7 +360,7 @@ function ChangeMessageDisplay({ message, lang }: { message: string; lang: Langua
     const data = JSON.parse(message);
     if (data.changes && Array.isArray(data.changes)) {
       return (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {data.changes.map((c: { field: string; old: number | string; new: number | string }, i: number) => {
             const meta = fieldLabels[c.field];
             const label = meta?.[lang] || c.field;
@@ -390,8 +370,8 @@ function ChangeMessageDisplay({ message, lang }: { message: string; lang: Langua
             const isScoreUp = c.field === 'surfScore' && typeof c.new === 'number' && typeof c.old === 'number' && c.new > c.old;
             const isScoreDown = c.field === 'surfScore' && typeof c.new === 'number' && typeof c.old === 'number' && c.new < c.old;
             return (
-              <div key={i} className="bg-sand-50 rounded-lg p-2.5">
-                <div className="text-xs text-ocean-500 font-medium mb-1.5">{label}</div>
+              <div key={i} className="bg-sand-50 rounded-lg p-2">
+                <div className="text-xs text-ocean-500 font-medium mb-1">{label}</div>
                 <div className="flex items-center justify-center gap-3">
                   <span className="text-sm text-ocean-400 line-through">
                     {oldVal}{unit}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import LogoOverlay from '@/components/LogoOverlay';
 import SavedItemCard from '@/components/SavedItemCard';
@@ -151,11 +151,11 @@ export default function SavedPage() {
 
   return (
     <ProtectedRoute>
-      <LogoOverlay />
       <div className="min-h-screen bg-sand-gradient">
         {/* Header */}
         <header className="fixed top-0 left-0 right-0 z-40 glass">
-          <div className="px-4 py-2 flex items-center justify-end">
+          <div className="px-4 py-2 flex items-center justify-between">
+            <LogoOverlay />
             <div className="flex items-center gap-3">
               {/* Language Toggle (icon + label) */}
               <button
@@ -191,7 +191,7 @@ export default function SavedPage() {
         </header>
 
         {/* Content */}
-        <main className="max-w-6xl mx-auto px-4 py-8 pt-16">
+        <main className="max-w-6xl mx-auto px-4 py-6 pt-16 pb-20 md:pb-6">
           <div className="flex flex-col items-center mb-8">
             <h1 className="text-3xl font-bold text-ocean-700 tracking-tight">
               {t.title}
@@ -227,7 +227,7 @@ export default function SavedPage() {
 
           {/* Saved Items Grid */}
           {!isLoading && !error && savedItems.length > 0 && (
-            <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 md:gap-6">
               {savedItems.map((item) => {
                 const feedbackKey = item.location_surf_key;
                 return (
@@ -250,3 +250,4 @@ export default function SavedPage() {
     </ProtectedRoute>
   );
 }
+
