@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import Providers from '@/components/Providers';
 import BottomNav from '@/components/BottomNav';
+import CloudWatchRUM from '@/components/CloudWatchRUM';
 
 export const metadata: Metadata = {
   title: 'awaves - Find Your Perfect Wave',
@@ -23,6 +24,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen bg-sand-50">
+        <CloudWatchRUM />
         <Providers>
           {children}
           <BottomNav />

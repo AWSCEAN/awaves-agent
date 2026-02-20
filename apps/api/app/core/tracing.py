@@ -59,6 +59,12 @@ class XRayMiddleware(BaseHTTPMiddleware):
         try:
             segment.put_http_meta("url", str(request.url))
             segment.put_http_meta("method", request.method)
+
+            # Annotate with frontend trace ID for end-to-end correlation
+            fe_trace_id = request.headers.get("X-Amzn-Trace-Id")
+            if fe_trace_id:
+                segment.put_annotation("frontend_trace_id", fe_trace_id)
+
             response: Response = await call_next(request)
             segment.put_http_meta("status", response.status_code)
             return response

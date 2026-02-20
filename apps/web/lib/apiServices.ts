@@ -117,6 +117,11 @@ async function synchronizedTokenRefresh(): Promise<boolean> {
   return refreshPromise;
 }
 
+// Generate a trace ID for X-Ray correlation
+function generateTraceId(): string {
+  return crypto.randomUUID();
+}
+
 // Helper for making API requests with 401 retry
 async function apiRequest<T>(
   endpoint: string,
@@ -127,6 +132,7 @@ async function apiRequest<T>(
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
+    'X-Amzn-Trace-Id': generateTraceId(),
     ...options.headers,
   };
 
