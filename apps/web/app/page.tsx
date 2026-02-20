@@ -135,7 +135,7 @@ export default function LandingPage() {
               <div className="flex justify-center mb-4">
                 <Image
                   src="/awaves_main.svg"
-                  alt="AWAVES"
+                  alt="awaves"
                   width={200}
                   height={200}
                   className="animate-ripple"
@@ -180,7 +180,7 @@ export default function LandingPage() {
         <footer className="flex-shrink-0 py-3 px-4 bg-ocean-900 text-white/70 hidden md:block">
           <div className="max-w-6xl mx-auto text-center">
             <p className="text-xs">
-              © 2024 AWAVES. All rights reserved.
+              © 2024 awaves. All rights reserved.
             </p>
           </div>
         </footer>

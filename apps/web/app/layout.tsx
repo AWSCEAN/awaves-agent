@@ -4,7 +4,7 @@ import Providers from '@/components/Providers';
 import BottomNav from '@/components/BottomNav';
 
 export const metadata: Metadata = {
-  title: 'AWAVES - Find Your Perfect Wave',
+  title: 'awaves - Find Your Perfect Wave',
   description: 'AI-powered surf spot discovery for Korea and beyond',
   keywords: ['surf', 'surfing', 'waves', 'korea', 'surf spots', 'wave forecast'],
 };

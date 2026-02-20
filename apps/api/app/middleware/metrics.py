@@ -1,7 +1,7 @@
 """CloudWatch Custom Metrics middleware.
 
 Collects HTTP latency and error counts per request, then publishes
-them asynchronously to CloudWatch Metrics under the AWaves/Application
+them asynchronously to CloudWatch Metrics under the awaves/Application
 namespace. Cache and ML inference metrics are exposed as module-level
 helpers for use in service layers.
 """
@@ -21,7 +21,7 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-NAMESPACE = "AWaves/Application"
+NAMESPACE = "awaves/Application"
 
 # Singleton CloudWatch client (created lazily)
 _cw_client = None
@@ -33,7 +33,7 @@ def _get_cw_client():
     if _cw_client is None:
         _cw_client = boto3.client(
             "cloudwatch",
-            region_name=settings.aws_region or "ap-northeast-2",
+            region_name=settings.aws_region or "us-east-1",
             aws_access_key_id=settings.aws_access_key_id or None,
             aws_secret_access_key=settings.aws_secret_access_key or None,
         )

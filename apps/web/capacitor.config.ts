@@ -3,7 +3,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   // App identity — must match your Play Store / developer account
   appId: 'com.awaves.app',
-  appName: 'AWaves',
+  appName: 'awaves',
 
   // --- URL wrapper mode (recommended for this app) ---
   // The app loads your deployed web URL inside the WebView.

@@ -35,7 +35,7 @@ def init_tracing() -> None:
         )
         patch_all()
         _xray_recorder = xray_recorder
-        logger.info("X-Ray tracing initialised (service=AWaves-API)")
+        logger.info("X-Ray tracing initialised (service=awaves-API)")
     except ImportError:
         logger.warning("aws-xray-sdk not installed — X-Ray tracing disabled")
     except Exception as exc:

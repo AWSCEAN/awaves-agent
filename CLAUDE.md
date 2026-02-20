@@ -1,4 +1,4 @@
-# AWAVES Project - Claude Code Configuration
+# awaves Project - Claude Code Configuration
 
 이 프로젝트는 Claude Code 멀티 에이전트 시스템을 사용합니다.
 
