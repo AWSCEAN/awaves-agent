@@ -88,14 +88,19 @@ class SurfDataRepository(BaseDynamoDBRepository):
 
     @classmethod
     async def _enrich_with_korean(cls, spots: list[dict]) -> list[dict]:
-        """Enrich spots with Korean address fields from locations table."""
+        """Enrich spots with location metadata from locations table.
+
+        Fills in Korean address fields and also backfills English fields
+        (name, city, region, country, address) when they are missing from
+        the surf_info data.
+        """
         if not spots:
             return spots
 
         try:
             loc_ids = [s["LocationId"] for s in spots]
             # BatchGetItem: max 100 keys per request
-            ko_map: dict[str, dict] = {}
+            loc_map: dict[str, dict] = {}
             for i in range(0, len(loc_ids), 100):
                 batch_ids = loc_ids[i:i + 100]
                 keys = [{"locationId": {"S": lid}} for lid in batch_ids]
@@ -104,13 +109,18 @@ class SurfDataRepository(BaseDynamoDBRepository):
                         RequestItems={
                             settings.dynamodb_locations_table: {
                                 "Keys": keys,
-                                "ProjectionExpression": "locationId, display_name_ko, city_ko, state_ko, country_ko",
                             }
                         }
                     )
                 for item in resp.get("Responses", {}).get(settings.dynamodb_locations_table, []):
                     lid = item["locationId"]["S"]
-                    ko_map[lid] = {
+                    loc_map[lid] = {
+                        # English fields
+                        "display_name": item.get("display_name", {}).get("S", "") or None,
+                        "city": item.get("city", {}).get("S", "") or None,
+                        "region": item.get("state", {}).get("S", "") or None,
+                        "country": item.get("country", {}).get("S", "") or None,
+                        # Korean fields
                         "nameKo": item.get("display_name_ko", {}).get("S", "") or None,
                         "cityKo": item.get("city_ko", {}).get("S", "") or None,
                         "regionKo": item.get("state_ko", {}).get("S", "") or None,
@@ -119,11 +129,27 @@ class SurfDataRepository(BaseDynamoDBRepository):
                     }
 
             for spot in spots:
-                ko = ko_map.get(spot["LocationId"])
-                if ko:
-                    spot.update(ko)
+                loc = loc_map.get(spot["LocationId"])
+                if not loc:
+                    continue
+                # Backfill English fields when missing from surf_info data
+                if not spot.get("name") or spot["name"] == f"{spot['geo']['lat']}, {spot['geo']['lng']}":
+                    if loc.get("display_name"):
+                        spot["name"] = loc["display_name"]
+                if not spot.get("address") and loc.get("display_name"):
+                    spot["address"] = loc["display_name"]
+                if not spot.get("city") and loc.get("city"):
+                    spot["city"] = loc["city"]
+                if not spot.get("region") and loc.get("region"):
+                    spot["region"] = loc["region"]
+                if not spot.get("country") and loc.get("country"):
+                    spot["country"] = loc["country"]
+                # Always set Korean fields
+                for key in ("nameKo", "cityKo", "regionKo", "countryKo", "addressKo"):
+                    if loc.get(key):
+                        spot[key] = loc[key]
         except Exception as e:
-            logger.warning(f"Failed to enrich spots with Korean data: {e}")
+            logger.warning(f"Failed to enrich spots with location data: {e}")
 
         return spots
 

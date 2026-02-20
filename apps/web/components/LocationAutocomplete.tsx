@@ -92,9 +92,10 @@ export default function LocationAutocomplete({
       );
     });
 
-    // Sort by type: spots first, then regions, then countries
+    // Sort by type: countries first, then regions, then spots
+    // so broad categories are always visible within the 10-result limit
     const sorted = filtered.sort((a, b) => {
-      const typeOrder = { spot: 0, region: 1, country: 2 };
+      const typeOrder = { country: 0, region: 1, spot: 2 };
       return typeOrder[a.type] - typeOrder[b.type];
     });
 
@@ -132,7 +133,7 @@ export default function LocationAutocomplete({
   };
 
   return (
-    <div ref={containerRef} className={`relative overflow-hidden ${className}`}>
+    <div ref={containerRef} className={`relative ${className}`}>
       <input
         ref={inputRef}
         type="text"
