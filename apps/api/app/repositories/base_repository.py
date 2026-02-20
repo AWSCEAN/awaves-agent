@@ -1,6 +1,7 @@
 """Base DynamoDB repository with shared session and client setup."""
 
 import logging
+from contextlib import contextmanager
 from typing import ClassVar, Optional
 
 import aioboto3
@@ -9,6 +10,29 @@ from botocore.config import Config
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def dynamodb_subsegment(name: str = "DynamoDB_Query"):
+    """Wrap a block in an X-Ray subsegment for DynamoDB calls."""
+    try:
+        from app.core.tracing import get_xray_recorder
+        recorder = get_xray_recorder()
+    except Exception:
+        recorder = None
+
+    if recorder is None:
+        yield
+        return
+
+    subsegment = recorder.begin_subsegment(name)
+    try:
+        yield
+    except Exception as exc:
+        subsegment.add_exception(exc, stack=True)
+        raise
+    finally:
+        recorder.end_subsegment()
 
 
 class BaseDynamoDBRepository:

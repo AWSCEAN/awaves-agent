@@ -2,7 +2,7 @@
 
 ## 개요
 
-AWAVES는 AI 기반 서핑 스팟 탐색 플랫폼입니다. 사용자의 실력과 선호도에 맞는 최적의 서핑 스팟을 추천하고, 실시간 파도 데이터를 제공합니다.
+awaves는 AI 기반 서핑 스팟 탐색 플랫폼입니다. 사용자의 실력과 선호도에 맞는 최적의 서핑 스팟을 추천하고, 실시간 파도 데이터를 제공합니다.
 
 ## 기술 스택
 
@@ -17,6 +17,7 @@ AWAVES는 AI 기반 서핑 스팟 탐색 플랫폼입니다. 사용자의 실력
 | Cache | Redis | 7+ | 세션/캐시 |
 | Search | OpenSearch | 2.x | 위치 키워드 검색 |
 | Auth | JWT | - | 인증 토큰 |
+| Observability | CloudWatch + X-Ray | - | 로깅, 메트릭, 트레이싱 |
 | Monorepo | pnpm + Turborepo | - | 패키지 관리 |
 
 ## 시스템 구성도
@@ -87,6 +88,11 @@ awaves-agent/
 │       │   │   ├── saved_list_repository.py # SavedListRepository (저장 목록 CRUD)
 │       │   │   ├── surf_data_repository.py  # SurfDataRepository (서핑 예보 데이터)
 │       │   │   └── user_repository.py       # UserRepository (사용자 CRUD, PostgreSQL)
+│       │   ├── core/              # 핵심 인프라
+│       │   │   ├── logging.py             # JSON 구조화 로깅 (CloudWatch Logs)
+│       │   │   └── tracing.py             # AWS X-Ray 트레이싱
+│       │   ├── middleware/         # HTTP 미들웨어
+│       │   │   └── metrics.py             # CloudWatch Custom Metrics
 │       │   ├── services/         # 비즈니스 로직
 │       │   │   ├── opensearch_service.py    # OpenSearch 클라이언트
 │       │   │   ├── search_service.py        # 검색 오케스트레이션
@@ -207,7 +213,7 @@ awaves-agent/
 ## 지도 시스템 아키텍처
 
 ### 개요
-AWAVES의 지도 시스템은 Mapbox GL JS를 기반으로 하며, Open-Meteo API를 통해 실시간 해양 및 기상 데이터를 통합합니다.
+awaves의 지도 시스템은 Mapbox GL JS를 기반으로 하며, Open-Meteo API를 통해 실시간 해양 및 기상 데이터를 통합합니다.
 
 ### 컴포넌트 계층
 
@@ -428,6 +434,36 @@ function calculateSafetyScore(waveHeight, windSpeed) {
 - Mapbox GL JS: CDN 사용 고려
 - Tree-shaking: 사용하지 않는 모듈 제거
 - Code splitting: 라우트별 분할
+
+---
+
+## 관측 가능성 (Observability)
+
+> 상세 문서: [docs/observability.md](observability.md)
+
+### 구성 요소
+
+| 구성 요소 | 기술 | 용도 |
+|----------|------|------|
+| 구조화 로깅 | JSON → stdout → Fluent Bit → CloudWatch Logs | 로그 수집/검색 |
+| 커스텀 메트릭 | boto3 → CloudWatch Metrics (`awaves/Application`) | API 지연, 에러, 캐시 히트율 |
+| 분산 트레이싱 | aws-xray-sdk → X-Ray Daemon → X-Ray Service Map | 요청 흐름 추적 |
+
+### 미들웨어 스택 (실행 순서)
+
+```
+Request → CORS → XRayMiddleware → CloudWatchMetricsMiddleware → Router → Response
+```
+
+### 수집 메트릭 (6종)
+
+| 메트릭 | 설명 |
+|--------|------|
+| `API_Latency` | HTTP 요청 응답 시간 (ms) |
+| `API_Error_Count` | 4xx/5xx 응답 카운트 |
+| `Cache_Hit` / `Cache_Miss` | Redis 캐시 히트/미스 |
+| `ML_Inference_Latency` | SageMaker 추론 지연 (ms) |
+| `External_API_Failure` | 외부 서비스 (SageMaker, OpenSearch) 호출 실패 |
 
 ---
 

@@ -6,7 +6,7 @@ import time as _time
 from typing import Optional
 
 from app.config import settings
-from app.repositories.base_repository import BaseDynamoDBRepository
+from app.repositories.base_repository import BaseDynamoDBRepository, dynamodb_subsegment
 from app.services.cache import SurfSpotsCacheService as CacheService
 
 logger = logging.getLogger(__name__)
@@ -56,12 +56,13 @@ class SurfDataRepository(BaseDynamoDBRepository):
             async with await cls.get_client() as client:
                 all_items: list[dict] = []
                 params: dict = {"TableName": cls.TABLE_NAME}
-                while True:
-                    response = await client.scan(**params)
-                    all_items.extend(response.get("Items", []))
-                    if "LastEvaluatedKey" not in response:
-                        break
-                    params["ExclusiveStartKey"] = response["LastEvaluatedKey"]
+                with dynamodb_subsegment("DynamoDB_Scan"):
+                    while True:
+                        response = await client.scan(**params)
+                        all_items.extend(response.get("Items", []))
+                        if "LastEvaluatedKey" not in response:
+                            break
+                        params["ExclusiveStartKey"] = response["LastEvaluatedKey"]
 
                 _scan_cache = all_items
                 _scan_cache_time = _time.monotonic()
@@ -276,11 +277,12 @@ class SurfDataRepository(BaseDynamoDBRepository):
                     key_expr += " AND begins_with(SurfTimestamp, :d)"
                     expr_values[":d"] = {"S": date}
 
-                response = await client.query(
-                    TableName=cls.TABLE_NAME,
-                    KeyConditionExpression=key_expr,
-                    ExpressionAttributeValues=expr_values,
-                )
+                with dynamodb_subsegment("DynamoDB_Query"):
+                    response = await client.query(
+                        TableName=cls.TABLE_NAME,
+                        KeyConditionExpression=key_expr,
+                        ExpressionAttributeValues=expr_values,
+                    )
                 spots = [cls._to_surf_info(item) for item in response.get("Items", [])]
                 return await cls._enrich_with_korean(spots)
         except Exception as e:

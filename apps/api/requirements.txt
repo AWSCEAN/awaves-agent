@@ -12,6 +12,7 @@ alembic==1.17.2
 # AWS SDK
 boto3>=1.34.0
 aioboto3==13.1.1
+aws-xray-sdk>=2.14.0
 
 # Cache - Redis
 redis==7.1.0

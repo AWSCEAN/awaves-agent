@@ -11,13 +11,39 @@ Flow:
 import hashlib
 import logging
 import random
+import time as _time
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
 import httpx
 
 from app.config import settings
+from app.middleware.metrics import emit_ml_inference_latency, emit_external_api_failure
 from app.services.cache import InferenceCacheService as CacheService
 from app.repositories.surf_data_repository import SurfDataRepository
+
+
+@contextmanager
+def _sagemaker_subsegment():
+    """Wrap a block in an X-Ray subsegment for SageMaker calls."""
+    try:
+        from app.core.tracing import get_xray_recorder
+        recorder = get_xray_recorder()
+    except Exception:
+        recorder = None
+
+    if recorder is None:
+        yield
+        return
+
+    subsegment = recorder.begin_subsegment("SageMaker_Invoke")
+    try:
+        yield
+    except Exception as exc:
+        subsegment.add_exception(exc, stack=True)
+        raise
+    finally:
+        recorder.end_subsegment()
 
 logger = logging.getLogger(__name__)
 
@@ -88,23 +114,30 @@ async def _call_sagemaker(
         "lng": lng,
     }
 
+    start = _time.perf_counter()
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                endpoint,
-                json=payload,
-                headers={"Content-Type": "application/json"},
-            )
-            resp.raise_for_status()
-            return resp.json()
+        with _sagemaker_subsegment():
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(
+                    endpoint,
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                )
+                resp.raise_for_status()
+                latency_ms = (_time.perf_counter() - start) * 1000
+                emit_ml_inference_latency(latency_ms)
+                return resp.json()
     except httpx.ConnectError:
         logger.warning("SageMaker endpoint not reachable at %s", endpoint)
+        emit_external_api_failure("SageMaker")
         return None
     except httpx.HTTPStatusError as e:
         logger.warning("SageMaker endpoint returned error: %s", e)
+        emit_external_api_failure("SageMaker")
         return None
     except Exception as e:
         logger.warning("SageMaker call failed: %s", e)
+        emit_external_api_failure("SageMaker")
         return None
 
 

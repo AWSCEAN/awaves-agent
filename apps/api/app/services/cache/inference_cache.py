@@ -5,7 +5,8 @@ import logging
 from typing import Optional
 
 from app.config import settings
-from app.services.cache.base import BaseCacheService
+from app.services.cache.base import BaseCacheService, _redis_subsegment
+from app.middleware.metrics import emit_cache_hit, emit_cache_miss
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +31,12 @@ class InferenceCacheService(BaseCacheService):
             return None
 
         try:
-            value = await client.get(cls._inference_key(location_id, surf_date))
+            with _redis_subsegment("Redis_Get"):
+                value = await client.get(cls._inference_key(location_id, surf_date))
             if value:
+                emit_cache_hit("inference")
                 return json.loads(value)
+            emit_cache_miss("inference")
         except Exception as e:
             logger.warning(f"Failed to get inference prediction from cache: {e}")
 

@@ -5,7 +5,8 @@ import logging
 from typing import Optional
 
 from app.config import settings
-from app.services.cache.base import BaseCacheService
+from app.services.cache.base import BaseCacheService, _redis_subsegment
+from app.middleware.metrics import emit_cache_hit, emit_cache_miss
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +29,12 @@ class SavedItemsCacheService(BaseCacheService):
             return None
 
         try:
-            value = await client.get(cls._saved_key(user_id))
+            with _redis_subsegment("Redis_Get"):
+                value = await client.get(cls._saved_key(user_id))
             if value:
+                emit_cache_hit("saved_items")
                 return json.loads(value)
+            emit_cache_miss("saved_items")
         except Exception as e:
             logger.warning(f"Failed to get saved items from cache: {e}")
 
