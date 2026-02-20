@@ -2,6 +2,7 @@
 
 import type { SavedListItem, SurfInfo } from '@/types';
 import { getGradeBgColor, getGradeTextColor, getGradeBorderColor } from '@/lib/services/surfInfoService';
+import { useSwipeDown } from '@/hooks/useSwipeDown';
 
 interface TimeSlotPickerPanelProps {
   locationId: string;
@@ -51,9 +52,24 @@ export default function TimeSlotPickerPanel({
   );
 
   const displayName = sorted[0]?.name || locationId;
+  const swipe = useSwipeDown(onClose);
 
   return (
-    <div className={`fixed right-0 bottom-0 w-[420px] bg-white shadow-xl z-40 flex flex-col animate-slide-in-right transition-all duration-300 ${showLocationPrompt ? 'top-[100px]' : 'top-14'}`}>
+    <div
+      className={`
+        mobile-sheet-bottom fixed left-0 right-0 z-40 flex flex-col bg-white shadow-xl overflow-hidden
+        animate-slide-up rounded-t-2xl max-h-[70vh]
+        md:bottom-0 md:animate-none md:animate-slide-in-right md:rounded-none md:left-auto md:right-0 md:max-h-none md:w-[420px]
+        transition-all duration-300
+        ${showLocationPrompt ? 'md:top-[100px]' : 'md:top-14'}
+      `}
+      onTouchStart={swipe.onTouchStart}
+      onTouchMove={swipe.onTouchMove}
+      onTouchEnd={swipe.onTouchEnd}
+    >
+      {/* Mobile drag handle */}
+      <div className="md:hidden bottom-sheet-handle" />
+
       {/* Header */}
       <div className="bg-ocean-gradient px-4 py-3">
         <div className="flex justify-between items-start">

@@ -42,6 +42,25 @@ const tokenManager = {
   },
 };
 
+// Decode a JWT and return its expiry Unix timestamp, or null if unreadable.
+function getTokenExpiry(token: string): number | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return typeof payload.exp === 'number' ? payload.exp : null;
+  } catch {
+    return null;
+  }
+}
+
+// Returns true if the token is missing or expired (with a 30-second buffer).
+export function isAccessTokenExpired(): boolean {
+  const token = tokenManager.getAccessToken();
+  if (!token) return true;
+  const exp = getTokenExpiry(token);
+  if (exp === null) return false; // can't decode — let the server decide
+  return exp * 1000 < Date.now() + 30_000;
+}
+
 // Flag to prevent multiple simultaneous refresh attempts
 let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
@@ -250,6 +269,11 @@ export const authService = {
 
   isLoggedIn(): boolean {
     return !!tokenManager.getAccessToken();
+  },
+
+  /** Proactively refresh the access token. Returns true on success. */
+  async refreshTokens(): Promise<boolean> {
+    return synchronizedTokenRefresh();
   },
 };
 

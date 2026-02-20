@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import type { UserV2 } from '@/types';
-import { authService } from '@/lib/apiServices';
+import { authService, isAccessTokenExpired } from '@/lib/apiServices';
 
 interface AuthContextType {
   user: UserV2 | null;
@@ -26,6 +26,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setIsLoading(false);
       return;
+    }
+
+    // If the access token is already expired, refresh it proactively before
+    // calling /auth/me — avoids a guaranteed 401 showing in the browser console.
+    if (isAccessTokenExpired()) {
+      const refreshed = await authService.refreshTokens();
+      if (!refreshed) {
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
     }
 
     try {

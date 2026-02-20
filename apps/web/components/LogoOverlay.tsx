@@ -7,31 +7,22 @@ export default function LogoOverlay() {
   return (
     <Link
       href="/"
-      style={{
-        position: 'fixed',
-        top: '4px',
-        left: 0,
-        zIndex: 9999,
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        padding: '6px 16px',
-        height: '48px',
-      }}
+      className="flex items-center gap-1.5 flex-shrink-0 py-1"
     >
+      {/* Letter logo hidden on mobile to save space, shown on desktop */}
       <Image
         src="/awaves_letter.svg"
         alt="AWAVES"
         width={60}
         height={20}
-        style={{ height: '20px', width: 'auto', marginTop: '4px' }}
+        className="hidden md:block h-5 w-auto mt-1"
       />
       <Image
         src="/awaves_logo.svg"
         alt="AWAVES Logo"
         width={36}
         height={36}
-        style={{ height: '36px', width: 'auto' }}
+        className="h-8 w-auto md:h-9"
       />
     </Link>
   );

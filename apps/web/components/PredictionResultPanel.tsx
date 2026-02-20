@@ -3,6 +3,7 @@
 import { useLocale } from 'next-intl';
 import type { PredictionResult } from '@/types';
 import { getGradeBgColor, getGradeTextColor, getGradeBorderColor } from '@/lib/services/surfInfoService';
+import { useSwipeDown } from '@/hooks/useSwipeDown';
 
 interface PredictionResultPanelProps {
   result: PredictionResult;
@@ -38,6 +39,7 @@ export default function PredictionResultPanel({
   showLocationPrompt = false,
 }: PredictionResultPanelProps) {
   const locale = useLocale();
+  const swipe = useSwipeDown(onClose);
 
   if (!isOpen) return null;
 
@@ -46,7 +48,21 @@ export default function PredictionResultPanel({
   const dateStr = result.surfTimestamp.split('T')[0];
 
   return (
-    <div className={`fixed left-0 bottom-0 w-96 bg-white shadow-xl z-40 flex flex-col transition-all duration-300 ${showLocationPrompt ? 'top-[100px]' : 'top-14'}`}>
+    <div
+      className={`
+        mobile-sheet-bottom fixed left-0 right-0 z-40 flex flex-col bg-white shadow-xl overflow-hidden
+        animate-slide-up rounded-t-2xl max-h-[70vh]
+        md:bottom-0 md:animate-none md:animate-slide-in-left md:rounded-none md:right-auto md:left-0 md:max-h-none md:w-96
+        transition-all duration-300
+        ${showLocationPrompt ? 'md:top-[100px]' : 'md:top-14'}
+      `}
+      onTouchStart={swipe.onTouchStart}
+      onTouchMove={swipe.onTouchMove}
+      onTouchEnd={swipe.onTouchEnd}
+    >
+      {/* Mobile drag handle */}
+      <div className="md:hidden bottom-sheet-handle" />
+
       {/* Header - Indigo/Purple gradient for prediction branding */}
       <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-5 py-4">
         <div className="flex justify-between items-start">
@@ -70,7 +86,7 @@ export default function PredictionResultPanel({
       </div>
 
       {/* Content */}
-      <div className="flex-1 p-6 space-y-8">
+      <div className="flex-1 p-6 space-y-8 overflow-y-auto">
         {/* Location */}
         <div className="text-center">
           <h3 className="text-2xl font-bold text-ocean-800">{displayName}</h3>

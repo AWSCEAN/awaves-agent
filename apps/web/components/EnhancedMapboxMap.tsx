@@ -38,6 +38,10 @@ interface EnhancedMapboxMapProps {
   showMeasureDistance?: boolean;
   saveCountByLocation?: Map<string, number>;
   onMultiSaveMarkerClick?: (locationId: string, coordinates: { lat: number; lng: number }) => void;
+  /** Pixel offset [x, y] applied to flyTo so the center point appears offset on screen.
+   *  Use [0, negative] to visually raise the marker above a bottom panel (negative Y = above center).
+   *  Use [negative, 0] to shift marker left of a right sidebar. */
+  centerOffset?: [number, number];
 }
 
 function getSurfScoreColor(score: number): string {
@@ -61,6 +65,7 @@ export default function EnhancedMapboxMap({
   showMeasureDistance = true,
   saveCountByLocation,
   onMultiSaveMarkerClick,
+  centerOffset,
 }: EnhancedMapboxMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -307,8 +312,9 @@ export default function EnhancedMapboxMap({
       center: [center.lng, center.lat],
       zoom: 12,
       duration: 1500,
+      ...(centerOffset ? { offset: centerOffset } : {}),
     });
-  }, [center, isMapLoaded]);
+  }, [center, isMapLoaded, centerOffset]);
 
   useEffect(() => {
     if (!map.current) return;
@@ -645,12 +651,6 @@ export default function EnhancedMapboxMap({
 
     if (bestNearby) {
       const { spot } = bestNearby;
-
-      map.current.flyTo({
-        center: [spot.geo.lng, spot.geo.lat],
-        zoom: 12,
-        duration: 1500,
-      });
 
       // Add a temporary marker at the nearby spot if it doesn't already have one
       // Check both regular and saved marker keys
