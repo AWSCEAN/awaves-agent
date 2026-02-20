@@ -1,10 +1,10 @@
-# AWAVES Android APK Build Guide (Capacitor)
+# awaves Android APK Build Guide (Capacitor)
 
 ## Overview
 
-AWAVES uses **Capacitor** to wrap the React/Next.js web app in a native Android WebView and generate an `.apk` / `.aab` file.
+awaves uses **Capacitor** to wrap the React/Next.js web app in a native Android WebView and generate an `.apk` / `.aab` file.
 
-**Mode used: URL wrapper** — the APK loads the deployed AWAVES web app URL inside a WebView.
+**Mode used: URL wrapper** — the APK loads the deployed awaves web app URL inside a WebView.
 This is the recommended approach because the app requires a live API backend regardless.
 
 ---
@@ -63,7 +63,7 @@ server: {
 cd apps/web
 
 # Initialize - this reads from capacitor.config.ts
-npx cap init AWaves com.awaves.app --web-dir .next
+npx cap init awaves com.awaves.app --web-dir .next
 
 # Add Android platform (creates the android/ folder)
 npx cap add android

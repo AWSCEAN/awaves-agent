@@ -235,7 +235,7 @@ export default function RegisterPage() {
           <Link href="/">
             <Image
               src="/awaves_main.svg"
-              alt="AWAVES"
+              alt="awaves"
               width={180}
               height={180}
               className="animate-ripple"
@@ -247,7 +247,7 @@ export default function RegisterPage() {
           <Link href="/">
             <Image
               src="/awaves_main.svg"
-              alt="AWAVES"
+              alt="awaves"
               width={80}
               height={80}
               className="animate-ripple"

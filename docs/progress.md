@@ -22,6 +22,24 @@
 
 ## 작업 기록
 
+### 2026-02-20
+#### 완료
+- AWS 관측 가능성 스택 통합 (Task: t11_be_cloudwatch1)
+  - **T1 — JSON 구조화 로깅**: `app/core/logging.py` 생성, `JsonFormatter`로 모든 로그를 단일 행 JSON으로 stdout 출력 (Fluent Bit → CloudWatch Logs 파이프라인 연결)
+  - **T2 — CloudWatch Custom Metrics**: `app/middleware/metrics.py` 생성, `awaves/Application` 네임스페이스에 6종 메트릭 전송 (`API_Latency`, `API_Error_Count`, `Cache_Hit`, `Cache_Miss`, `ML_Inference_Latency`, `External_API_Failure`)
+  - **T3 — X-Ray 트레이싱**: `app/core/tracing.py` 생성, `XRayMiddleware`가 요청별 세그먼트 생성, `patch_all()`로 boto3/httpx 자동 패치
+  - **T4 — 서브세그먼트 계측**: DynamoDB (Scan, Query, PutItem, GetItem, DeleteItem, UpdateItem), Redis (Get), SageMaker (Invoke)
+  - **추가 계측**: 기존 8개 파일에 로거/메트릭/서브세그먼트 추가 (saved_list_repository, user_repository, saved_cache, auth_cache, auth, user_service, opensearch_service, search_service)
+  - Docs: `docs/observability.md` 신규 생성, `docs/architecture.md` 업데이트
+  - 의존성: `aws-xray-sdk>=2.14.0` 추가
+
+#### 결정 사항
+- CloudWatch Metrics `put_metric_data`는 `run_in_executor`로 비동기 처리하여 요청 지연에 영향 없음
+- X-Ray 데몬 미실행 시 `context_missing="LOG_ERROR"`로 graceful degradation
+- 모든 관측 가능성 계측은 fail-safe: 실패해도 서비스 가용성에 영향 없음
+
+---
+
 ### 2026-02-19
 #### 완료
 - Redis 캐시 서비스 도메인별 분리 (리팩토링)

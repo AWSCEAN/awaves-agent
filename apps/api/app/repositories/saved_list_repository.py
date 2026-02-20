@@ -4,7 +4,7 @@ import logging
 from typing import Optional
 
 from app.config import settings
-from app.repositories.base_repository import BaseDynamoDBRepository
+from app.repositories.base_repository import BaseDynamoDBRepository, dynamodb_subsegment
 
 logger = logging.getLogger(__name__)
 
@@ -112,11 +112,12 @@ class SavedListRepository(BaseDynamoDBRepository):
 
         try:
             async with await cls.get_client() as client:
-                await client.put_item(
-                    TableName=cls.TABLE_NAME,
-                    Item=item,
-                    ConditionExpression="attribute_not_exists(UserId) AND attribute_not_exists(SortKey)",
-                )
+                with dynamodb_subsegment("DynamoDB_PutItem"):
+                    await client.put_item(
+                        TableName=cls.TABLE_NAME,
+                        Item=item,
+                        ConditionExpression="attribute_not_exists(UserId) AND attribute_not_exists(SortKey)",
+                    )
                 return cls._deserialize_item(item)
         except Exception as e:
             if "ConditionalCheckFailedException" in str(e):
@@ -130,11 +131,12 @@ class SavedListRepository(BaseDynamoDBRepository):
         """Get all saved items for a user."""
         try:
             async with await cls.get_client() as client:
-                response = await client.query(
-                    TableName=cls.TABLE_NAME,
-                    KeyConditionExpression="UserId = :uid",
-                    ExpressionAttributeValues={":uid": {"S": user_id}},
-                )
+                with dynamodb_subsegment("DynamoDB_Query"):
+                    response = await client.query(
+                        TableName=cls.TABLE_NAME,
+                        KeyConditionExpression="UserId = :uid",
+                        ExpressionAttributeValues={":uid": {"S": user_id}},
+                    )
                 return [cls._deserialize_item(item) for item in response.get("Items", [])]
         except Exception as e:
             logger.error(f"Failed to get saved list: {e}")
@@ -154,13 +156,14 @@ class SavedListRepository(BaseDynamoDBRepository):
 
         try:
             async with await cls.get_client() as client:
-                response = await client.get_item(
-                    TableName=cls.TABLE_NAME,
-                    Key={
-                        "UserId": {"S": user_id},
-                        "SortKey": {"S": sort_key},
-                    },
-                )
+                with dynamodb_subsegment("DynamoDB_GetItem"):
+                    response = await client.get_item(
+                        TableName=cls.TABLE_NAME,
+                        Key={
+                            "UserId": {"S": user_id},
+                            "SortKey": {"S": sort_key},
+                        },
+                    )
                 item = response.get("Item")
                 return cls._deserialize_item(item) if item else None
         except Exception as e:
@@ -181,13 +184,14 @@ class SavedListRepository(BaseDynamoDBRepository):
 
         try:
             async with await cls.get_client() as client:
-                await client.delete_item(
-                    TableName=cls.TABLE_NAME,
-                    Key={
-                        "UserId": {"S": user_id},
-                        "SortKey": {"S": sort_key},
-                    },
-                )
+                with dynamodb_subsegment("DynamoDB_DeleteItem"):
+                    await client.delete_item(
+                        TableName=cls.TABLE_NAME,
+                        Key={
+                            "UserId": {"S": user_id},
+                            "SortKey": {"S": sort_key},
+                        },
+                    )
                 return True
         except Exception as e:
             logger.error(f"Failed to delete item: {e}")
@@ -207,15 +211,16 @@ class SavedListRepository(BaseDynamoDBRepository):
 
         try:
             async with await cls.get_client() as client:
-                await client.update_item(
-                    TableName=cls.TABLE_NAME,
-                    Key={
-                        "UserId": {"S": user_id},
-                        "SortKey": {"S": sort_key},
-                    },
-                    UpdateExpression="SET flagChange = :fc REMOVE changeMessage",
-                    ExpressionAttributeValues={":fc": {"BOOL": False}},
-                )
+                with dynamodb_subsegment("DynamoDB_UpdateItem"):
+                    await client.update_item(
+                        TableName=cls.TABLE_NAME,
+                        Key={
+                            "UserId": {"S": user_id},
+                            "SortKey": {"S": sort_key},
+                        },
+                        UpdateExpression="SET flagChange = :fc REMOVE changeMessage",
+                        ExpressionAttributeValues={":fc": {"BOOL": False}},
+                    )
                 return True
         except Exception as e:
             logger.error(f"Failed to acknowledge change: {e}")

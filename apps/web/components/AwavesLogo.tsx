@@ -16,7 +16,7 @@ export default function AwavesLogo({ size = 'md' }: AwavesLogoProps) {
   return (
     <Image
       src="/awaves_main.svg"
-      alt="AWAVES Logo"
+      alt="awaves Logo"
       width={width}
       height={height}
       priority

@@ -1,1 +1,1 @@
-"""Test package for AWAVES API."""
+"""Test package for awaves API."""

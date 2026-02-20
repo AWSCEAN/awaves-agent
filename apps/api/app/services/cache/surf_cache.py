@@ -5,7 +5,8 @@ import logging
 from typing import Optional
 
 from app.config import settings
-from app.services.cache.base import BaseCacheService
+from app.services.cache.base import BaseCacheService, _redis_subsegment
+from app.middleware.metrics import emit_cache_hit, emit_cache_miss
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +24,12 @@ class SurfSpotsCacheService(BaseCacheService):
             return None
 
         try:
-            value = await client.get(cls.SURF_ALL_KEY)
+            with _redis_subsegment("Redis_Get"):
+                value = await client.get(cls.SURF_ALL_KEY)
             if value:
+                emit_cache_hit("surf_spots")
                 return json.loads(value)
+            emit_cache_miss("surf_spots")
         except Exception as e:
             logger.warning(f"Failed to get surf spots from cache: {e}")
 

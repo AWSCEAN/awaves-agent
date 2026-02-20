@@ -1,6 +1,7 @@
 """Base cache service with shared Redis client."""
 
 import logging
+from contextlib import contextmanager
 from typing import Optional
 
 import redis.asyncio as redis
@@ -8,6 +9,29 @@ import redis.asyncio as redis
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def _redis_subsegment(name: str = "Redis_Get"):
+    """Wrap a block in an X-Ray subsegment if tracing is available."""
+    try:
+        from app.core.tracing import get_xray_recorder
+        recorder = get_xray_recorder()
+    except Exception:
+        recorder = None
+
+    if recorder is None:
+        yield
+        return
+
+    subsegment = recorder.begin_subsegment(name)
+    try:
+        yield
+    except Exception as exc:
+        subsegment.add_exception(exc, stack=True)
+        raise
+    finally:
+        recorder.end_subsegment()
 
 
 class BaseCacheService:

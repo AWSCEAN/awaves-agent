@@ -7,6 +7,7 @@ from typing import Optional
 from opensearchpy import AsyncOpenSearch
 
 from app.config import settings
+from app.middleware.metrics import emit_external_api_failure
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,7 @@ class OpenSearchService:
                 )
             except Exception as e:
                 logger.error("OpenSearch connection failed: %s", e)
+                emit_external_api_failure("OpenSearch")
                 cls._available = False
                 cls._client = None
                 return None
@@ -322,6 +324,7 @@ class OpenSearchService:
             return success_count
         except Exception as e:
             logger.error("Bulk index failed: %s", e)
+            emit_external_api_failure("OpenSearch")
             return 0
 
     @classmethod
@@ -375,6 +378,7 @@ class OpenSearchService:
             return results
         except Exception as e:
             logger.error("OpenSearch search failed: %s", e)
+            emit_external_api_failure("OpenSearch")
             return []
 
     @classmethod

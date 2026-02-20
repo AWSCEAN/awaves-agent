@@ -9,7 +9,7 @@
 
 ## Summary
 
-Converted the AWAVES web app from desktop-only to fully mobile-responsive and WebView-ready for Android APK packaging via Capacitor.
+Converted the awaves web app from desktop-only to fully mobile-responsive and WebView-ready for Android APK packaging via Capacitor.
 
 ---
 
