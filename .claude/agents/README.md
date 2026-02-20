@@ -1,4 +1,4 @@
-# AWAVES Multi-Agent System
+# awaves Multi-Agent System
 
 Claude Code 기반 멀티 에이전트 개발 워크플로우입니다.
 

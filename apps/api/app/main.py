@@ -13,6 +13,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.core.logging import setup_json_logging
+from app.core.tracing import init_tracing, XRayMiddleware
+from app.middleware.metrics import CloudWatchMetricsMiddleware
 from app.db.session import close_db, init_db
 from app.routers import auth, feedback, register, saved, search, surf
 from app.graphql.schema import graphql_app
@@ -20,6 +23,12 @@ from app.services.cache import CacheService
 from app.repositories.saved_list_repository import SavedListRepository
 from app.services.opensearch_service import OpenSearchService
 from app.repositories.surf_data_repository import SurfDataRepository
+
+# Initialise JSON structured logging before any logger is used
+setup_json_logging()
+
+# Initialise X-Ray tracing (patches boto3, httpx, etc.)
+init_tracing()
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +191,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="AWAVES API",
+    title="awaves API",
     description="AI-powered surf spot discovery API",
     version="0.1.0",
     docs_url="/docs",
@@ -199,6 +208,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Observability middleware (order: X-Ray outermost → Metrics inner)
+app.add_middleware(XRayMiddleware)
+app.add_middleware(CloudWatchMetricsMiddleware)
+
 # Include routers
 # Include routers
 app.include_router(register.router, tags=["Registration"])  # /register at root level
@@ -213,7 +226,7 @@ app.include_router(graphql_app, prefix="/graphql", tags=["GraphQL"])
 @app.get("/")
 async def root() -> dict[str, str]:
     """Root endpoint."""
-    return {"message": "Welcome to AWAVES API", "version": "0.1.0"}
+    return {"message": "Welcome to awaves API", "version": "0.1.0"}
 
 
 @app.get("/health")

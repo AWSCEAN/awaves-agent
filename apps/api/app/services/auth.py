@@ -1,5 +1,6 @@
 """Authentication service with JWT and session cache."""
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
@@ -12,6 +13,8 @@ from app.config import settings
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.services.cache import AuthCacheService as CacheService
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -84,10 +87,12 @@ class AuthService:
         # Find user by username
         user = await self.user_repo.get_by_username(username)
         if not user:
+            logger.warning("Login failed: user not found (username=%s)", username)
             return None
 
         # Verify password
         if not self._verify_password(password, user.password_hash):
+            logger.warning("Login failed: invalid password (username=%s)", username)
             return None
 
         # Create tokens
@@ -111,6 +116,7 @@ class AuthService:
             expires_in=expires_in,
         )
 
+        logger.info("Login successful (user_id=%d)", user.user_id)
         return token_pair, user
 
     async def refresh_tokens(self, refresh_token: str) -> Optional[TokenPair]:
@@ -121,6 +127,7 @@ class AuthService:
         # Decode the refresh token
         payload = self._decode_token(refresh_token)
         if not payload or payload.get("type") != "refresh":
+            logger.warning("Token refresh failed: invalid refresh token")
             return None
 
         user_id = int(payload.get("sub"))
@@ -128,6 +135,7 @@ class AuthService:
         # Validate against cache
         is_valid = await CacheService.validate_refresh_token(user_id, refresh_token)
         if not is_valid:
+            logger.warning("Token refresh failed: cache validation failed (user_id=%d)", user_id)
             return None
 
         # Verify user still exists
@@ -158,6 +166,7 @@ class AuthService:
     async def logout(self, user_id: int) -> None:
         """Logout user by invalidating refresh token."""
         await CacheService.invalidate_refresh_token(user_id)
+        logger.info("User logged out (user_id=%d)", user_id)
 
     async def get_current_user(self, token: str) -> Optional[User]:
         """Get user from access token."""

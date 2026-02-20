@@ -1,5 +1,6 @@
 """User registration service."""
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
@@ -8,6 +9,8 @@ import bcrypt
 
 from app.repositories.user_repository import UserRepository
 from app.schemas.user import ErrorDetail, UserV2Response
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -52,6 +55,7 @@ class UserService:
         """
         # Verify password and confirm_password match
         if password != confirm_password:
+            logger.warning("Registration failed: password mismatch (username=%s)", username)
             return RegistrationResult(
                 success=False,
                 error=ErrorDetail(
@@ -62,6 +66,7 @@ class UserService:
 
         # Check if privacy consent is given
         if not privacy_consent_yn:
+            logger.warning("Registration failed: consent required (username=%s)", username)
             return RegistrationResult(
                 success=False,
                 error=ErrorDetail(
@@ -72,6 +77,7 @@ class UserService:
 
         # Check if username already exists
         if await self.user_repository.exists_by_username(username):
+            logger.warning("Registration failed: username exists (username=%s)", username)
             return RegistrationResult(
                 success=False,
                 error=ErrorDetail(
@@ -99,6 +105,7 @@ class UserService:
             created_at=user.created_at,
         )
 
+        logger.info("User registered successfully (user_id=%d, username=%s)", user.user_id, username)
         return RegistrationResult(success=True, user=user_response)
 
     async def update_user_level(

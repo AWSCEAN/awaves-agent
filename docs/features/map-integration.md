@@ -2,7 +2,7 @@
 
 ## Overview
 
-The AWAVES Map Integration feature provides a comprehensive surf forecasting and spot exploration system built on Mapbox GL JS with real-time weather data from Open-Meteo APIs.
+The awaves Map Integration feature provides a comprehensive surf forecasting and spot exploration system built on Mapbox GL JS with real-time weather data from Open-Meteo APIs.
 
 **Version**: 1.0
 **Status**: Production Ready

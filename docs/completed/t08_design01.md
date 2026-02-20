@@ -8,7 +8,7 @@
 
 ## Summary
 
-Updated layout/spacing for the AWAVES web application pages including main landing page, login, and register pages. Added logo animations and restructured page layouts.
+Updated layout/spacing for the awaves web application pages including main landing page, login, and register pages. Added logo animations and restructured page layouts.
 
 ---
 

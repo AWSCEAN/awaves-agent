@@ -496,7 +496,7 @@ curl "http://localhost:8001/search?q=Bondi&size=10"
 ### 외부 API 통합 (External APIs)
 
 #### Open-Meteo Marine Forecast API
-AWAVES는 파도 및 해양 데이터를 위해 Open-Meteo Marine Forecast API를 사용합니다.
+awaves는 파도 및 해양 데이터를 위해 Open-Meteo Marine Forecast API를 사용합니다.
 
 **Endpoint**
 ```

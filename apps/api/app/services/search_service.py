@@ -3,6 +3,7 @@
 import logging
 from typing import Optional
 
+from app.middleware.metrics import emit_external_api_failure
 from app.services.opensearch_service import OpenSearchService
 from app.repositories.surf_data_repository import SurfDataRepository
 
@@ -83,6 +84,7 @@ class SearchService:
         )
         if not os_results:
             # OpenSearch unavailable or returned nothing — fall back to DynamoDB text search
+            emit_external_api_failure("OpenSearch")
             return await cls._text_search_fallback(
                 query, size=size, date=date, time=time, surfer_level=surfer_level
             )

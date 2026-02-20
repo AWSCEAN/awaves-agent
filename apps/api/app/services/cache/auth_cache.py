@@ -5,7 +5,8 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from app.services.cache.base import BaseCacheService
+from app.services.cache.base import BaseCacheService, _redis_subsegment
+from app.middleware.metrics import emit_cache_hit, emit_cache_miss
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +54,12 @@ class AuthCacheService(BaseCacheService):
 
         try:
             key = cls._get_key(user_id)
-            value = await client.get(key)
+            with _redis_subsegment("Redis_Get"):
+                value = await client.get(key)
             if value:
+                emit_cache_hit("auth_token")
                 return json.loads(value)
+            emit_cache_miss("auth_token")
         except Exception as e:
             logger.warning(f"Failed to get refresh token: {e}")
 
