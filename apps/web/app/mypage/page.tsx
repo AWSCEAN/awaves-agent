@@ -147,8 +147,8 @@ export default function MyPage() {
   return (
     <ProtectedRoute>
     <div className="min-h-screen bg-sand-gradient flex flex-col">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-40 glass">
+      {/* Header - desktop only (BottomNav handles mobile navigation) */}
+      <header className="hidden md:block fixed top-0 left-0 right-0 z-40 glass">
         <div className="px-4 py-2 flex items-center justify-between">
           <LogoOverlay />
           <div className="flex items-center gap-3">
@@ -184,7 +184,7 @@ export default function MyPage() {
       </header>
 
       {/* Content */}
-      <main className="flex-1 flex flex-col justify-center max-w-2xl w-full mx-auto px-4 pt-16 pb-20 md:pb-8">
+      <main className="flex-1 flex flex-col justify-center max-w-2xl w-full mx-auto px-4 pt-20 md:pt-16 pb-20 md:pb-8">
         <h1 className="text-2xl md:text-3xl font-bold text-ocean-700 tracking-tight text-center mb-6">{t.title}</h1>
 
         {/* Profile Section */}

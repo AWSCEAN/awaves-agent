@@ -3,7 +3,8 @@
 export default function SurfLoadingScreen() {
   return (
     <div className="h-screen flex flex-col items-center justify-center bg-sand-gradient overflow-hidden">
-      {/* 3D Scene Container */}
+      {/* 3D Scene Container – scaled down on mobile so it fits small screens */}
+      <div className="transform scale-[0.65] md:scale-100 origin-center">
       <div className="surf-scene">
         {/* Ocean waves behind */}
         <div className="surf-ocean">
@@ -54,6 +55,7 @@ export default function SurfLoadingScreen() {
           <div className="surf-drop" style={{ animationDelay: '0.45s' }} />
         </div>
       </div>
+      </div>{/* end scale wrapper */}
 
       {/* Loading text */}
       <div className="text-center mt-8">

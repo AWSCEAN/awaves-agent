@@ -57,8 +57,8 @@ export default function TimeSlotPickerPanel({
   return (
     <div
       className={`
-        fixed bottom-14 left-0 right-0 z-40 flex flex-col bg-white shadow-xl overflow-hidden
-        animate-slide-up rounded-t-2xl max-h-[60vh]
+        mobile-sheet-bottom fixed left-0 right-0 z-40 flex flex-col bg-white shadow-xl overflow-hidden
+        animate-slide-up rounded-t-2xl max-h-[70vh]
         md:bottom-0 md:animate-none md:animate-slide-in-right md:rounded-none md:left-auto md:right-0 md:max-h-none md:w-[420px]
         transition-all duration-300
         ${showLocationPrompt ? 'md:top-[100px]' : 'md:top-14'}

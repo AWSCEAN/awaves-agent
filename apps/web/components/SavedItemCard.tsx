@@ -166,7 +166,7 @@ export default function SavedItemCard({
         {/* ═══════════════════════════════════════════════════ */}
         {/* MOBILE LAYOUT (compact, everything visible at once) */}
         {/* ═══════════════════════════════════════════════════ */}
-        <div className="md:hidden p-2.5">
+        <div className="md:hidden pt-2.5 px-2.5 pb-1.5">
           {/* Row 1: name + region/timestamp + remove */}
           <div className="flex items-start justify-between gap-2 mb-1.5">
             <div className="flex-1 min-w-0">
@@ -212,7 +212,7 @@ export default function SavedItemCard({
           </div>
 
           {/* Row 3: 4-column conditions (ultra compact) */}
-          <div className="grid grid-cols-4 gap-1 mb-1.5">
+          <div className="grid grid-cols-4 gap-1 mb-3">
             {item.wave_height !== undefined && (
               <div className="flex flex-col items-center bg-sand-50 rounded px-0.5 py-1">
                 <span className="text-xs leading-none">🌊</span>
@@ -243,42 +243,41 @@ export default function SavedItemCard({
             )}
           </div>
 
-          {/* Row 4: departure + feedback + map link */}
-          <div className="flex items-center gap-2 text-[10px]">
+          {/* Row 4: departure + rate button + map link */}
+          <div className="flex items-center gap-2">
             {item.departure_date && (
-              <span className="text-ocean-400 flex-shrink-0">
+              <span className="text-[10px] text-ocean-400 flex-shrink-0">
                 {t.departureDate}: {formatDate(item.departure_date)}
               </span>
             )}
             {showFeedbackSection && (
               <button
                 onClick={() => setShowFeedback(!showFeedback)}
-                className="text-ocean-400 hover:text-ocean-600 flex-shrink-0 underline"
+                className="px-2.5 py-1 rounded-md border border-ocean-200 bg-ocean-50 text-ocean-600 text-xs font-medium hover:bg-ocean-100 flex-shrink-0"
               >
                 {lang === 'ko' ? '평가하기' : 'Rate'}
               </button>
             )}
-            {feedbackStatus && (
-              <span className="text-green-600 flex-shrink-0">✓ {t.feedbackThanks}</span>
-            )}
-            <Link href={mapHref} className="ml-auto text-xs font-medium text-ocean-600 hover:text-ocean-800 flex-shrink-0">
+            <Link href={mapHref} className="ml-auto px-2.5 py-1 rounded-md bg-ocean-600 text-white text-xs font-medium hover:bg-ocean-700 flex-shrink-0">
               {t.viewOnMap} →
             </Link>
           </div>
 
           {/* Inline feedback (mobile toggle) */}
           {showFeedback && !feedbackStatus && (
-            <div className="flex flex-wrap items-center gap-1.5 mt-1.5 pt-1.5 border-t border-sand-100">
-              <span className="text-[10px] text-ocean-500">{t.feedbackQuestion}</span>
-              <button onClick={() => handleFeedbackClick('POSITIVE')} className="flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-green-50 hover:bg-green-100 text-green-700">
-                <span>👍</span> {t.feedbackYes}
-              </button>
-              <button onClick={() => handleFeedbackClick('NEGATIVE')} className="flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-red-50 hover:bg-red-100 text-red-700">
-                <span>👎</span> {t.feedbackNo}
-              </button>
-              <button onClick={() => { onFeedback('DEFERRED'); setShowFeedback(false); }} className="px-2 py-0.5 rounded text-xs bg-gray-50 hover:bg-gray-100 text-gray-600">
-                {t.feedbackLater}
-              </button>
+            <div className="mt-2 pt-2 border-t border-sand-100">
+              <p className="text-[10px] text-ocean-500 mb-1.5">{t.feedbackQuestion}</p>
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => handleFeedbackClick('POSITIVE')} className="flex-1 flex items-center justify-center gap-0.5 px-2 py-1 rounded-md text-xs bg-green-50 hover:bg-green-100 text-green-700">
+                  <span>👍</span> {t.feedbackYes}
+                </button>
+                <button onClick={() => handleFeedbackClick('NEGATIVE')} className="flex-1 flex items-center justify-center gap-0.5 px-2 py-1 rounded-md text-xs bg-red-50 hover:bg-red-100 text-red-700">
+                  <span>👎</span> {t.feedbackNo}
+                </button>
+                <button onClick={() => { onFeedback('DEFERRED'); setShowFeedback(false); }} className="flex-1 px-2 py-1 rounded-md text-xs bg-gray-50 hover:bg-gray-100 text-gray-600">
+                  {t.feedbackLater}
+                </button>
+              </div>
             </div>
           )}
         </div>

@@ -50,8 +50,8 @@ export default function PredictionResultPanel({
   return (
     <div
       className={`
-        fixed bottom-14 left-0 right-0 z-40 flex flex-col bg-white shadow-xl overflow-hidden
-        animate-slide-up rounded-t-2xl max-h-[60vh]
+        mobile-sheet-bottom fixed left-0 right-0 z-40 flex flex-col bg-white shadow-xl overflow-hidden
+        animate-slide-up rounded-t-2xl max-h-[70vh]
         md:bottom-0 md:animate-none md:animate-slide-in-left md:rounded-none md:right-auto md:left-0 md:max-h-none md:w-96
         transition-all duration-300
         ${showLocationPrompt ? 'md:top-[100px]' : 'md:top-14'}
