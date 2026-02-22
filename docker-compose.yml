@@ -1,0 +1,78 @@
+# Local EKS deployment testing
+# Builds and runs both containers exactly as they will run on EKS.
+#
+# Usage:
+#   1. Export your Mapbox token (one-time per shell):
+#        export NEXT_PUBLIC_MAPBOX_TOKEN=pk.eyJ1...
+#      Or add it to a root .env file:
+#        echo "NEXT_PUBLIC_MAPBOX_TOKEN=pk.eyJ1..." >> .env
+#
+#   2. Build and start both containers:
+#        docker compose up --build
+#
+#   3. Test:
+#        curl http://localhost:8001/health   -> {"status":"healthy"}
+#        open http://localhost:3000          -> awaves web app
+#
+#   4. Tear down:
+#        docker compose down
+#
+# Note: DATABASE_URL, JWT_SECRET_KEY, Redis URL, and AWS creds are read
+# from apps/api/.env and apps/api/.env.local — never baked into the image.
+
+services:
+  api:
+    build:
+      context: apps/api
+      dockerfile: Dockerfile
+    image: awaves-api:local
+    container_name: awaves-api
+    ports:
+      - "8001:8001"
+    env_file:
+      - apps/api/.env
+      - apps/api/.env.local
+    environment:
+      # .env.local sets these to "localhost" which is the container itself.
+      # host.docker.internal resolves to the Docker host on Windows/Mac Docker Desktop,
+      # allowing the container to reach services bound to 0.0.0.0 on the host.
+      OPENSEARCH_HOST: host.docker.internal
+      DDB_ENDPOINT_URL: "http://host.docker.internal:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - awaves-net
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # NEXT_PUBLIC_* vars are baked into JS bundles at build time by Next.js.
+        # They must be passed here as build args — setting them in K8s env has no effect.
+        NEXT_PUBLIC_API_URL: http://localhost:8001
+        NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN:-}
+        NEXT_PUBLIC_CDN_URL: ${NEXT_PUBLIC_CDN_URL:-}
+    image: awaves-web:local
+    container_name: awaves-web
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - awaves-net
+
+networks:
+  awaves-net:
+    driver: bridge

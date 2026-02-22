@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- awaves brand palette — referenced by styles.xml AppTheme -->
+    <color name="colorPrimary">#094074</color>
+    <color name="colorPrimaryDark">#062E55</color>
+    <color name="colorAccent">#1B8FC4</color>
+</resources>

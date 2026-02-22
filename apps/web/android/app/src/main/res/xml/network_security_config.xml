@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Network security config for awaves Android app.
+
+  The Chromium WebView (used by Capacitor) enforces cleartext restrictions
+  independently from the Java network stack — localhost is NOT automatically
+  exempt inside the WebView. We must explicitly allow it here.
+
+  Physical device (WiFi) testing — add your machine's IP when needed:
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">192.168.X.X</domain>
+    </domain-config>
+-->
+<network-security-config>
+    <!-- Allow HTTP to localhost (used via adb reverse for emulator dev) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+    <!-- Block cleartext for all other domains (production safety) -->
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

@@ -406,7 +406,7 @@ function MapPageContent() {
   };
 
   const handleSpotClick = (spot: SearchResult) => {
-    setShowResults(false);
+    if (isMobile) setShowResults(false);
     setMapCenter({ lat: spot.geo.lat, lng: spot.geo.lng });
     setTimeSlotSelection(null);
     setSelectedSpotDetail({

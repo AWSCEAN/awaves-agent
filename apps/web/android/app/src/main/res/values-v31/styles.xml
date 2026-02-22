@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ (API 31+) splash screen override.
+
+  On Android 12+, Theme.SplashScreen uses the Window Splash Screen API.
+  The legacy android:background item is ignored by the new API.
+  This file overrides AppTheme.NoActionBarLaunch specifically for API 31+.
+
+  windowSplashScreenBackground : the full-screen background colour shown
+  during launch (ocean blue = awaves brand colour).
+
+  postSplashScreenTheme        : the theme applied once the splash exits.
+  Without this the activity would have no theme after the splash.
+-->
+<resources>
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <!-- Ocean blue background — matches capacitor.config.ts SplashScreen.backgroundColor -->
+        <item name="windowSplashScreenBackground">@color/colorPrimary</item>
+        <!-- Use app adaptive icon as the centred splash icon (blue bg + orange wave) -->
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <!-- Icon background matches outer background for a seamless look -->
+        <item name="windowSplashScreenIconBackgroundColor">@color/colorPrimary</item>
+        <!-- Transition back to the normal no-action-bar theme -->
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+    </style>
+</resources>
