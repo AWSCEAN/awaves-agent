@@ -17,7 +17,16 @@ spec:
         app: fastapi-api
     spec:
       # IRSA: grants the pod AWS permissions without static keys.
-      # Created via: eksctl create iamserviceaccount --name awaves-api-sa --namespace api
+      # Attach the following policies to the IAM role:
+      #   - AmazonDynamoDBFullAccess          (surf data, saved spots, locations tables)
+      #   - AmazonOpenSearchServiceFullAccess  (search index)
+      #   - AmazonSageMakerFullAccess          (inference endpoint)
+      #   - CloudWatchFullAccess               (logs + metrics)
+      #   - AWSKeyManagementServicePowerUser   (KMS encrypt/decrypt)
+      #   - rds-db:connect (inline policy)     (Aurora IAM auth — replaces DB password)
+      # Note: ElastiCache (Redis) uses password-based auth — keep CACHE_URL in K8s secret.
+      # Created via: eksctl create iamserviceaccount --name awaves-api-sa --namespace api \
+      #   --attach-policy-arn <each policy ARN above> --approve
       serviceAccountName: awaves-api-sa
       containers:
         - name: api

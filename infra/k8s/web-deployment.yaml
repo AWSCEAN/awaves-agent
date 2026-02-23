@@ -16,8 +16,13 @@ spec:
       labels:
         app: react-web
     spec:
-      # IRSA: grants the pod AWS permissions (CloudWatch RUM, S3 CDN) without static keys.
-      # Created via: eksctl create iamserviceaccount --name awaves-web-sa --namespace web
+      # IRSA: grants the pod AWS permissions without static keys.
+      # Attach the following policies to the IAM role:
+      #   - AmazonS3ReadOnlyAccess             (read static assets from S3 bucket)
+      #   - cloudfront:CreateInvalidation      (cache invalidation on deploy — inline policy)
+      #   - CloudWatchFullAccess               (CloudWatch RUM metrics)
+      # Created via: eksctl create iamserviceaccount --name awaves-web-sa --namespace web \
+      #   --attach-policy-arn <each policy ARN above> --approve
       serviceAccountName: awaves-web-sa
       containers:
         - name: web
