@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: react-mobile
+  namespace: mobile
+  labels:
+    app: react-mobile
+    app.kubernetes.io/part-of: awaves
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: react-mobile
+  template:
+    metadata:
+      labels:
+        app: react-mobile
+    spec:
+      containers:
+        - name: mobile
+          # Same image as web deployment — one build, two deployments (Option A)
+          # Replace <ECR_REGISTRY> with your actual ECR URI before applying
+          image: <ECR_REGISTRY>/awaves-web:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: "production"
+            # NEXT_PUBLIC_* vars below are informational only — their values are
+            # already baked into the JS bundles at docker build time via --build-arg.
+            # Changing them here has no effect on client-side code.
+            - name: NEXT_PUBLIC_API_URL
+              value: "https://api.awaves.app"
+            - name: NEXT_PUBLIC_CDN_URL
+              value: "https://cdn.awaves.app"
+            - name: NEXT_PUBLIC_MAPBOX_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: awaves-web-secrets
+                  key: mapbox-token
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      imagePullSecrets:
+        - name: ecr-secret
