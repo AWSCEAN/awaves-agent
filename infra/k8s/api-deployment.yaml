@@ -22,6 +22,7 @@ spec:
       #   - AmazonOpenSearchServiceFullAccess  (search index)
       #   - AmazonSageMakerFullAccess          (inference endpoint)
       #   - CloudWatchFullAccess               (logs + metrics)
+      #   - AWSXRayDaemonWriteAccess           (distributed tracing)
       #   - AWSKeyManagementServicePowerUser   (KMS encrypt/decrypt)
       #   - rds-db:connect (inline policy)     (Aurora IAM auth — replaces DB password)
       # Note: ElastiCache (Redis) uses password-based auth — keep CACHE_URL in K8s secret.
