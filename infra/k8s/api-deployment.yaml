@@ -70,7 +70,7 @@ spec:
             - name: DYNAMODB_LOCATIONS_TABLE
               value: "locations"
             - name: CORS_ORIGINS
-              value: "https://awaves.app,https://www.awaves.app,https://mobile.awaves.app"
+              value: "https://awaves.net,https://www.awaves.net,https://mobile.awaves.net"
             - name: INFERENCE_MODE
               value: "sagemaker"
             - name: SAGEMAKER_ENDPOINT_NAME

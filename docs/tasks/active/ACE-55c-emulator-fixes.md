@@ -135,7 +135,7 @@ cd apps/web
 node_modules/.bin/cap sync android
 ```
 Then in Android Studio:
-1. **Uninstall old app** from emulator first (long-press icon → Uninstall, or `adb uninstall com.awaves.app`)
+1. **Uninstall old app** from emulator first (long-press icon → Uninstall, or `adb uninstall com.awaves.net`)
 2. **Build → Clean Project**
 3. **Build → Build Bundle(s)/APK(s) → Build APK(s)**
 4. **Run ▶**
@@ -210,7 +210,7 @@ After Cold Boot: run `adb reverse` again (it resets on each boot).
 | **Browser dev** | `http://localhost:8001` ✅ | *(irrelevant)* | `uvicorn ... --port 8001` | none |
 | **Android emulator** | `http://localhost:8001` ✅ | `http://localhost:3000` ✅ | `uvicorn ... --port 8001` | `adb reverse tcp:3000 tcp:3000 && adb reverse tcp:8001 tcp:8001` |
 | **Physical device (WiFi)** | `http://192.168.x.x:8001` | `http://192.168.x.x:3000` | `uvicorn --host 0.0.0.0 --port 8001` | Add IP to `network_security_config.xml` + `.env.local` |
-| **Production EKS** | baked via Docker build-arg | `https://mobile.awaves.app` | EKS pod | — |
+| **Production EKS** | baked via Docker build-arg | `https://mobile.awaves.net` | EKS pod | — |
 
 ---
 

@@ -1,10 +1,10 @@
-# API Ingress — routes api.awaves.app to the FastAPI backend.
+# API Ingress — routes api.awaves.net to the FastAPI backend.
 # Shares the same ALB group as the frontend ingresses (awaves-frontend)
 # to avoid provisioning a separate load balancer.
 #
 # Prerequisites:
 #   - AWS Load Balancer Controller installed in the EKS cluster
-#   - ACM wildcard cert for *.awaves.app must exist
+#   - ACM wildcard cert for *.awaves.net must exist
 #   - Replace <ACM_CERT_ARN> with the real ARN before applying
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -21,7 +21,7 @@ metadata:
     alb.ingress.kubernetes.io/group.order: "3"
 spec:
   rules:
-    - host: api.awaves.app
+    - host: api.awaves.net
       http:
         paths:
           - path: /

@@ -32,9 +32,9 @@ spec:
             # already baked into the JS bundles at docker build time via --build-arg.
             # Changing them here has no effect on client-side code.
             - name: NEXT_PUBLIC_API_URL
-              value: "https://api.awaves.app"
+              value: "https://api.awaves.net"
             - name: NEXT_PUBLIC_CDN_URL
-              value: "https://cdn.awaves.app"
+              value: "https://cdn.awaves.net"
             - name: NEXT_PUBLIC_MAPBOX_TOKEN
               valueFrom:
                 secretKeyRef:

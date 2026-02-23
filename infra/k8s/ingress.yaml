@@ -3,7 +3,7 @@
 #
 # Prerequisites:
 #   - AWS Load Balancer Controller must be installed in the EKS cluster
-#   - ACM wildcard cert for *.awaves.app must exist
+#   - ACM wildcard cert for *.awaves.net must exist
 #   - Replace <ACM_CERT_ARN> with the real ARN before applying
 ---
 apiVersion: networking.k8s.io/v1
@@ -21,7 +21,7 @@ metadata:
     alb.ingress.kubernetes.io/group.order: "1"
 spec:
   rules:
-    - host: web.awaves.app
+    - host: web.awaves.net
       http:
         paths:
           - path: /
@@ -47,7 +47,7 @@ metadata:
     alb.ingress.kubernetes.io/group.order: "2"
 spec:
   rules:
-    - host: mobile.awaves.app
+    - host: mobile.awaves.net
       http:
         paths:
           - path: /
