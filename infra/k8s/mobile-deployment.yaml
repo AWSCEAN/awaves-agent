@@ -16,6 +16,9 @@ spec:
       labels:
         app: react-mobile
     spec:
+      # IRSA: grants the pod AWS permissions (CloudWatch RUM, S3 CDN) without static keys.
+      # Created via: eksctl create iamserviceaccount --name awaves-mobile-sa --namespace mobile
+      serviceAccountName: awaves-mobile-sa
       containers:
         - name: mobile
           # Same image as web deployment — one build, two deployments (Option A)

@@ -16,6 +16,9 @@ spec:
       labels:
         app: react-web
     spec:
+      # IRSA: grants the pod AWS permissions (CloudWatch RUM, S3 CDN) without static keys.
+      # Created via: eksctl create iamserviceaccount --name awaves-web-sa --namespace web
+      serviceAccountName: awaves-web-sa
       containers:
         - name: web
           # Replace <ECR_REGISTRY> with your actual ECR URI before applying
