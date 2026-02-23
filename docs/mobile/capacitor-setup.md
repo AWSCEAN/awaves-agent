@@ -23,60 +23,80 @@ This is the recommended approach because the app requires a live API backend reg
 
 ## Step 1: Install Capacitor Dependencies
 
+Capacitor v8 dependencies are already installed in `apps/web/package.json`:
+- `@capacitor/core ^8.1.0`
+- `@capacitor/cli ^8.1.0`
+- `@capacitor/android ^8.1.0`
+
+The `android/` project has been initialized. Skip to Step 4 for daily development.
+
+If starting from scratch on a new machine:
 ```bash
 cd apps/web
-
-# Install Capacitor core + CLI + Android platform
-pnpm add @capacitor/core @capacitor/cli @capacitor/android
-pnpm add -D @capacitor/cli
-
-# Optional: splash screen and status bar plugins
-pnpm add @capacitor/splash-screen @capacitor/status-bar
+pnpm install  # installs all deps including Capacitor
 ```
 
 ---
 
 ## Step 2: Configure the App URL
 
-Edit [apps/web/capacitor.config.ts](../../apps/web/capacitor.config.ts):
+The app URL is pre-configured to the mobile EKS subdomain in
+[apps/web/capacitor.config.ts](../../apps/web/capacitor.config.ts):
 
 ```typescript
 server: {
-  url: 'https://your-actual-deployed-url.com',  // ← PUT YOUR URL HERE
+  url: 'https://mobile.awaves.app',  // EKS mobile deployment endpoint
   cleartext: false,
   androidScheme: 'https',
 },
 ```
 
-> **Note**: If testing locally, you can temporarily use:
+> **Why `mobile.awaves.app` (not `awaves.app`)?**
+> The EKS cluster runs two separate Deployments from the same Docker image:
+> - `web.awaves.app` → `react-web` Deployment (browser users, HPA min:2/max:10)
+> - `mobile.awaves.app` → `react-mobile` Deployment (APK WebView, HPA min:1/max:3)
+>
+> This gives the APK an isolated, independently-scalable entry point.
+> Static assets (JS/CSS) are served via CloudFront → S3 using `assetPrefix`.
+> See [infra/k8s/](../../infra/k8s/) for all Kubernetes manifests.
+
+> **For local testing**, temporarily use:
 > ```typescript
-> url: 'http://10.0.2.2:3000'  // Android emulator localhost
+> url: 'http://10.0.2.2:3000'  // Android emulator → host machine localhost
 > // or
 > url: 'http://YOUR_LOCAL_IP:3000'  // physical device on same WiFi
+> // Also set: cleartext: true, androidScheme: 'http'
 > ```
 
 ---
 
-## Step 3: Initialize Capacitor (first time only)
+## Step 3: Initialize Capacitor (first time only / new machine)
+
+> **Note:** The `android/` directory is already committed to the repo. On an existing
+> clone, skip this step and go to Step 4.
 
 ```bash
 cd apps/web
 
-# Initialize - this reads from capacitor.config.ts
-npx cap init awaves com.awaves.app --web-dir .next
-
 # Add Android platform (creates the android/ folder)
-npx cap add android
+# capacitor.config.ts already exists — do NOT run `cap init` again
+node_modules/.bin/cap add android
+
+# Create assets directory (required by cap sync on a fresh project)
+mkdir -p android/app/src/main/assets
+
+# Sync config into Android project
+node_modules/.bin/cap sync android
 ```
 
 ---
 
-## Step 4: Sync (run every time after changing web files)
+## Step 4: Sync (run every time after changing web files or config)
 
 ```bash
 cd apps/web
 pnpm cap:sync
-# or: npx cap sync android
+# or: node_modules/.bin/cap sync android
 ```
 
 ---
@@ -86,7 +106,7 @@ pnpm cap:sync
 ```bash
 cd apps/web
 pnpm cap:open
-# or: npx cap open android
+# or: node_modules/.bin/cap open android
 ```
 
 Android Studio will open with the `android/` project.
@@ -134,6 +154,64 @@ To avoid rejection as a "thin wrapper":
 | HTTPS only | ✅ `cleartext: false` | N/A |
 | Native features | ⚠️ Basic only | Consider adding `@capacitor/push-notifications` |
 | Offline fallback | ❌ Requires internet | Consider Service Worker for offline shell |
+
+---
+
+## EKS Deployment Architecture
+
+The Capacitor APK uses **URL-wrapper mode** — it loads the live web app from AWS EKS
+rather than bundling static assets. You must deploy the web app to EKS before testing
+against production.
+
+### One Image, Two Deployments
+
+The same Docker image (`awaves-web:latest`) is deployed twice:
+
+| Deployment | Namespace | Replicas | Domain | Users |
+|------------|-----------|----------|--------|-------|
+| `react-web` | `web` | min:2, max:10 | `web.awaves.app` | Browser |
+| `react-mobile` | `mobile` | min:1, max:3 | `mobile.awaves.app` | APK WebView |
+
+### Build and Push Docker Image
+
+```bash
+# From monorepo root — NEXT_PUBLIC_* must be passed as build args
+docker build -f apps/web/Dockerfile \
+  --build-arg NEXT_PUBLIC_CDN_URL=https://cdn.awaves.app \
+  --build-arg NEXT_PUBLIC_API_URL=https://api.awaves.app \
+  --build-arg NEXT_PUBLIC_MAPBOX_TOKEN=pk.YOUR_TOKEN_HERE \
+  -t awaves-web:latest .
+
+docker tag awaves-web:latest <ECR_REGISTRY>/awaves-web:latest
+docker push <ECR_REGISTRY>/awaves-web:latest
+```
+
+### Sync Static Assets to S3 (run after every build)
+
+```bash
+# After next build, sync static assets to S3 before deploying to EKS
+aws s3 sync apps/web/.next/static/ s3://<YOUR-S3-BUCKET>/_next/static/ \
+  --cache-control "public,max-age=31536000,immutable" \
+  --region ap-northeast-2
+```
+
+### Deploy to EKS
+
+```bash
+# Replace <ECR_REGISTRY> and <ACM_CERT_ARN> in the YAML files first
+kubectl apply -f infra/k8s/namespace.yaml
+kubectl apply -f infra/k8s/web-deployment.yaml
+kubectl apply -f infra/k8s/mobile-deployment.yaml
+kubectl apply -f infra/k8s/web-service.yaml
+kubectl apply -f infra/k8s/mobile-service.yaml
+kubectl apply -f infra/k8s/ingress.yaml
+kubectl apply -f infra/k8s/web-hpa.yaml
+kubectl apply -f infra/k8s/mobile-hpa.yaml
+
+# Verify
+kubectl get pods -n web && kubectl get pods -n mobile
+kubectl get ingress -n web && kubectl get ingress -n mobile
+```
 
 ---
 

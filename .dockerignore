@@ -1,0 +1,11 @@
+node_modules
+apps/web/node_modules
+apps/web/.next
+apps/web/out
+apps/web/android
+apps/api/.venv
+apps/api/__pycache__
+**/.env*
+**/*.log
+**/.turbo
+**/coverage
