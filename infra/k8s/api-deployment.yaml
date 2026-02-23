@@ -73,8 +73,6 @@ spec:
               value: "443"
             - name: DYNAMODB_SURF_DATA_TABLE
               value: "surf_info"
-            - name: DYNAMODB_SAVED_SPOTS_TABLE
-              value: "awaves-saved-spots"
             - name: DYNAMODB_SAVED_LIST_TABLE
               value: "saved_list"
             - name: DYNAMODB_LOCATIONS_TABLE
