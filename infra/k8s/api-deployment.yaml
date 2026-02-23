@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapi-api
+  namespace: api
+  labels:
+    app: fastapi-api
+    app.kubernetes.io/part-of: awaves
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fastapi-api
+  template:
+    metadata:
+      labels:
+        app: fastapi-api
+    spec:
+      # IRSA: grants the pod AWS permissions without static keys.
+      # Attach the following policies to the IAM role:
+      #   - AmazonDynamoDBFullAccess          (surf data, saved spots, locations tables)
+      #   - AmazonOpenSearchServiceFullAccess  (search index)
+      #   - AmazonSageMakerFullAccess          (inference endpoint)
+      #   - CloudWatchFullAccess               (logs + metrics)
+      #   - AWSXRayDaemonWriteAccess           (distributed tracing)
+      #   - AWSKeyManagementServicePowerUser   (KMS encrypt/decrypt)
+      #   - rds-db:connect (inline policy)     (Aurora IAM auth — replaces DB password)
+      # Note: ElastiCache (Redis) uses password-based auth — keep CACHE_URL in K8s secret.
+      # Created via: eksctl create iamserviceaccount --name awaves-api-sa --namespace api \
+      #   --attach-policy-arn <each policy ARN above> --approve
+      serviceAccountName: awaves-api-sa
+      containers:
+        - name: api
+          # Replace <ECR_REGISTRY> with your actual ECR URI before applying
+          image: <ECR_REGISTRY>/awaves-api:latest
+          ports:
+            - containerPort: 8001
+          env:
+            - name: ENV
+              value: "production"
+            - name: PORT
+              value: "8001"
+            - name: AWS_REGION
+              value: "ap-northeast-2"
+            # Secrets loaded from K8s secret — create with:
+            #   kubectl create secret generic awaves-api-secrets \
+            #     --from-literal=database-url="postgresql+asyncpg://..." \
+            #     --from-literal=jwt-secret-key="..." \
+            #     --from-literal=cache-url="redis://..." \
+            #     --from-literal=opensearch-host="search-awaves-prod.ap-northeast-2.es.amazonaws.com" \
+            #     -n api
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: awaves-api-secrets
+                  key: database-url
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: awaves-api-secrets
+                  key: jwt-secret-key
+            - name: CACHE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: awaves-api-secrets
+                  key: cache-url
+            - name: OPENSEARCH_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: awaves-api-secrets
+                  key: opensearch-host
+            - name: OPENSEARCH_PORT
+              value: "443"
+            - name: DYNAMODB_SURF_DATA_TABLE
+              value: "surf_info"
+            - name: DYNAMODB_SAVED_SPOTS_TABLE
+              value: "awaves-saved-spots"
+            - name: DYNAMODB_SAVED_LIST_TABLE
+              value: "saved_list"
+            - name: DYNAMODB_LOCATIONS_TABLE
+              value: "locations"
+            - name: CORS_ORIGINS
+              value: "https://awaves.net,https://www.awaves.net,https://mobile.awaves.net"
+            - name: INFERENCE_MODE
+              value: "sagemaker"
+            - name: SAGEMAKER_ENDPOINT_NAME
+              value: "awaves-surf-predictor"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      imagePullSecrets:
+        - name: ecr-secret

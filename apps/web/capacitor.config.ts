@@ -9,7 +9,7 @@ const config: CapacitorConfig = {
   // The app loads your deployed web URL inside the WebView.
   // Replace with your actual production URL before building.
   server: {
-    // url: 'https://mobile.awaves.app', // EKS mobile deployment endpoint
+    // url: 'https://awaves.net', // production deployment endpoint
     // Using localhost + adb reverse: run once per emulator session before testing:
     //   adb reverse tcp:3000 tcp:3000
     //   adb reverse tcp:8001 tcp:8001

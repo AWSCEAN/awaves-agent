@@ -45,16 +45,16 @@ The app URL is pre-configured to the mobile EKS subdomain in
 
 ```typescript
 server: {
-  url: 'https://mobile.awaves.app',  // EKS mobile deployment endpoint
+  url: 'https://mobile.awaves.net',  // EKS mobile deployment endpoint
   cleartext: false,
   androidScheme: 'https',
 },
 ```
 
-> **Why `mobile.awaves.app` (not `awaves.app`)?**
+> **Why `mobile.awaves.net` (not `awaves.net`)?**
 > The EKS cluster runs two separate Deployments from the same Docker image:
-> - `web.awaves.app` → `react-web` Deployment (browser users, HPA min:2/max:10)
-> - `mobile.awaves.app` → `react-mobile` Deployment (APK WebView, HPA min:1/max:3)
+> - `web.awaves.net` → `react-web` Deployment (browser users, HPA min:2/max:10)
+> - `mobile.awaves.net` → `react-mobile` Deployment (APK WebView, HPA min:1/max:3)
 >
 > This gives the APK an isolated, independently-scalable entry point.
 > Static assets (JS/CSS) are served via CloudFront → S3 using `assetPrefix`.
@@ -169,16 +169,16 @@ The same Docker image (`awaves-web:latest`) is deployed twice:
 
 | Deployment | Namespace | Replicas | Domain | Users |
 |------------|-----------|----------|--------|-------|
-| `react-web` | `web` | min:2, max:10 | `web.awaves.app` | Browser |
-| `react-mobile` | `mobile` | min:1, max:3 | `mobile.awaves.app` | APK WebView |
+| `react-web` | `web` | min:2, max:10 | `web.awaves.net` | Browser |
+| `react-mobile` | `mobile` | min:1, max:3 | `mobile.awaves.net` | APK WebView |
 
 ### Build and Push Docker Image
 
 ```bash
 # From monorepo root — NEXT_PUBLIC_* must be passed as build args
 docker build -f apps/web/Dockerfile \
-  --build-arg NEXT_PUBLIC_CDN_URL=https://cdn.awaves.app \
-  --build-arg NEXT_PUBLIC_API_URL=https://api.awaves.app \
+  --build-arg NEXT_PUBLIC_CDN_URL=https://cdn.awaves.net \
+  --build-arg NEXT_PUBLIC_API_URL=https://api.awaves.net \
   --build-arg NEXT_PUBLIC_MAPBOX_TOKEN=pk.YOUR_TOKEN_HERE \
   -t awaves-web:latest .
 
@@ -241,7 +241,7 @@ android:usesCleartextTraffic="true"
 The Mapbox GL JS requires WebGL. Make sure you're testing on a real device or emulator with GPU acceleration enabled (not a software renderer).
 
 ### "Mixed content" errors
-Ensure your deployed API uses HTTPS. Set `NEXT_PUBLIC_API_URL=https://api.awaves.app` in your production env.
+Ensure your deployed API uses HTTPS. Set `NEXT_PUBLIC_API_URL=https://api.awaves.net` in your production env.
 
 ### Back button behavior
 Capacitor handles the back button by navigating the WebView history. If you want custom behavior, add:
