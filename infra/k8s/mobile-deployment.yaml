@@ -27,7 +27,7 @@ spec:
       containers:
         - name: mobile
           # Same image as web deployment — one build, two deployments (Option A)
-          image: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-mobile-app/awaves-web:latest
+          image: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-mobile-app:latest
           ports:
             - containerPort: 3000
           env:

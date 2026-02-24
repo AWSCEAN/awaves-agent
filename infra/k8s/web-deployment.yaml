@@ -26,7 +26,7 @@ spec:
       serviceAccountName: awaves-web-sa
       containers:
         - name: web
-          image: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-web-app/awaves-web:latest
+          image: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-web-app:latest
           ports:
             - containerPort: 3000
           env:

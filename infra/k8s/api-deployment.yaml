@@ -31,7 +31,7 @@ spec:
       serviceAccountName: awaves-api-sa
       containers:
         - name: api
-          image: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-backend-api/awaves-api:latest
+          image: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-backend-api:latest
           ports:
             - containerPort: 8001
           envFrom:
