@@ -21,7 +21,7 @@ load_dotenv(_api_dir / ".env")
 load_dotenv(_api_dir / ".env.local", override=True)
 
 ENDPOINT_URL = "http://localhost:8000"
-TABLE_NAME = "surf_info"
+TABLE_NAME = "awaves-dev-surf-info"
 REGION = "ap-northeast-2"
 CSV_FILE = "data/mock_surf_prediction_current.csv"
 

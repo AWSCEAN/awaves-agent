@@ -75,7 +75,6 @@ class Settings(BaseSettings):
 
     # DynamoDB
     dynamodb_surf_data_table: str = ""
-    dynamodb_saved_spots_table: str = ""
     dynamodb_saved_list_table: str = ""
     dynamodb_locations_table: str = ""
     ddb_endpoint_url: str = ""
