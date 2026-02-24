@@ -26,8 +26,7 @@ spec:
       serviceAccountName: awaves-web-sa
       containers:
         - name: web
-          # Replace <ECR_REGISTRY> with your actual ECR URI before applying
-          image: <ECR_REGISTRY>/awaves-web:latest
+          image: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-web-app/awaves-web:latest
           ports:
             - containerPort: 3000
           env:

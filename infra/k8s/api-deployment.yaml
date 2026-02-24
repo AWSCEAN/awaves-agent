@@ -31,58 +31,29 @@ spec:
       serviceAccountName: awaves-api-sa
       containers:
         - name: api
-          # Replace <ECR_REGISTRY> with your actual ECR URI before applying
-          image: <ECR_REGISTRY>/awaves-api:latest
+          image: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-backend-api/awaves-api:latest
           ports:
             - containerPort: 8001
+          envFrom:
+            - configMapRef:
+                name: awaves-api-config
           env:
-            - name: ENV
-              value: "production"
-            - name: PORT
-              value: "8001"
-            - name: AWS_REGION
-              value: "ap-northeast-2"
-            # Secrets loaded from K8s secret — create with:
-            #   kubectl create secret generic awaves-api-secrets \
-            #     --from-literal=database-url="postgresql+asyncpg://..." \
-            #     --from-literal=jwt-secret-key="..." \
-            #     --from-literal=cache-url="redis://..." \
-            #     --from-literal=opensearch-host="search-awaves-prod.ap-northeast-2.es.amazonaws.com" \
-            #     -n api
-            - name: DATABASE_URL
+            # Secrets synced from AWS Secrets Manager via ExternalSecret (api-externalsecret.yaml)
+            - name: DB_WRITER_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: awaves-api-secrets
-                  key: database-url
+                  key: db-writer-password
+            - name: DB_READER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: awaves-api-secrets
+                  key: db-reader-password
             - name: JWT_SECRET_KEY
               valueFrom:
                 secretKeyRef:
                   name: awaves-api-secrets
                   key: jwt-secret-key
-            - name: CACHE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: awaves-api-secrets
-                  key: cache-url
-            - name: OPENSEARCH_HOST
-              valueFrom:
-                secretKeyRef:
-                  name: awaves-api-secrets
-                  key: opensearch-host
-            - name: OPENSEARCH_PORT
-              value: "443"
-            - name: DYNAMODB_SURF_DATA_TABLE
-              value: "surf_info"
-            - name: DYNAMODB_SAVED_LIST_TABLE
-              value: "saved_list"
-            - name: DYNAMODB_LOCATIONS_TABLE
-              value: "locations"
-            - name: CORS_ORIGINS
-              value: "https://awaves.net,https://www.awaves.net,https://mobile.awaves.net"
-            - name: INFERENCE_MODE
-              value: "sagemaker"
-            - name: SAGEMAKER_ENDPOINT_NAME
-              value: "awaves-surf-predictor"
           resources:
             requests:
               cpu: "500m"
