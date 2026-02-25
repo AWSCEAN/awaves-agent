@@ -45,11 +45,9 @@
 #
 # ── GitHub repository setup ────────────────────────────────────────────────────
 #
-#  Secrets (Settings → Secrets and variables → Actions → Secrets):
-#    NEXT_PUBLIC_MAPBOX_TOKEN   — Mapbox public token (pk.eyJ1...)
-#
 #  Variables (Settings → Secrets and variables → Actions → Variables):
 #    EKS_CLUSTER_NAME           — your EKS cluster name (e.g. awaves-dev-eks)
+#    NEXT_PUBLIC_MAPBOX_TOKEN   — Mapbox public token (pk.eyJ1...) — not a secret
 #
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -139,7 +137,7 @@ jobs:
           docker build \
             --build-arg NEXT_PUBLIC_API_URL=https://api.awaves.net \
             --build-arg NEXT_PUBLIC_CDN_URL=https://cdn.awaves.net \
-            --build-arg NEXT_PUBLIC_MAPBOX_TOKEN=${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }} \
+            --build-arg NEXT_PUBLIC_MAPBOX_TOKEN=${{ vars.NEXT_PUBLIC_MAPBOX_TOKEN }} \
             -t $ECR_WEB:${{ github.sha }} \
             -t $ECR_WEB:latest \
             .
@@ -215,7 +213,7 @@ jobs:
           docker build \
             --build-arg NEXT_PUBLIC_API_URL=https://api.awaves.net \
             --build-arg NEXT_PUBLIC_CDN_URL=https://cdn.awaves.net \
-            --build-arg NEXT_PUBLIC_MAPBOX_TOKEN=${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }} \
+            --build-arg NEXT_PUBLIC_MAPBOX_TOKEN=${{ vars.NEXT_PUBLIC_MAPBOX_TOKEN }} \
             -t $ECR_MOBILE:${{ github.sha }} \
             -t $ECR_MOBILE:latest \
             .
