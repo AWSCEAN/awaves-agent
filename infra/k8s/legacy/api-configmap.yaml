@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: awaves-api-config
+  namespace: api
+  labels:
+    app: fastapi-api
+    app.kubernetes.io/part-of: awaves
+data:
+  ENV: "production"
+  PORT: "8001"
+  AWS_REGION: "us-east-1"
+
+  # Aurora PostgreSQL connection
+  DB_WRITER_HOST: "awaves-dev-aurora.cluster-cqpamok4qo4i.us-east-1.rds.amazonaws.com"
+  DB_READER_HOST: "awaves-dev-aurora.cluster-ro-cqpamok4qo4i.us-east-1.rds.amazonaws.com"
+  DB_PORT: "5432"
+  DB_NAME: "awaves"
+  DB_WRITER_USER: "awaves_writer"
+  DB_READER_USER: "awaves_reader"
+  DB_SSL_MODE: "verify-full"
+  DB_SSL_ROOT_CERT: "/certs/global-bundle.pem"
+
+  # Valkey (Redis-compatible) cache
+  CACHE_URL: "rediss://master.awaves-dev-valkey.2pzwt5.use1.cache.amazonaws.com:6379"
+
+  # OpenSearch
+  OPENSEARCH_HOST: "https://vpc-awaves-dev-spots-k6qy4iunvw7wk3g5zjjd5m46li.us-east-1.es.amazonaws.com"
+  OPENSEARCH_PORT: "443"
+
+  # DynamoDB tables
+  DYNAMODB_SURF_DATA_TABLE: "awaves-dev-surf-info"
+  DYNAMODB_SAVED_LIST_TABLE: "awaves-dev-saved-list"
+  DYNAMODB_LOCATIONS_TABLE: "awaves-dev-locations"
+
+  # Application
+  CORS_ORIGINS: "https://awaves.net,https://www.awaves.net,https://mobile.awaves.net"
+  INFERENCE_MODE: "sagemaker"
+  SAGEMAKER_ENDPOINT_NAME: "awaves-dev-surf-index"

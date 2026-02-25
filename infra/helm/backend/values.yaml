@@ -1,0 +1,37 @@
+image:
+  repository: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-backend-api
+  tag: latest
+  pullPolicy: Always
+
+replicaCount: 2
+
+service:
+  port: 80
+  targetPort: 8001
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
+
+hpa:
+  minReplicas: 2
+  maxReplicas: 10
+  cpuUtilization: 70
+
+ingress:
+  host: api.awaves.net
+  # The value below was set by the backend engineer — verify it is an ACM cert ARN
+  # (format: arn:aws:acm:us-east-1:<account>:certificate/<id>) before deploying.
+  certificateArn: "arn:aws:elasticloadbalancing:us-east-1:107570140649:loadbalancer/app/k8s-awavesde-webappin-35d6501f04/501ecb569eeabe20"
+  groupOrder: "3"
+
+serviceAccount:
+  name: awaves-api-sa
+  irsaRoleArn: arn:aws:iam::107570140649:role/awaves-dev-backend-api
+
+imagePullSecrets:
+  - name: ecr-secret

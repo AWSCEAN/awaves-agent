@@ -1,0 +1,36 @@
+image:
+  repository: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-mobile-app
+  tag: latest
+  pullPolicy: Always
+
+replicaCount: 1
+
+service:
+  port: 80
+  targetPort: 3000
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "256Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+hpa:
+  minReplicas: 1
+  maxReplicas: 3
+  cpuUtilization: 70
+
+ingress:
+  host: mobile.awaves.net
+  # Replace with your ACM cert ARN: arn:aws:acm:us-east-1:<account>:certificate/<id>
+  certificateArn: "<ACM_CERT_ARN>"
+  groupOrder: "2"
+
+serviceAccount:
+  name: awaves-mobile-sa
+  irsaRoleArn: arn:aws:iam::107570140649:role/awaves-dev-web-app
+
+imagePullSecrets:
+  - name: ecr-secret
