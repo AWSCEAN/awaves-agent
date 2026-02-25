@@ -31,7 +31,7 @@ load_dotenv(_api_dir / ".env.local", override=True)
 
 ENDPOINT_URL = "http://localhost:8000"
 SURF_TABLE = "awaves-dev-surf-info"
-SAVED_TABLE = "awaves-dev-saved_list"
+SAVED_TABLE = "awaves-dev-saved-list"
 REGION = "ap-northeast-2"
 
 REDIS_URL = os.getenv("CACHE_URL")

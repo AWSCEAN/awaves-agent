@@ -30,7 +30,7 @@ data:
 
   # DynamoDB tables
   DYNAMODB_SURF_DATA_TABLE: "awaves-dev-surf-info"
-  DYNAMODB_SAVED_LIST_TABLE: "awaves-dev-saved_list"
+  DYNAMODB_SAVED_LIST_TABLE: "awaves-dev-saved-list"
   DYNAMODB_LOCATIONS_TABLE: "awaves-dev-locations"
 
   # Application

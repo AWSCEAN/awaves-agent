@@ -41,10 +41,7 @@ spec:
             - name: NEXT_PUBLIC_CDN_URL
               value: "https://cdn.awaves.net"
             - name: NEXT_PUBLIC_MAPBOX_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: awaves-web-secrets
-                  key: mapbox-token
+              value: "pk.eyJ1IjoicWtkZWtkbmpzMTIwMSIsImEiOiJjbWw0ODc2ejMwejF4M3JzNWhxczc3dHN0In0.wxEvng2hYWnoIY0Yrqk0cA"
           resources:
             requests:
               cpu: "250m"
