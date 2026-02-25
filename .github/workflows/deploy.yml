@@ -1,0 +1,238 @@
+# Deploy to AWS EKS — triggered on every push to main.
+#
+# ── One-time AWS setup (do this before the first run) ─────────────────────────
+#
+#  1. Create GitHub OIDC provider in IAM:
+#       aws iam create-open-id-connect-provider \
+#         --url https://token.actions.githubusercontent.com \
+#         --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1 \
+#         --client-id-list sts.amazonaws.com
+#
+#  2. Create IAM role `awaves-github-actions` with trust policy:
+#       {
+#         "Version": "2012-10-17",
+#         "Statement": [{
+#           "Effect": "Allow",
+#           "Principal": { "Federated": "arn:aws:iam::107570140649:oidc-provider/token.actions.githubusercontent.com" },
+#           "Action": "sts:AssumeRoleWithWebIdentity",
+#           "Condition": {
+#             "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
+#             "StringLike":  { "token.actions.githubusercontent.com:sub": "repo:AWSCEAN/awaves-agent:ref:refs/heads/main" }
+#           }
+#         }]
+#       }
+#
+#  3. Attach the following managed policies to `awaves-github-actions`:
+#       - AmazonEC2ContainerRegistryPowerUser   (ECR push for all three repos)
+#       - AmazonS3FullAccess                    (S3 sync for frontend static assets)
+#       - CloudFrontFullAccess                  (cache invalidation)
+#
+#  4. Add an inline policy for EKS access:
+#       {
+#         "Version": "2012-10-17",
+#         "Statement": [{
+#           "Effect": "Allow",
+#           "Action": ["eks:DescribeCluster"],
+#           "Resource": "arn:aws:eks:us-east-1:107570140649:cluster/*"
+#         }]
+#       }
+#     Then add `awaves-github-actions` to the EKS aws-auth ConfigMap:
+#       kubectl edit configmap aws-auth -n kube-system
+#       # add under mapRoles:
+#       - rolearn: arn:aws:iam::107570140649:role/awaves-github-actions
+#         username: github-actions
+#         groups: ["system:masters"]
+#
+# ── GitHub repository setup ────────────────────────────────────────────────────
+#
+#  Secrets (Settings → Secrets and variables → Actions → Secrets):
+#    NEXT_PUBLIC_MAPBOX_TOKEN   — Mapbox public token (pk.eyJ1...)
+#
+#  Variables (Settings → Secrets and variables → Actions → Variables):
+#    EKS_CLUSTER_NAME           — your EKS cluster name (e.g. awaves-dev-eks)
+#
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: Deploy to AWS EKS
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ROLE_ARN: arn:aws:iam::107570140649:role/awaves-github-actions
+  ECR_BACKEND: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-backend-api
+  ECR_WEB: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-web-app
+  ECR_MOBILE: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-mobile-app
+  S3_BUCKET: awaves-frontend-dev-107570140649
+  CF_DISTRIBUTION_ID: EDCXZ1CBA9XL4
+
+# Required for GitHub OIDC token — no static AWS keys stored in secrets
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # ── Backend: FastAPI ─────────────────────────────────────────────────────────
+  deploy-backend:
+    name: Backend — Build, Push, Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push backend image
+        run: |
+          docker build \
+            -t $ECR_BACKEND:${{ github.sha }} \
+            -t $ECR_BACKEND:latest \
+            apps/api/
+
+          docker push $ECR_BACKEND:${{ github.sha }}
+          docker push $ECR_BACKEND:latest
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --region $AWS_REGION \
+            --name ${{ vars.EKS_CLUSTER_NAME }}
+
+      - name: Roll out backend deployment
+        run: |
+          kubectl set image deployment/fastapi-api \
+            api=$ECR_BACKEND:${{ github.sha }} \
+            -n api
+          kubectl rollout status deployment/fastapi-api \
+            -n api --timeout=5m
+
+  # ── Web: Next.js + S3 static assets + CloudFront invalidation ───────────────
+  deploy-web:
+    name: Web — Build, S3 Sync, Invalidate, Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build web image
+        # NEXT_PUBLIC_* vars must be passed as build-args — Next.js inlines them
+        # into the JS bundles at build time. Setting them in K8s env has no effect.
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL=https://api.awaves.net \
+            --build-arg NEXT_PUBLIC_CDN_URL=https://cdn.awaves.net \
+            --build-arg NEXT_PUBLIC_MAPBOX_TOKEN=${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }} \
+            -t $ECR_WEB:${{ github.sha }} \
+            -t $ECR_WEB:latest \
+            .
+
+      - name: Push web image
+        run: |
+          docker push $ECR_WEB:${{ github.sha }}
+          docker push $ECR_WEB:latest
+
+      - name: Extract static assets from image
+        # The Dockerfile copies static files to /app/apps/web/.next/static
+        run: |
+          CONTAINER_ID=$(docker create $ECR_WEB:${{ github.sha }})
+          docker cp $CONTAINER_ID:/app/apps/web/.next/static ./static-out
+          docker rm $CONTAINER_ID
+
+      - name: Upload static assets to S3
+        # Files are content-hashed by Next.js — safe to cache forever (immutable).
+        # --delete removes stale hashed files from previous deploys.
+        run: |
+          aws s3 sync ./static-out \
+            s3://$S3_BUCKET/_next/static/ \
+            --cache-control "public, max-age=31536000, immutable" \
+            --delete \
+            --region $AWS_REGION
+
+      - name: Invalidate CloudFront cache
+        # Only needed if CloudFront caches non-hashed assets (e.g. public/ files).
+        # Hashed _next/static/* files don't need invalidation — they get new names.
+        run: |
+          INVALIDATION_ID=$(aws cloudfront create-invalidation \
+            --distribution-id $CF_DISTRIBUTION_ID \
+            --paths "/favicon.ico" "/manifest.json" "/_next/static/*" \
+            --query 'Invalidation.Id' \
+            --output text)
+          echo "Invalidation ID: $INVALIDATION_ID"
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --region $AWS_REGION \
+            --name ${{ vars.EKS_CLUSTER_NAME }}
+
+      - name: Roll out web deployment
+        run: |
+          kubectl set image deployment/react-web \
+            web=$ECR_WEB:${{ github.sha }} \
+            -n web
+          kubectl rollout status deployment/react-web \
+            -n web --timeout=5m
+
+  # ── Mobile: same Next.js source, separate ECR repo + K8s deployment ─────────
+  deploy-mobile:
+    name: Mobile — Build, Push, Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push mobile image
+        # Same Dockerfile as web — two ECR repos, two K8s deployments (Option A).
+        # Mobile WebView loads https://awaves.net; this server is the SSR fallback.
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL=https://api.awaves.net \
+            --build-arg NEXT_PUBLIC_CDN_URL=https://cdn.awaves.net \
+            --build-arg NEXT_PUBLIC_MAPBOX_TOKEN=${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }} \
+            -t $ECR_MOBILE:${{ github.sha }} \
+            -t $ECR_MOBILE:latest \
+            .
+
+          docker push $ECR_MOBILE:${{ github.sha }}
+          docker push $ECR_MOBILE:latest
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --region $AWS_REGION \
+            --name ${{ vars.EKS_CLUSTER_NAME }}
+
+      - name: Roll out mobile deployment
+        run: |
+          kubectl set image deployment/react-mobile \
+            mobile=$ECR_MOBILE:${{ github.sha }} \
+            -n mobile
+          kubectl rollout status deployment/react-mobile \
+            -n mobile --timeout=5m
