@@ -10,7 +10,20 @@ CloudWatch Logs Insights verification query:
 import json
 import logging
 import sys
+from contextvars import ContextVar
 from datetime import datetime, timezone
+from typing import Optional
+
+# Context variable for request trace ID — shared with TraceIdMiddleware
+trace_id_var: ContextVar[Optional[str]] = ContextVar("trace_id", default=None)
+
+
+class TraceIdLogFilter(logging.Filter):
+    """Inject trace_id from ContextVar into every log record."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.request_id = trace_id_var.get()  # type: ignore[attr-defined]
+        return True
 
 
 class JsonFormatter(logging.Formatter):
@@ -27,8 +40,13 @@ class JsonFormatter(logging.Formatter):
         if record.exc_info and record.exc_info[0] is not None:
             log_entry["exception"] = self.formatException(record.exc_info)
 
-        if hasattr(record, "request_id"):
-            log_entry["request_id"] = record.request_id
+        request_id = getattr(record, "request_id", None)
+        if request_id:
+            log_entry["request_id"] = request_id
+
+        error_code = getattr(record, "error_code", None)
+        if error_code:
+            log_entry["error_code"] = error_code
 
         return json.dumps(log_entry, ensure_ascii=False)
 
@@ -44,6 +62,7 @@ def setup_json_logging(level: int = logging.INFO) -> None:
 
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JsonFormatter())
+    handler.addFilter(TraceIdLogFilter())
     root.addHandler(handler)
 
     # Suppress noisy third-party loggers

@@ -1,14 +1,19 @@
 """Main GraphQL schema definition."""
 
 import logging
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, List, Optional
 
 import strawberry
 from datetime import datetime
 from fastapi import Request
+from graphql import GraphQLError
 from strawberry.fastapi import GraphQLRouter
 from strawberry.extensions import SchemaExtension
+from strawberry.http import GraphQLHTTPResponse
+from strawberry.types import ExecutionContext, ExecutionResult
 
+from app.config import settings
+from app.core.exceptions import BaseAppException, UnauthorizedException
 from app.db.session import create_writer_session, create_reader_session
 from app.services.auth import AuthService
 from app.graphql.context import GraphQLContext
@@ -156,6 +161,67 @@ class SessionCleanupExtension(SchemaExtension):
                 _logger.warning("Failed to close GraphQL DB sessions: %s", e)
 
 
+def process_graphql_errors(
+    errors: List[GraphQLError],
+    execution_context: Optional[ExecutionContext] = None,
+) -> List[GraphQLError]:
+    """Format GraphQL errors consistently.
+
+    - Maps BaseAppException to structured extensions
+    - Maps "Not authenticated" to UNAUTHORIZED
+    - Hides internal details in production
+    """
+    processed: List[GraphQLError] = []
+    for error in errors:
+        original = error.original_error
+
+        if original is None:
+            # GraphQL syntax / validation error — pass through
+            processed.append(error)
+            continue
+
+        if isinstance(original, BaseAppException):
+            app_exc = original
+        elif "Not authenticated" in str(original):
+            app_exc = UnauthorizedException(message="Not authenticated")
+        else:
+            _logger.error(
+                "Unhandled GraphQL error: %s",
+                str(original),
+                exc_info=original,
+            )
+            app_exc = None
+
+        if app_exc is not None:
+            processed.append(
+                GraphQLError(
+                    message=app_exc.message,
+                    nodes=error.nodes,
+                    path=error.path,
+                    extensions={
+                        "code": app_exc.error_code,
+                        "status_code": app_exc.status_code,
+                    },
+                )
+            )
+        else:
+            msg = (
+                f"{type(original).__name__}: {original}"
+                if settings.env in ("local", "dev", "development")
+                else "An unexpected error occurred"
+            )
+            processed.append(
+                GraphQLError(
+                    message=msg,
+                    nodes=error.nodes,
+                    path=error.path,
+                    extensions={"code": "INTERNAL_ERROR"},
+                )
+            )
+
+    return processed
+
+
 schema = strawberry.Schema(
     query=Query,
     mutation=Mutation,
@@ -187,7 +253,21 @@ async def get_context(
     return GraphQLContext(db=db, db_read=db_read, user_id=user_id)
 
 
-graphql_app = GraphQLRouter(
+class ErrorFormattingGraphQLRouter(GraphQLRouter):
+    """GraphQLRouter that formats errors through process_graphql_errors."""
+
+    async def process_result(
+        self, request: Request, result: ExecutionResult,
+    ) -> GraphQLHTTPResponse:
+        if result.errors:
+            result = ExecutionResult(
+                data=result.data,
+                errors=process_graphql_errors(result.errors),
+            )
+        return await super().process_result(request, result)
+
+
+graphql_app = ErrorFormattingGraphQLRouter(
     schema,
     context_getter=get_context,
 )

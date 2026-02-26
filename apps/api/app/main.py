@@ -15,6 +15,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.core.logging import setup_json_logging
 from app.core.tracing import init_tracing, XRayMiddleware
+from app.core.middleware import TraceIdMiddleware
+from app.core.handlers import register_exception_handlers
 from app.middleware.metrics import CloudWatchMetricsMiddleware
 from app.db.session import close_db, init_db
 from app.routers import auth, feedback, register, saved, search, surf
@@ -226,6 +228,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Global exception handlers
+register_exception_handlers(app)
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -235,9 +240,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Observability middleware (order: X-Ray outermost → Metrics inner)
+# Observability middleware (last added = outermost = executes first)
 app.add_middleware(XRayMiddleware)
 app.add_middleware(CloudWatchMetricsMiddleware)
+app.add_middleware(TraceIdMiddleware)
 
 # Include routers
 # Include routers
