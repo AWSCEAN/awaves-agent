@@ -1,9 +1,10 @@
 """Authentication router."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import NotFoundException, UnauthorizedException
 from app.db.session import get_db, get_read_db
 from app.schemas.user import (
     CommonResponse,
@@ -109,10 +110,7 @@ async def logout(
     user_id = await auth_service.verify_access_token(credentials.credentials)
 
     if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-        )
+        raise UnauthorizedException(message="Invalid or expired token")
 
     await auth_service.logout(user_id)
 
@@ -131,10 +129,7 @@ async def get_current_user(
     user = await auth_service.get_current_user(credentials.credentials)
 
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-        )
+        raise UnauthorizedException(message="Invalid or expired token")
 
     return CommonResponse(
         result="success",
@@ -160,20 +155,14 @@ async def update_user_level(
     user_id = await auth_service.verify_access_token(credentials.credentials)
 
     if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-        )
+        raise UnauthorizedException(message="Invalid or expired token")
 
     user_repo = UserRepository(session)
     user_service = UserService(user_repo)
     updated_user = await user_service.update_user_level(user_id, request.user_level)
 
     if not updated_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
+        raise NotFoundException(message="User not found")
 
     return CommonResponse(
         result="success",

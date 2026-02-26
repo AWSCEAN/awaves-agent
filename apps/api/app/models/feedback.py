@@ -6,6 +6,7 @@ from typing import Optional
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.timezone import now_kst
 from app.db.session import Base
 
 
@@ -23,7 +24,7 @@ class Feedback(Base):
     feedback_result: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     feedback_status: Mapped[str] = mapped_column(String(20), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
+        DateTime, default=now_kst, nullable=False
     )
 
     def __repr__(self) -> str:

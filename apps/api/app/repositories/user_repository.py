@@ -1,12 +1,12 @@
 """User repository for database operations."""
 
 import logging
-from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.timezone import now_kst
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ class UserRepository:
             user_level=user_level,
             privacy_consent_yn=privacy_consent_yn,
             last_login_dt=None,
-            created_at=datetime.utcnow(),
+            created_at=now_kst(),
         )
         self.session.add(user)
         await self.session.flush()
@@ -62,7 +62,7 @@ class UserRepository:
         """Update user's last login timestamp."""
         user = await self.get_by_id(user_id)
         if user:
-            user.last_login_dt = datetime.utcnow()
+            user.last_login_dt = now_kst()
             await self.session.flush()
             await self.session.refresh(user)
         return user

@@ -10,6 +10,7 @@ import jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.timezone import now_kst
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.services.cache import AuthCacheService as CacheService
@@ -43,7 +44,7 @@ class AuthService:
     def _create_access_token(self, user_id: int) -> tuple[str, int]:
         """Create a JWT access token."""
         expires_in = settings.jwt_access_token_expire_minutes * 60
-        expire = datetime.utcnow() + timedelta(minutes=settings.jwt_access_token_expire_minutes)
+        expire = now_kst() + timedelta(minutes=settings.jwt_access_token_expire_minutes)
 
         payload = {
             "sub": str(user_id),
@@ -56,7 +57,7 @@ class AuthService:
 
     def _create_refresh_token(self, user_id: int) -> tuple[str, datetime]:
         """Create a JWT refresh token and return with expiration datetime."""
-        expires_at = datetime.utcnow() + timedelta(days=settings.jwt_refresh_token_expire_days)
+        expires_at = now_kst() + timedelta(days=settings.jwt_refresh_token_expire_days)
 
         payload = {
             "sub": str(user_id),
