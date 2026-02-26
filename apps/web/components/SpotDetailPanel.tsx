@@ -4,7 +4,7 @@ import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useLocale } from 'next-intl';
 import type { SurfInfo, SavedListItem } from '@/types';
 import { useSwipeDown } from '@/hooks/useSwipeDown';
-import { getGradeBgColor, getGradeTextColor, getGradeBorderColor } from '@/lib/services/surfInfoService';
+import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, getMetricsForLevel, surferLevelToKey } from '@/lib/services/surfInfoService';
 
 interface SpotDetailPanelProps {
   surfInfo: SurfInfo;
@@ -18,6 +18,7 @@ interface SpotDetailPanelProps {
   currentConditions?: SurfInfo | null;
   onTimeslotSelect?: (save: SavedListItem) => void;
   onCurrentSelect?: (surfInfo: SurfInfo) => void;
+  surferLevel?: string;
 }
 
 function getScoreColor(score: number): string {
@@ -44,6 +45,7 @@ export default function SpotDetailPanel({
   currentConditions,
   onTimeslotSelect,
   onCurrentSelect,
+  surferLevel = '',
 }: SpotDetailPanelProps) {
   const locale = useLocale();
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
@@ -89,7 +91,9 @@ export default function SpotDetailPanel({
   }, []);
 
   const displayName = locale === 'ko' && surfInfo.nameKo ? surfInfo.nameKo : surfInfo.name;
-  const { surfScore, surfGrade, surfingLevel } = surfInfo.derivedMetrics;
+  // Use displayLevel from search result row if available, otherwise use surferLevel prop
+  const effectiveLevel = ((surfInfo as unknown as { displayLevel?: string }).displayLevel) || surferLevel;
+  const { surfScore, surfGrade } = getMetricsForLevel(surfInfo.derivedMetrics, effectiveLevel);
   const { waveHeight, wavePeriod, windSpeed, waterTemperature } = surfInfo.conditions;
 
   // Hourly forecast data (same multipliers as the table)
@@ -230,7 +234,7 @@ export default function SpotDetailPanel({
                 </svg>
                 <span className="text-sm font-semibold text-white">
                   {(() => {
-                    const date = new Date(surfInfo.SurfTimestamp);
+                    const date = new Date(surfInfo.surfTimestamp);
                     const year = date.getFullYear();
                     const month = (date.getMonth() + 1).toString().padStart(2, '0');
                     const day = date.getDate().toString().padStart(2, '0');
@@ -267,7 +271,7 @@ export default function SpotDetailPanel({
               <button
                 onClick={() => onCurrentSelect(currentConditions)}
                 className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  currentConditions.SurfTimestamp === surfInfo.SurfTimestamp
+                  currentConditions.surfTimestamp === surfInfo.surfTimestamp
                     ? 'bg-ocean-500 text-white'
                     : 'bg-ocean-100 text-ocean-700 hover:bg-ocean-200 border border-ocean-300'
                 }`}
@@ -280,7 +284,7 @@ export default function SpotDetailPanel({
               .sort((a, b) => new Date(a.surfTimestamp).getTime() - new Date(b.surfTimestamp).getTime())
               .map((save) => {
                 const d = new Date(save.surfTimestamp);
-                const isActive = save.surfTimestamp === surfInfo.SurfTimestamp;
+                const isActive = save.surfTimestamp === surfInfo.surfTimestamp;
                 const timeLabel = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
                 const dateLabel = locale === 'ko'
                   ? `${d.getMonth() + 1}/${d.getDate()}`
@@ -335,7 +339,7 @@ export default function SpotDetailPanel({
               {locale === 'ko' ? '레벨' : 'Level'}
             </div>
             <div className="text-2xl font-bold text-ocean-800">
-              {getLevelLabel(surfingLevel)}
+              {getLevelLabel(effectiveLevel ? surferLevelToKey(effectiveLevel) : (surfInfo.difficulty || 'intermediate').toUpperCase())}
             </div>
           </div>
         </div>

@@ -19,7 +19,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import LocaleProvider, { useLocale as useAppLocale } from '@/components/LocaleProvider';
 import type { SurfInfo, SavedListItem, SurferLevel, SurfingLevel, SurfGrade, PredictionResult } from '@/types';
 import type { OverlayMode, SpotSelectionData } from '@/components/EnhancedMapboxMap';
-import { TIME_SLOTS, getCurrentTimeSlot, localToUTC } from '@/lib/services/surfInfoService';
+import { TIME_SLOTS, getCurrentTimeSlot, localToUTC, getMetricsForLevel, surferLevelToKey } from '@/lib/services/surfInfoService';
 import { surfService } from '@/lib/apiServices';
 import { useSavedItems } from '@/hooks/useSavedItems';
 import SurfLoadingScreen from '@/components/SurfLoadingScreen';
@@ -145,7 +145,7 @@ function MapPageContent() {
       wavePeriod: item.wave_period || 0,
       windSpeed: item.wind_speed || 0,
       waterTemperature: item.water_temperature || 0,
-      surfingLevel: (item.surfer_level || 'BEGINNER') as SurfingLevel,
+      surfingLevel: (item.surfer_level?.toUpperCase() || 'BEGINNER') as SurfingLevel,
       surfScore: item.surf_score,
       surfGrade: (item.surf_grade || 'D') as SurfGrade,
       name: item.address || item.location_id,
@@ -189,8 +189,8 @@ function MapPageContent() {
         } else if (savesAtLocation.length === 1) {
           const matchingSaved = savesAtLocation[0];
           const surfInfo: SurfInfo = {
-            LocationId: matchingSaved.locationId,
-            SurfTimestamp: matchingSaved.surfTimestamp,
+            locationId: matchingSaved.locationId,
+            surfTimestamp: matchingSaved.surfTimestamp,
             geo: { lat: latNum, lng: lngNum },
             conditions: {
               waveHeight: matchingSaved.waveHeight,
@@ -199,9 +199,9 @@ function MapPageContent() {
               waterTemperature: matchingSaved.waterTemperature,
             },
             derivedMetrics: {
-              surfScore: matchingSaved.surfScore,
-              surfGrade: matchingSaved.surfGrade,
-              surfingLevel: (matchingSaved.surfingLevel || 'BEGINNER') as SurfingLevel,
+              BEGINNER: { surfScore: matchingSaved.surfScore, surfGrade: matchingSaved.surfGrade },
+              INTERMEDIATE: { surfScore: matchingSaved.surfScore, surfGrade: matchingSaved.surfGrade },
+              ADVANCED: { surfScore: matchingSaved.surfScore, surfGrade: matchingSaved.surfGrade },
             },
             metadata: { modelVersion: '', dataSource: '', predictionType: 'FORECAST', createdAt: '' },
             name: matchingSaved.name || matchingSaved.locationId,
@@ -273,12 +273,7 @@ function MapPageContent() {
         if (response.success && response.data) {
           setAllSpots(response.data);
           let results = response.data as SearchResult[];
-          if (options?.surferLevel) {
-            const level = options.surferLevel.toUpperCase();
-            results = results.filter(s =>
-              s.derivedMetrics?.surfingLevel?.toUpperCase() === level
-            );
-          }
+          // All spots now have all levels — no need to filter by surferLevel
           setSearchResults(results);
         }
       }
@@ -372,16 +367,17 @@ function MapPageContent() {
       coordinates: { latitude: surfInfo.geo.lat, longitude: surfInfo.geo.lng },
     });
 
-    // Use the display name as address so saved spots page shows the name
-    const displayName = surfInfo.name || surfInfo.address || surfInfo.LocationId;
+    // Use displayLevel from search result row if available, otherwise use surferLevel
+    const effectiveLevel = ((surfInfo as unknown as { displayLevel?: string }).displayLevel) || surferLevel;
+    const displayName = surfInfo.name || surfInfo.address || surfInfo.locationId;
 
     try {
       await saveItem({
-        locationId: surfInfo.LocationId,
-        surfTimestamp: surfInfo.SurfTimestamp,
-        surferLevel: surfInfo.derivedMetrics.surfingLevel,
-        surfScore: surfInfo.derivedMetrics.surfScore,
-        surfGrade: surfInfo.derivedMetrics.surfGrade,
+        locationId: surfInfo.locationId,
+        surfTimestamp: surfInfo.surfTimestamp,
+        surferLevel: surferLevelToKey(effectiveLevel),
+        surfScore: getMetricsForLevel(surfInfo.derivedMetrics, effectiveLevel).surfScore,
+        surfGrade: getMetricsForLevel(surfInfo.derivedMetrics, effectiveLevel).surfGrade,
         address: displayName,
         region: surfInfo.region,
         country: surfInfo.country,
@@ -431,7 +427,7 @@ function MapPageContent() {
     const saves = savesByLocation.get(locationId) || [];
     if (saves.length === 1) {
       // Single save: prefer current forecast, fall back to saved data
-      const currentSpot = allSpots.find(s => s.LocationId === locationId);
+      const currentSpot = allSpots.find(s => s.locationId === locationId);
       if (currentSpot) {
         setTimeSlotSelection(null);
         setSelectedSpotDetail({
@@ -442,8 +438,8 @@ function MapPageContent() {
         // No current forecast available — construct from saved data
         const save = saves[0];
         const surfInfo: SurfInfo = {
-          LocationId: save.locationId,
-          SurfTimestamp: save.surfTimestamp,
+          locationId: save.locationId,
+          surfTimestamp: save.surfTimestamp,
           geo: { lat: coordinates.lat, lng: coordinates.lng },
           conditions: {
             waveHeight: save.waveHeight,
@@ -452,9 +448,9 @@ function MapPageContent() {
             waterTemperature: save.waterTemperature,
           },
           derivedMetrics: {
-            surfScore: save.surfScore,
-            surfGrade: save.surfGrade,
-            surfingLevel: (save.surfingLevel || 'BEGINNER') as SurfingLevel,
+            BEGINNER: { surfScore: save.surfScore, surfGrade: save.surfGrade },
+            INTERMEDIATE: { surfScore: save.surfScore, surfGrade: save.surfGrade },
+            ADVANCED: { surfScore: save.surfScore, surfGrade: save.surfGrade },
           },
           metadata: { modelVersion: '', dataSource: '', predictionType: 'FORECAST', createdAt: '' },
           name: save.name || save.locationId,
@@ -483,8 +479,8 @@ function MapPageContent() {
     const lat = Number(latStr);
     const lng = Number(lngStr);
     const surfInfo: SurfInfo = {
-      LocationId: save.locationId,
-      SurfTimestamp: save.surfTimestamp,
+      locationId: save.locationId,
+      surfTimestamp: save.surfTimestamp,
       geo: { lat, lng },
       conditions: {
         waveHeight: save.waveHeight,
@@ -493,9 +489,9 @@ function MapPageContent() {
         waterTemperature: save.waterTemperature,
       },
       derivedMetrics: {
-        surfScore: save.surfScore,
-        surfGrade: save.surfGrade,
-        surfingLevel: (save.surfingLevel || 'BEGINNER') as SurfingLevel,
+        BEGINNER: { surfScore: save.surfScore, surfGrade: save.surfGrade },
+        INTERMEDIATE: { surfScore: save.surfScore, surfGrade: save.surfGrade },
+        ADVANCED: { surfScore: save.surfScore, surfGrade: save.surfGrade },
       },
       metadata: { modelVersion: '', dataSource: '', predictionType: 'FORECAST', createdAt: '' },
       name: save.name || save.locationId,
@@ -514,7 +510,7 @@ function MapPageContent() {
   }, []);
 
   const getCurrentConditionsForLocation = useCallback((locationId: string): SurfInfo | null => {
-    return allSpots.find(s => s.LocationId === locationId) || null;
+    return allSpots.find(s => s.locationId === locationId) || null;
   }, [allSpots]);
 
   const handleSuggestByDistance = useCallback(async () => {
@@ -535,9 +531,7 @@ function MapPageContent() {
         let nearby = (response.data as SearchResult[]).filter(
           (spot) => spot.distance !== undefined && spot.distance <= 50
         );
-        if (surferLevel) {
-          nearby = nearby.filter(s => s.derivedMetrics?.surfingLevel?.toUpperCase() === surferLevel.toUpperCase());
-        }
+        // All spots now have all levels — no need to filter by surferLevel
         setSearchResults(nearby);
       }
     } catch (err) {
@@ -940,6 +934,7 @@ function MapPageContent() {
               userLocation={userLocation}
               onVisibleItemsChange={setVisibleSpots}
               showLocationPrompt={showLocationPrompt}
+              surferLevel={surferLevel}
             />
           )
         )}
@@ -966,6 +961,7 @@ function MapPageContent() {
           saveCountByLocation={saveCountByLocation}
           onMultiSaveMarkerClick={handleMultiSaveMarkerClick}
           centerOffset={centerOffset}
+          surferLevel={surferLevel}
         />
 
         {/* 10-Day Quick Date Selector - Bottom Center of visible map area */}
@@ -1065,6 +1061,7 @@ function MapPageContent() {
             }}
             showLocationPrompt={showLocationPrompt}
             locale={locale as 'en' | 'ko'}
+            surferLevel={surferLevel}
           />
         )}
 
@@ -1074,20 +1071,21 @@ function MapPageContent() {
             surfInfo={selectedSpotDetail.surfInfo}
             coordinates={selectedSpotDetail.coordinates}
             isSaved={savedSpots.some(
-              (s) => s.locationId === selectedSpotDetail.surfInfo.LocationId
-                && s.surfTimestamp === selectedSpotDetail.surfInfo.SurfTimestamp
+              (s) => s.locationId === selectedSpotDetail.surfInfo.locationId
+                && s.surfTimestamp === selectedSpotDetail.surfInfo.surfTimestamp
             )}
             onClose={() => setSelectedSpotDetail(null)}
             onSave={async () => {
               const si = selectedSpotDetail.surfInfo;
+              const effLevel = ((si as unknown as { displayLevel?: string }).displayLevel) || surferLevel;
               try {
                 await saveItem({
-                  locationId: si.LocationId,
-                  surfTimestamp: si.SurfTimestamp,
-                  surferLevel: si.derivedMetrics.surfingLevel,
-                  surfScore: si.derivedMetrics.surfScore,
-                  surfGrade: si.derivedMetrics.surfGrade,
-                  address: si.name || si.address || si.LocationId,
+                  locationId: si.locationId,
+                  surfTimestamp: si.surfTimestamp,
+                  surferLevel: surferLevelToKey(effLevel),
+                  surfScore: getMetricsForLevel(si.derivedMetrics, effLevel).surfScore,
+                  surfGrade: getMetricsForLevel(si.derivedMetrics, effLevel).surfGrade,
+                  address: si.name || si.address || si.locationId,
                   region: si.region,
                   country: si.country,
                   waveHeight: si.conditions.waveHeight,
@@ -1104,13 +1102,13 @@ function MapPageContent() {
             }}
             onRemove={() => {
               handleRemoveSpot(
-                selectedSpotDetail.surfInfo.LocationId,
-                selectedSpotDetail.surfInfo.SurfTimestamp,
+                selectedSpotDetail.surfInfo.locationId,
+                selectedSpotDetail.surfInfo.surfTimestamp,
               );
             }}
             showLocationPrompt={showLocationPrompt}
-            savedTimeslots={savesByLocation.get(selectedSpotDetail.surfInfo.LocationId)}
-            currentConditions={getCurrentConditionsForLocation(selectedSpotDetail.surfInfo.LocationId)}
+            savedTimeslots={savesByLocation.get(selectedSpotDetail.surfInfo.locationId)}
+            currentConditions={getCurrentConditionsForLocation(selectedSpotDetail.surfInfo.locationId)}
             onTimeslotSelect={handleTimeSlotSelect}
             onCurrentSelect={(surfInfo) => {
               setSelectedSpotDetail({
@@ -1118,6 +1116,7 @@ function MapPageContent() {
                 coordinates: selectedSpotDetail.coordinates,
               });
             }}
+            surferLevel={surferLevel}
           />
         )}
       </div>

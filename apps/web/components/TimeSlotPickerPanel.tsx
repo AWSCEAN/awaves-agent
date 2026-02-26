@@ -1,7 +1,7 @@
 'use client';
 
 import type { SavedListItem, SurfInfo } from '@/types';
-import { getGradeBgColor, getGradeTextColor, getGradeBorderColor } from '@/lib/services/surfInfoService';
+import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, getMetricsForLevel } from '@/lib/services/surfInfoService';
 import { useSwipeDown } from '@/hooks/useSwipeDown';
 
 interface TimeSlotPickerPanelProps {
@@ -14,6 +14,7 @@ interface TimeSlotPickerPanelProps {
   onSelectCurrent?: (surfInfo: SurfInfo) => void;
   showLocationPrompt?: boolean;
   locale?: 'en' | 'ko';
+  surferLevel?: string;
 }
 
 function formatTimestamp(ts: string, locale: string): { date: string; time: string } {
@@ -46,6 +47,7 @@ export default function TimeSlotPickerPanel({
   onSelectCurrent,
   showLocationPrompt = false,
   locale = 'en',
+  surferLevel = '',
 }: TimeSlotPickerPanelProps) {
   const sorted = [...saves].sort(
     (a, b) => new Date(a.surfTimestamp).getTime() - new Date(b.surfTimestamp).getTime()
@@ -113,10 +115,10 @@ export default function TimeSlotPickerPanel({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-ocean-800">
-                    {formatTimestamp(currentConditions.SurfTimestamp, locale).date}
+                    {formatTimestamp(currentConditions.surfTimestamp, locale).date}
                   </span>
                   <span className="text-sm text-ocean-500">
-                    {formatTimestamp(currentConditions.SurfTimestamp, locale).time}
+                    {formatTimestamp(currentConditions.surfTimestamp, locale).time}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 mt-1.5">
@@ -124,12 +126,12 @@ export default function TimeSlotPickerPanel({
                     {locale === 'ko' ? '파고' : 'Wave'}: {currentConditions.conditions.waveHeight.toFixed(1)}m
                   </span>
                   <span className="text-xs text-ocean-500">
-                    {locale === 'ko' ? '점수' : 'Score'}: {Math.round(currentConditions.derivedMetrics.surfScore)}
+                    {locale === 'ko' ? '점수' : 'Score'}: {Math.round(getMetricsForLevel(currentConditions.derivedMetrics, surferLevel).surfScore)}
                   </span>
                 </div>
               </div>
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center border text-sm font-bold ${getGradeBgColor(currentConditions.derivedMetrics.surfGrade)} ${getGradeTextColor(currentConditions.derivedMetrics.surfGrade)} ${getGradeBorderColor(currentConditions.derivedMetrics.surfGrade)}`}>
-                {currentConditions.derivedMetrics.surfGrade}
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center border text-sm font-bold ${getGradeBgColor(getMetricsForLevel(currentConditions.derivedMetrics, surferLevel).surfGrade)} ${getGradeTextColor(getMetricsForLevel(currentConditions.derivedMetrics, surferLevel).surfGrade)} ${getGradeBorderColor(getMetricsForLevel(currentConditions.derivedMetrics, surferLevel).surfGrade)}`}>
+                {getMetricsForLevel(currentConditions.derivedMetrics, surferLevel).surfGrade}
               </div>
             </div>
           </button>

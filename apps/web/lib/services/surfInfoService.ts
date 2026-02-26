@@ -1,4 +1,32 @@
-import type { SurfGrade, SurfingLevel, SurfInfo } from '@/types';
+import type { SurfGrade, SurfingLevel, SurfInfo, SurfInfoDerivedMetrics, LevelMetrics } from '@/types';
+
+// --- Level Metrics Helper ---
+
+/**
+ * Get the metrics for a specific surfer level from derivedMetrics.
+ * If surferLevel is empty (All Levels), defaults to INTERMEDIATE.
+ */
+export function getMetricsForLevel(
+  derivedMetrics: SurfInfoDerivedMetrics | undefined,
+  surferLevel: string = ''
+): LevelMetrics {
+  const fallback: LevelMetrics = { surfScore: 0, surfGrade: 'D' as SurfGrade };
+  if (!derivedMetrics) return fallback;
+  const levelKey = surferLevelToKey(surferLevel);
+  return derivedMetrics[levelKey] ?? fallback;
+}
+
+/**
+ * Map surferLevel (lowercase) to SurfInfoDerivedMetrics key (uppercase).
+ */
+export function surferLevelToKey(surferLevel: string): keyof SurfInfoDerivedMetrics {
+  switch (surferLevel.toLowerCase()) {
+    case 'beginner': return 'BEGINNER';
+    case 'advanced': return 'ADVANCED';
+    case 'intermediate':
+    default: return 'INTERMEDIATE';
+  }
+}
 
 // --- Grade/Level Generators ---
 
@@ -116,7 +144,7 @@ export function localToUTC(localDate: string, localTime: string): { date: string
 
 export function generateSurfInfoForSpot(
   spot: {
-    LocationId: string;
+    locationId: string;
     geo: { lat: number; lng: number };
     name: string;
     nameKo?: string;
@@ -131,7 +159,7 @@ export function generateSurfInfoForSpot(
   },
   date: string
 ): SurfInfo[] {
-  const seed = hashCode(`${spot.LocationId}-${date}`);
+  const seed = hashCode(`${spot.locationId}-${date}`);
 
   return TIME_SLOTS.map((time, i) => {
     const variation = seededRandom(seed + i * 1000);
@@ -145,8 +173,8 @@ export function generateSurfInfoForSpot(
     const surfScore = calculateSurfScore(waveHeight, wavePeriod, windSpeed);
 
     return {
-      LocationId: spot.LocationId,
-      SurfTimestamp: `${date}T${time}:00Z`,
+      locationId: spot.locationId,
+      surfTimestamp: `${date}T${time}:00Z`,
       geo: spot.geo,
       conditions: {
         waveHeight: round2(waveHeight),
@@ -155,9 +183,18 @@ export function generateSurfInfoForSpot(
         waterTemperature: round2(waterTemperature),
       },
       derivedMetrics: {
-        surfScore: round2(surfScore),
-        surfGrade: generateSurfGrade(surfScore),
-        surfingLevel: generateSurfingLevel(waveHeight, windSpeed),
+        BEGINNER: {
+          surfScore: round2(surfScore * 0.85),
+          surfGrade: generateSurfGrade(surfScore * 0.85),
+        },
+        INTERMEDIATE: {
+          surfScore: round2(surfScore),
+          surfGrade: generateSurfGrade(surfScore),
+        },
+        ADVANCED: {
+          surfScore: round2(surfScore * 1.1 > 100 ? 100 : surfScore * 1.1),
+          surfGrade: generateSurfGrade(Math.min(100, surfScore * 1.1)),
+        },
       },
       metadata: {
         modelVersion: 'sagemaker-awaves-v1.2',
@@ -185,7 +222,7 @@ export function getBestSurfInfoForDate(
 ): SurfInfo {
   const infos = generateSurfInfoForSpot(spot, date);
   return infos.reduce((best, curr) =>
-    curr.derivedMetrics.surfScore > best.derivedMetrics.surfScore ? curr : best
+    curr.derivedMetrics.INTERMEDIATE.surfScore > best.derivedMetrics.INTERMEDIATE.surfScore ? curr : best
   );
 }
 

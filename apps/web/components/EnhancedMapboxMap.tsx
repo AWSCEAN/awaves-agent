@@ -8,6 +8,7 @@ import length from '@turf/length';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css';
 import type { SurfInfo, SavedListItem } from '@/types';
+import { getMetricsForLevel } from '@/lib/services/surfInfoService';
 
 export interface SpotSelectionData {
   surfInfo: SurfInfo;
@@ -42,6 +43,7 @@ interface EnhancedMapboxMapProps {
    *  Use [0, negative] to visually raise the marker above a bottom panel (negative Y = above center).
    *  Use [negative, 0] to shift marker left of a right sidebar. */
   centerOffset?: [number, number];
+  surferLevel?: string;
 }
 
 function getSurfScoreColor(score: number): string {
@@ -66,6 +68,7 @@ export default function EnhancedMapboxMap({
   saveCountByLocation,
   onMultiSaveMarkerClick,
   centerOffset,
+  surferLevel = '',
 }: EnhancedMapboxMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -202,9 +205,9 @@ export default function EnhancedMapboxMap({
       const desiredKeys = new Set<string>();
 
       spots.forEach((spot) => {
-        if (savedLocationIds.has(spot.LocationId)) return;
+        if (savedLocationIds.has(spot.locationId)) return;
         if (bounds.contains([spot.geo.lng, spot.geo.lat])) {
-          desiredKeys.add(spot.LocationId);
+          desiredKeys.add(spot.locationId);
         }
       });
 
@@ -229,11 +232,11 @@ export default function EnhancedMapboxMap({
 
       // Add surfer markers for visible spots that don't have a marker yet
       spots.forEach((spot) => {
-        if (savedLocationIds.has(spot.LocationId)) return;
-        if (!desiredKeys.has(spot.LocationId)) return;
-        if (markersRef.current[spot.LocationId]) return;
+        if (savedLocationIds.has(spot.locationId)) return;
+        if (!desiredKeys.has(spot.locationId)) return;
+        if (markersRef.current[spot.locationId]) return;
 
-        const markerColor = getSurfScoreColor(spot.derivedMetrics.surfScore);
+        const markerColor = getSurfScoreColor(getMetricsForLevel(spot.derivedMetrics, surferLevel).surfScore);
         const el = createMarkerElement(
           '\u{1F3C4}',
           markerColor,
@@ -251,7 +254,7 @@ export default function EnhancedMapboxMap({
           .setLngLat([spot.geo.lng, spot.geo.lat])
           .addTo(map.current!);
 
-        markersRef.current[spot.LocationId] = marker;
+        markersRef.current[spot.locationId] = marker;
       });
 
       // Add heart markers for visible saved spots
@@ -356,7 +359,7 @@ export default function EnhancedMapboxMap({
 
       const overlaySpots = spots;
       const features = overlaySpots.map((spot) => {
-        const score = spot.derivedMetrics.surfScore;
+        const score = getMetricsForLevel(spot.derivedMetrics, surferLevel).surfScore;
         const color = getSurfScoreColor(score);
 
         return {
@@ -619,7 +622,7 @@ export default function EnhancedMapboxMap({
     // Use allSpots for detection so 100km works regardless of search state
     const currentSpots = allSpotsRef.current.length > 0 ? allSpotsRef.current : spotsRef.current;
     const clickedLocationId = `${lngLat.lat.toFixed(4)}#${lngLat.lng.toFixed(4)}`;
-    const exactMatch = currentSpots.find(s => s.LocationId === clickedLocationId);
+    const exactMatch = currentSpots.find(s => s.locationId === clickedLocationId);
 
     if (exactMatch) {
       showSurfInfoAtCoords(lngLat.lng, lngLat.lat, exactMatch, currentSelectedDate);
@@ -641,8 +644,8 @@ export default function EnhancedMapboxMap({
 
       if (
         !bestNearby ||
-        spot.derivedMetrics.surfScore > bestNearby.spot.derivedMetrics.surfScore ||
-        (spot.derivedMetrics.surfScore === bestNearby.spot.derivedMetrics.surfScore &&
+        getMetricsForLevel(spot.derivedMetrics, surferLevel).surfScore > (bestNearby.spot.derivedMetrics?.INTERMEDIATE?.surfScore ?? 0) ||
+        (getMetricsForLevel(spot.derivedMetrics, surferLevel).surfScore === (bestNearby.spot.derivedMetrics?.INTERMEDIATE?.surfScore ?? 0) &&
           spot.name.localeCompare(bestNearby.spot.name) < 0)
       ) {
         bestNearby = { spot, distance };
@@ -654,10 +657,10 @@ export default function EnhancedMapboxMap({
 
       // Add a temporary marker at the nearby spot if it doesn't already have one
       // Check both regular and saved marker keys
-      const hasSurfMarker = markersRef.current[spot.LocationId];
-      const hasSavedMarker = markersRef.current[`saved-${spot.LocationId}`];
+      const hasSurfMarker = markersRef.current[spot.locationId];
+      const hasSavedMarker = markersRef.current[`saved-${spot.locationId}`];
       if (!hasSurfMarker && !hasSavedMarker) {
-        const nearbyMarkerColor = getSurfScoreColor(spot.derivedMetrics.surfScore);
+        const nearbyMarkerColor = getSurfScoreColor(getMetricsForLevel(spot.derivedMetrics, surferLevel).surfScore);
         const el = createMarkerElement(
           '\u{1F3C4}',
           nearbyMarkerColor,

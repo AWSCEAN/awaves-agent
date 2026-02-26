@@ -4,12 +4,14 @@ import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { ko, enUS } from 'date-fns/locale';
 import { useTranslations, useLocale } from 'next-intl';
-import type { SurfInfo } from '@/types';
-import { getGradeBgColor, getGradeTextColor, getGradeBorderColor } from '@/lib/services/surfInfoService';
+import type { SurfInfo, SurfingLevel } from '@/types';
+import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, getMetricsForLevel, surferLevelToKey } from '@/lib/services/surfInfoService';
 import { useSwipeDown } from '@/hooks/useSwipeDown';
 
 export interface SearchResult extends SurfInfo {
   distance?: number;
+  /** Which level this row represents (set during expansion). */
+  displayLevel?: SurfingLevel;
 }
 
 type SortMode = 'surfScore' | 'distance';
@@ -28,6 +30,7 @@ interface SearchResultsListProps {
   userLocation?: { lat: number; lng: number } | null;
   onVisibleItemsChange?: (items: SearchResult[]) => void;
   showLocationPrompt?: boolean;
+  surferLevel?: string;
 }
 
 const ITEMS_PER_PAGE = 25;
@@ -46,6 +49,7 @@ export default function SearchResultsList({
   userLocation,
   onVisibleItemsChange,
   showLocationPrompt = false,
+  surferLevel = '',
 }: SearchResultsListProps) {
   const t = useTranslations('search');
   const tCommon = useTranslations('common');
@@ -62,12 +66,32 @@ export default function SearchResultsList({
     setCurrentPage(1);
   }, [results]);
 
-  // Sort results based on current sort mode
+  // Expand results: when "All Levels" (surferLevel=''), create 3 rows per spot;
+  // when a specific level is selected, create 1 row per spot with that level.
+  const expandedResults = useMemo(() => {
+    const levels: SurfingLevel[] = surferLevel
+      ? [surferLevelToKey(surferLevel)]
+      : ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'];
+
+    const expanded: SearchResult[] = [];
+    for (const spot of results) {
+      for (const level of levels) {
+        expanded.push({ ...spot, displayLevel: level });
+      }
+    }
+    return expanded;
+  }, [results, surferLevel]);
+
+  // Sort expanded results based on current sort mode
   const sortedResults = useMemo(() => {
-    const sorted = [...results];
+    const sorted = [...expandedResults];
     switch (sortMode) {
       case 'surfScore':
-        return sorted.sort((a, b) => b.derivedMetrics.surfScore - a.derivedMetrics.surfScore);
+        return sorted.sort((a, b) => {
+          const scoreA = getMetricsForLevel(a.derivedMetrics, a.displayLevel || '').surfScore;
+          const scoreB = getMetricsForLevel(b.derivedMetrics, b.displayLevel || '').surfScore;
+          return scoreB - scoreA;
+        });
       case 'distance':
         return sorted.sort((a, b) => {
           if (a.distance === undefined && b.distance === undefined) return 0;
@@ -78,7 +102,7 @@ export default function SearchResultsList({
       default:
         return sorted;
     }
-  }, [results, sortMode]);
+  }, [expandedResults, sortMode]);
 
   const totalPages = Math.ceil(sortedResults.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -96,11 +120,14 @@ export default function SearchResultsList({
   };
 
   const getLevelLabel = (spot: SearchResult): string => {
-    const level = spot.derivedMetrics?.surfingLevel;
-    if (level) {
-      return t(`difficulty.${level.toLowerCase()}`);
+    const level = spot.displayLevel;
+    if (!level) return '';
+    switch (level) {
+      case 'BEGINNER': return locale === 'ko' ? '초급' : 'Beginner';
+      case 'INTERMEDIATE': return locale === 'ko' ? '중급' : 'Intermediate';
+      case 'ADVANCED': return locale === 'ko' ? '상급' : 'Advanced';
+      default: return '';
     }
-    return '';
   };
 
   if (!isOpen) return null;
@@ -215,8 +242,9 @@ export default function SearchResultsList({
         ) : (
           <ul className="p-2 space-y-2">
             {paginatedResults.map((spot, index) => {
-              const compositeKey = `${spot.LocationId}#${spot.SurfTimestamp}`;
-              const isSaved = savedSpotIds.has(compositeKey);
+              const compositeKey = `${spot.locationId}#${spot.surfTimestamp}#${spot.displayLevel || ''}`;
+              const savedKey = `${spot.locationId}#${spot.surfTimestamp}`;
+              const isSaved = savedSpotIds.has(savedKey);
               const displayName = locale === 'ko' && spot.nameKo ? spot.nameKo : spot.name;
 
               return (
@@ -239,7 +267,11 @@ export default function SearchResultsList({
                       <div className="flex items-center gap-2 text-xs text-ocean-500 mb-2 min-w-0 overflow-hidden">
                         <span className="truncate min-w-0 flex-shrink">{locale === 'ko' && spot.regionKo ? spot.regionKo : spot.region}, {locale === 'ko' && spot.countryKo ? spot.countryKo : spot.country}</span>
                         {getLevelLabel(spot) && (
-                          <span className="px-1.5 py-0.5 bg-sand-100 rounded text-ocean-600">
+                          <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                            spot.displayLevel === 'BEGINNER' ? 'bg-green-100 text-green-700' :
+                            spot.displayLevel === 'ADVANCED' ? 'bg-red-100 text-red-700' :
+                            'bg-orange-100 text-orange-700'
+                          }`}>
                             {getLevelLabel(spot)}
                           </span>
                         )}
@@ -248,14 +280,14 @@ export default function SearchResultsList({
                       {/* Scores + Grade */}
                       <div className="flex items-center gap-3 mt-1">
                         <div className="flex items-center gap-2 bg-sand-100 rounded-lg px-2.5 py-1">
-                          <div className={`w-3 h-3 rounded-full ${getSurfScoreColor(spot.derivedMetrics.surfScore)}`} />
+                          <div className={`w-3 h-3 rounded-full ${getSurfScoreColor(getMetricsForLevel(spot.derivedMetrics, spot.displayLevel || '').surfScore)}`} />
                           <span className="text-lg font-bold text-ocean-800">
-                            {Math.round(spot.derivedMetrics.surfScore)}
+                            {Math.round(getMetricsForLevel(spot.derivedMetrics, spot.displayLevel || '').surfScore)}
                           </span>
                           <span className="text-xs text-ocean-500">/100</span>
                         </div>
-                        <span className={`px-3 py-1 rounded-lg text-base font-bold border ${getGradeBgColor(spot.derivedMetrics.surfGrade)} ${getGradeTextColor(spot.derivedMetrics.surfGrade)} ${getGradeBorderColor(spot.derivedMetrics.surfGrade)}`}>
-                          {spot.derivedMetrics.surfGrade}
+                        <span className={`px-3 py-1 rounded-lg text-base font-bold border ${getGradeBgColor(getMetricsForLevel(spot.derivedMetrics, spot.displayLevel || '').surfGrade)} ${getGradeTextColor(getMetricsForLevel(spot.derivedMetrics, spot.displayLevel || '').surfGrade)} ${getGradeBorderColor(getMetricsForLevel(spot.derivedMetrics, spot.displayLevel || '').surfGrade)}`}>
+                          {getMetricsForLevel(spot.derivedMetrics, spot.displayLevel || '').surfGrade}
                         </span>
                       </div>
 
@@ -272,7 +304,7 @@ export default function SearchResultsList({
                       onClick={(e) => {
                         e.stopPropagation();
                         if (isSaved && onRemoveSpot) {
-                          setConfirmDelete({ id: spot.LocationId, surfTimestamp: spot.SurfTimestamp, name: displayName });
+                          setConfirmDelete({ id: spot.locationId, surfTimestamp: spot.surfTimestamp, name: displayName });
                         } else if (!isSaved) {
                           onSaveSpot(spot);
                         }

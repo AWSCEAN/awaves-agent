@@ -20,10 +20,15 @@ export interface SurfInfoConditions {
   waterTemperature: number;
 }
 
-export interface SurfInfoDerivedMetrics {
+export interface LevelMetrics {
   surfScore: number;          // 0-100
   surfGrade: SurfGrade;       // A/B/C/D
-  surfingLevel: SurfingLevel; // BEGINNER/INTERMEDIATE/ADVANCED
+}
+
+export interface SurfInfoDerivedMetrics {
+  BEGINNER: LevelMetrics;
+  INTERMEDIATE: LevelMetrics;
+  ADVANCED: LevelMetrics;
 }
 
 export interface SurfInfoMetadata {
@@ -35,8 +40,8 @@ export interface SurfInfoMetadata {
 
 export interface SurfInfo {
   // DynamoDB Keys
-  LocationId: string;           // PK: "{lat}#{lng}"
-  SurfTimestamp: string;        // SK: ISO 8601
+  locationId: string;           // PK: "{lat}#{lng}"
+  surfTimestamp: string;        // SK: ISO 8601
 
   // DynamoDB Data
   geo: SurfInfoGeo;
