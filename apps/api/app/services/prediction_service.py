@@ -37,6 +37,9 @@ def _sagemaker_subsegment():
         return
 
     subsegment = recorder.begin_subsegment("SageMaker_Invoke")
+    if subsegment is None:
+        yield
+        return
     try:
         yield
     except Exception as exc:
@@ -247,7 +250,7 @@ async def _add_spot_name(prediction: dict, location_id: str) -> None:
     spot_name = location_id
     spot_name_ko = None
     for spot in all_spots:
-        if spot.get("LocationId") == location_id:
+        if spot.get("locationId") == location_id:
             spot_name = spot.get("name", location_id)
             spot_name_ko = spot.get("nameKo")
             break

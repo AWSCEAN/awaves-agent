@@ -41,14 +41,10 @@ class SearchService:
                 spot.get("addressKo", ""),
                 spot.get("regionKo", ""),
                 spot.get("countryKo", ""),
-                spot.get("LocationId", ""),
+                spot.get("locationId", ""),
             ])).lower()
             if query_lower not in searchable:
                 continue
-            if surfer_level:
-                item_level = spot.get("derivedMetrics", {}).get("surfingLevel", "").upper()
-                if item_level and item_level != surfer_level.upper():
-                    continue
             results.append(spot)
             if len(results) >= size:
                 break
@@ -92,7 +88,7 @@ class SearchService:
         # Step 2: Batch-fetch all spots for the date/time (uses in-memory cache)
         # This is a single call instead of N individual DynamoDB queries
         all_spots = await SurfDataRepository.get_spots_for_date(date, time)
-        spots_by_id: dict[str, dict] = {s["LocationId"]: s for s in all_spots}
+        spots_by_id: dict[str, dict] = {s["locationId"]: s for s in all_spots}
 
         # Step 3: Match OpenSearch results with surf data
         results = []
@@ -101,14 +97,6 @@ class SearchService:
             surf_data = spots_by_id.get(location_id)
 
             if surf_data:
-                # Filter by surfer_level if specified
-                if surfer_level:
-                    item_level = surf_data.get("derivedMetrics", {}).get(
-                        "surfingLevel", ""
-                    ).upper()
-                    if item_level and item_level != surfer_level.upper():
-                        continue
-
                 # Copy to avoid mutating cached data
                 result = {**surf_data}
 
@@ -150,14 +138,10 @@ class SearchService:
 
                 results.append(result)
             else:
-                # No surf data: skip if surfer_level filter is active
-                if surfer_level:
-                    continue
-
                 # No surf data found but location exists, return location info
                 results.append({
-                    "LocationId": location_id,
-                    "SurfTimestamp": "",
+                    "locationId": location_id,
+                    "surfTimestamp": "",
                     "geo": {
                         "lat": os_result.get("lat", 0),
                         "lng": os_result.get("lon", 0),
@@ -169,9 +153,9 @@ class SearchService:
                         "waterTemperature": 0,
                     },
                     "derivedMetrics": {
-                        "surfScore": 0,
-                        "surfGrade": "D",
-                        "surfingLevel": "",
+                        "BEGINNER": {"surfScore": 0, "surfGrade": "D"},
+                        "INTERMEDIATE": {"surfScore": 0, "surfGrade": "D"},
+                        "ADVANCED": {"surfScore": 0, "surfGrade": "D"},
                     },
                     "metadata": {
                         "modelVersion": "",

@@ -101,7 +101,7 @@ async def get_spot(
     if not results:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Spot not found")
 
-    latest = max(results, key=lambda r: r["SurfTimestamp"])
+    latest = max(results, key=lambda r: r["surfTimestamp"])
     return SurfInfoResponse(**latest)
 
 

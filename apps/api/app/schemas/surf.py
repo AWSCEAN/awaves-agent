@@ -66,10 +66,15 @@ class ConditionsResponse(BaseModel):
     waterTemperature: float = 0
 
 
-class DerivedMetricsResponse(BaseModel):
+class LevelMetricsResponse(BaseModel):
     surfScore: float = 0
     surfGrade: str = "D"
-    surfingLevel: str = "BEGINNER"
+
+
+class DerivedMetricsResponse(BaseModel):
+    BEGINNER: LevelMetricsResponse = LevelMetricsResponse()
+    INTERMEDIATE: LevelMetricsResponse = LevelMetricsResponse()
+    ADVANCED: LevelMetricsResponse = LevelMetricsResponse()
 
 
 class MetadataResponse(BaseModel):
@@ -82,8 +87,8 @@ class MetadataResponse(BaseModel):
 class SurfInfoResponse(BaseModel):
     """SurfInfo response matching FE SurfInfo type."""
 
-    LocationId: str
-    SurfTimestamp: str
+    locationId: str
+    surfTimestamp: str
     geo: GeoResponse
     conditions: ConditionsResponse
     derivedMetrics: DerivedMetricsResponse

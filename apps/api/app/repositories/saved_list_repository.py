@@ -16,24 +16,49 @@ class SavedListRepository(BaseDynamoDBRepository):
 
     @classmethod
     async def create_table_if_not_exists(cls) -> bool:
-        """Create saved_list table if it doesn't exist."""
+        """Create saved_list table if it doesn't exist.
+
+        If the table exists but has an old key schema (e.g. PascalCase),
+        it is dropped and recreated with the correct camelCase keys.
+        """
+        expected_pk, expected_sk = "userId", "sortKey"
+
         try:
             async with await cls.get_client() as client:
+                need_create = False
                 try:
-                    await client.describe_table(TableName=cls.TABLE_NAME)
-                    logger.info(f"DynamoDB table {cls.TABLE_NAME} already exists")
-                    return True
+                    desc = await client.describe_table(TableName=cls.TABLE_NAME)
+                    key_schema = desc["Table"]["KeySchema"]
+                    pk = next(k["AttributeName"] for k in key_schema if k["KeyType"] == "HASH")
+                    sk = next(k["AttributeName"] for k in key_schema if k["KeyType"] == "RANGE")
+
+                    if pk == expected_pk and sk == expected_sk:
+                        logger.info(f"DynamoDB table {cls.TABLE_NAME} already exists")
+                        return True
+
+                    logger.info(
+                        f"Table {cls.TABLE_NAME} has old key schema ({pk}/{sk}). "
+                        f"Recreating with {expected_pk}/{expected_sk}..."
+                    )
+                    await client.delete_table(TableName=cls.TABLE_NAME)
+                    waiter = client.get_waiter("table_not_exists")
+                    await waiter.wait(TableName=cls.TABLE_NAME)
+                    need_create = True
+
                 except client.exceptions.ResourceNotFoundException:
+                    need_create = True
+
+                if need_create:
                     logger.info(f"Creating DynamoDB table {cls.TABLE_NAME}")
                     await client.create_table(
                         TableName=cls.TABLE_NAME,
                         KeySchema=[
-                            {"AttributeName": "UserId", "KeyType": "HASH"},
-                            {"AttributeName": "SortKey", "KeyType": "RANGE"},
+                            {"AttributeName": expected_pk, "KeyType": "HASH"},
+                            {"AttributeName": expected_sk, "KeyType": "RANGE"},
                         ],
                         AttributeDefinitions=[
-                            {"AttributeName": "UserId", "AttributeType": "S"},
-                            {"AttributeName": "SortKey", "AttributeType": "S"},
+                            {"AttributeName": expected_pk, "AttributeType": "S"},
+                            {"AttributeName": expected_sk, "AttributeType": "S"},
                         ],
                         BillingMode="PAY_PER_REQUEST",
                     )
@@ -82,25 +107,25 @@ class SavedListRepository(BaseDynamoDBRepository):
         sort_key = f"{location_id}#{surf_timestamp}"
 
         item = {
-            "UserId": {"S": user_id},
-            "SortKey": {"S": sort_key},
-            "SavedAt": {"S": saved_at},
-            "LocationId": {"S": location_id},
-            "SurfTimestamp": {"S": surf_timestamp},
-            "SurferLevel": {"S": surfer_level},
+            "userId": {"S": user_id},
+            "sortKey": {"S": sort_key},
+            "savedAt": {"S": saved_at},
+            "locationId": {"S": location_id},
+            "surfTimestamp": {"S": surf_timestamp},
+            "surferLevel": {"S": surfer_level},
             "surfScore": {"N": str(surf_score)},
             "surfGrade": {"S": surf_grade},
             "flagChange": {"BOOL": False},
         }
 
         if address:
-            item["Address"] = {"S": address}
+            item["address"] = {"S": address}
         if region:
-            item["Region"] = {"S": region}
+            item["region"] = {"S": region}
         if country:
-            item["Country"] = {"S": country}
+            item["country"] = {"S": country}
         if departure_date:
-            item["DepartureDate"] = {"S": departure_date}
+            item["departureDate"] = {"S": departure_date}
         if wave_height is not None:
             item["waveHeight"] = {"N": str(wave_height)}
         if wave_period is not None:
@@ -116,7 +141,7 @@ class SavedListRepository(BaseDynamoDBRepository):
                     await client.put_item(
                         TableName=cls.TABLE_NAME,
                         Item=item,
-                        ConditionExpression="attribute_not_exists(UserId) AND attribute_not_exists(SortKey)",
+                        ConditionExpression="attribute_not_exists(userId) AND attribute_not_exists(sortKey)",
                     )
                 return cls._deserialize_item(item)
         except Exception as e:
@@ -134,7 +159,7 @@ class SavedListRepository(BaseDynamoDBRepository):
                 with dynamodb_subsegment("DynamoDB_Query"):
                     response = await client.query(
                         TableName=cls.TABLE_NAME,
-                        KeyConditionExpression="UserId = :uid",
+                        KeyConditionExpression="userId = :uid",
                         ExpressionAttributeValues={":uid": {"S": user_id}},
                     )
                 return [cls._deserialize_item(item) for item in response.get("Items", [])]
@@ -160,8 +185,8 @@ class SavedListRepository(BaseDynamoDBRepository):
                     response = await client.get_item(
                         TableName=cls.TABLE_NAME,
                         Key={
-                            "UserId": {"S": user_id},
-                            "SortKey": {"S": sort_key},
+                            "userId": {"S": user_id},
+                            "sortKey": {"S": sort_key},
                         },
                     )
                 item = response.get("Item")
@@ -188,8 +213,8 @@ class SavedListRepository(BaseDynamoDBRepository):
                     await client.delete_item(
                         TableName=cls.TABLE_NAME,
                         Key={
-                            "UserId": {"S": user_id},
-                            "SortKey": {"S": sort_key},
+                            "userId": {"S": user_id},
+                            "sortKey": {"S": sort_key},
                         },
                     )
                 return True
@@ -215,8 +240,8 @@ class SavedListRepository(BaseDynamoDBRepository):
                     await client.update_item(
                         TableName=cls.TABLE_NAME,
                         Key={
-                            "UserId": {"S": user_id},
-                            "SortKey": {"S": sort_key},
+                            "userId": {"S": user_id},
+                            "sortKey": {"S": sort_key},
                         },
                         UpdateExpression="SET flagChange = :fc REMOVE changeMessage",
                         ExpressionAttributeValues={":fc": {"BOOL": False}},

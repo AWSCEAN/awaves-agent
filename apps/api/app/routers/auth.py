@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
+from app.db.session import get_db, get_read_db
 from app.schemas.user import (
     CommonResponse,
     ErrorDetail,
@@ -24,7 +24,12 @@ security = HTTPBearer()
 
 
 def get_auth_service(session: AsyncSession = Depends(get_db)) -> AuthService:
-    """Dependency to get auth service."""
+    """Dependency to get auth service (writer)."""
+    return AuthService(session)
+
+
+def get_read_auth_service(session: AsyncSession = Depends(get_read_db)) -> AuthService:
+    """Dependency to get auth service (reader) for read-only operations."""
     return AuthService(session)
 
 
@@ -120,7 +125,7 @@ async def logout(
 @router.get("/me", response_model=CommonResponse[UserV2Response])
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    auth_service: AuthService = Depends(get_auth_service),
+    auth_service: AuthService = Depends(get_read_auth_service),
 ) -> CommonResponse[UserV2Response]:
     """Get current authenticated user."""
     user = await auth_service.get_current_user(credentials.credentials)
