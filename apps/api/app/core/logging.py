@@ -47,5 +47,12 @@ def setup_json_logging(level: int = logging.INFO) -> None:
     root.addHandler(handler)
 
     # Suppress noisy third-party loggers
-    for name in ("uvicorn.access", "botocore", "aiobotocore"):
+    for name in (
+        "uvicorn.access",
+        "botocore",
+        "aiobotocore",
+        "sqlalchemy.engine",
+        "sqlalchemy.pool",
+        "sqlalchemy.dialects",
+    ):
         logging.getLogger(name).setLevel(logging.WARNING)
