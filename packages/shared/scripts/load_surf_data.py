@@ -6,7 +6,7 @@ import csv
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -30,52 +30,75 @@ if not REDIS_URL:
     raise RuntimeError("CACHE_URL is not set. Check apps/api/.env.local")
 
 
-def get_surfing_level(predicted_rating: float) -> str:
-    if predicted_rating >= 3.0:
-        return "ADVANCED"
-    elif predicted_rating >= 2.0:
-        return "INTERMEDIATE"
-    else:
-        return "BEGINNER"
+def compute_ttl(surf_timestamp: str, ttl_days: int = 7) -> int:
+    """Compute expiredAt as Unix epoch (TTL) from surf timestamp."""
+    dt = datetime.strptime(surf_timestamp, "%Y-%m-%dT%H:%M:%SZ")
+    return int((dt + timedelta(days=ttl_days)).timestamp())
 
 
 def create_table_if_not_exists(dynamodb):
+    expected_pk, expected_sk = "locationId", "surfTimestamp"
+
     try:
-        dynamodb.describe_table(TableName=TABLE_NAME)
-        print(f"Table '{TABLE_NAME}' already exists.")
+        desc = dynamodb.describe_table(TableName=TABLE_NAME)
+        key_schema = desc["Table"]["KeySchema"]
+        pk = next(k["AttributeName"] for k in key_schema if k["KeyType"] == "HASH")
+        sk = next(k["AttributeName"] for k in key_schema if k["KeyType"] == "RANGE")
+
+        if pk == expected_pk and sk == expected_sk:
+            print(f"Table '{TABLE_NAME}' already exists with correct key schema.")
+            return
+
+        # Key schema mismatch — drop and recreate
+        print(f"Table '{TABLE_NAME}' has old key schema ({pk}/{sk}). Recreating with {expected_pk}/{expected_sk}...")
+        dynamodb.delete_table(TableName=TABLE_NAME)
+        dynamodb.get_waiter("table_not_exists").wait(TableName=TABLE_NAME)
+        print(f"Table '{TABLE_NAME}' deleted.")
+
     except ClientError as e:
-        if e.response["Error"]["Code"] == "ResourceNotFoundException":
-            print(f"Creating table '{TABLE_NAME}'...")
-            dynamodb.create_table(
-                TableName=TABLE_NAME,
-                KeySchema=[
-                    {"AttributeName": "LocationId", "KeyType": "HASH"},
-                    {"AttributeName": "SurfTimestamp", "KeyType": "RANGE"},
-                ],
-                AttributeDefinitions=[
-                    {"AttributeName": "LocationId", "AttributeType": "S"},
-                    {"AttributeName": "SurfTimestamp", "AttributeType": "S"},
-                ],
-                BillingMode="PAY_PER_REQUEST",
-            )
-            dynamodb.get_waiter("table_exists").wait(TableName=TABLE_NAME)
-            print(f"Table '{TABLE_NAME}' created.")
-        else:
+        if e.response["Error"]["Code"] != "ResourceNotFoundException":
             raise
+
+    print(f"Creating table '{TABLE_NAME}'...")
+    dynamodb.create_table(
+        TableName=TABLE_NAME,
+        KeySchema=[
+            {"AttributeName": expected_pk, "KeyType": "HASH"},
+            {"AttributeName": expected_sk, "KeyType": "RANGE"},
+        ],
+        AttributeDefinitions=[
+            {"AttributeName": expected_pk, "AttributeType": "S"},
+            {"AttributeName": expected_sk, "AttributeType": "S"},
+        ],
+        BillingMode="PAY_PER_REQUEST",
+    )
+    dynamodb.get_waiter("table_exists").wait(TableName=TABLE_NAME)
+    print(f"Table '{TABLE_NAME}' created.")
 
 
 def delete_all_items(dynamodb_client, table_resource):
-    """Delete all items from the surf_info table."""
+    """Delete all items from the surf_info table.
+
+    Handles both old PascalCase (LocationId/SurfTimestamp) and new camelCase
+    (locationId/surfTimestamp) attribute names so existing data can be cleaned up.
+    """
     print("Deleting all existing items from surf_info table...")
+
+    # Describe the table to get the actual key attribute names
+    desc = dynamodb_client.describe_table(TableName=TABLE_NAME)
+    key_schema = desc["Table"]["KeySchema"]
+    pk_attr = next(k["AttributeName"] for k in key_schema if k["KeyType"] == "HASH")
+    sk_attr = next(k["AttributeName"] for k in key_schema if k["KeyType"] == "RANGE")
+
     response = dynamodb_client.scan(
         TableName=TABLE_NAME,
-        ProjectionExpression="LocationId, SurfTimestamp",
+        ProjectionExpression=f"{pk_attr}, {sk_attr}",
     )
     items = response.get("Items", [])
     while "LastEvaluatedKey" in response:
         response = dynamodb_client.scan(
             TableName=TABLE_NAME,
-            ProjectionExpression="LocationId, SurfTimestamp",
+            ProjectionExpression=f"{pk_attr}, {sk_attr}",
             ExclusiveStartKey=response["LastEvaluatedKey"],
         )
         items.extend(response.get("Items", []))
@@ -88,8 +111,8 @@ def delete_all_items(dynamodb_client, table_resource):
         for item in items:
             batch.delete_item(
                 Key={
-                    "LocationId": item["LocationId"]["S"],
-                    "SurfTimestamp": item["SurfTimestamp"]["S"],
+                    pk_attr: item[pk_attr]["S"],
+                    sk_attr: item[sk_attr]["S"],
                 }
             )
     print(f"Deleted {len(items)} items.")
@@ -199,15 +222,22 @@ def main():
             lng = float(row["lon"])
             location_id = f"{lat}#{lng}"
             surf_timestamp = parse_timestamp(row["datetime"])
-            predicted_score = float(row["predicted_score"])
-            predicted_rating = float(row["predicted_rating"])
             wave_height = float(row["wave_height"])
             wave_period = float(row["wave_period"])
             wind_speed = float(row["wind_speed_10m"])
 
+            # Per-level scores and grades
+            beginner_score = float(row["predicted_score_beginner"])
+            beginner_grade = row["predicted_rating_beginner"]
+            intermediate_score = float(row["predicted_score_intermediate"])
+            intermediate_grade = row["predicted_rating_intermediate"]
+            advanced_score = float(row["predicted_score_advanced"])
+            advanced_grade = row["predicted_rating_advanced"]
+
             item = {
-                "LocationId": location_id,
-                "SurfTimestamp": surf_timestamp,
+                "locationId": location_id,
+                "surfTimestamp": surf_timestamp,
+                "expiredAt": compute_ttl(surf_timestamp),
                 "geo": {
                     "lat": to_decimal(lat),
                     "lng": to_decimal(lng),
@@ -219,9 +249,18 @@ def main():
                     "waterTemperature": to_decimal(row["sea_surface_temperature"]),
                 },
                 "derivedMetrics": {
-                    "surfScore": to_decimal(round(predicted_score, 1)),
-                    "surfGrade": str(predicted_rating),
-                    "surfingLevel": get_surfing_level(predicted_rating),
+                    "BEGINNER": {
+                        "surfScore": to_decimal(round(beginner_score, 1)),
+                        "surfGrade": beginner_grade,
+                    },
+                    "INTERMEDIATE": {
+                        "surfScore": to_decimal(round(intermediate_score, 1)),
+                        "surfGrade": intermediate_grade,
+                    },
+                    "ADVANCED": {
+                        "surfScore": to_decimal(round(advanced_score, 1)),
+                        "surfGrade": advanced_grade,
+                    },
                 },
                 "metadata": {
                     "modelVersion": "sagemaker-awaves-v1.2",
@@ -238,14 +277,17 @@ def main():
             }
             batch.append(item)
 
-            # Track latest record per location for Redis cache
+            # Track latest record per location for Redis cache (use INTERMEDIATE as default)
             if location_id not in latest_map or surf_timestamp > latest_map[location_id]["lastUpdated"]:
                 latest_map[location_id] = {
-                    "LocationId": location_id,
+                    "locationId": location_id,
                     "lat": lat,
                     "lng": lng,
-                    "surfScore": round(predicted_score, 1),
-                    "surfGrade": str(predicted_rating),
+                    "derivedMetrics": {
+                        "BEGINNER": {"surfScore": round(beginner_score, 1), "surfGrade": beginner_grade},
+                        "INTERMEDIATE": {"surfScore": round(intermediate_score, 1), "surfGrade": intermediate_grade},
+                        "ADVANCED": {"surfScore": round(advanced_score, 1), "surfGrade": advanced_grade},
+                    },
                     "surfSafetyGrade": get_safety_grade(wind_speed, wave_height),
                     "waveHeight": wave_height,
                     "wavePeriod": wave_period,

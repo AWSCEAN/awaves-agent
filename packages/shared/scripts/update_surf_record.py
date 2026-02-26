@@ -81,8 +81,8 @@ def main():
     dynamodb.update_item(
         TableName=SURF_TABLE,
         Key={
-            "LocationId": {"S": LOCATION_ID},
-            "SurfTimestamp": {"S": SURF_TIMESTAMP},
+            "locationId": {"S": LOCATION_ID},
+            "surfTimestamp": {"S": SURF_TIMESTAMP},
         },
         UpdateExpression=(
             "SET derivedMetrics.surfScore = :score, "
@@ -127,14 +127,14 @@ def main():
         r = None
 
     # ── Step 3: Scan saved_list for matching items ───────────
-    print(f"\n[3/5] Scanning saved_list for items with LocationId = {LOCATION_ID}")
+    print(f"\n[3/5] Scanning saved_list for items with locationId = {LOCATION_ID}")
 
-    # Match by LocationId (not exact SortKey) so ALL saved timestamps
+    # Match by locationId (not exact sortKey) so ALL saved timestamps
     # at this location get notified when conditions change
     affected_users = []
     response = dynamodb.scan(
         TableName=SAVED_TABLE,
-        FilterExpression="LocationId = :lid",
+        FilterExpression="locationId = :lid",
         ExpressionAttributeValues={
             ":lid": {"S": LOCATION_ID},
         },
@@ -143,7 +143,7 @@ def main():
     while "LastEvaluatedKey" in response:
         response = dynamodb.scan(
             TableName=SAVED_TABLE,
-            FilterExpression="LocationId = :lid",
+            FilterExpression="locationId = :lid",
             ExpressionAttributeValues={
                 ":lid": {"S": LOCATION_ID},
             },
@@ -171,14 +171,14 @@ def main():
     print(f"       changeMessage: {change_message}")
 
     for item in items:
-        user_id = item["UserId"]["S"]
-        sort_key = item["SortKey"]["S"]
+        user_id = item["userId"]["S"]
+        sort_key = item["sortKey"]["S"]
 
         dynamodb.update_item(
             TableName=SAVED_TABLE,
             Key={
-                "UserId": {"S": user_id},
-                "SortKey": {"S": sort_key},
+                "userId": {"S": user_id},
+                "sortKey": {"S": sort_key},
             },
             UpdateExpression=(
                 "SET flagChange = :fc, "
