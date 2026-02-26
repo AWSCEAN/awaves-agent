@@ -65,14 +65,14 @@ async def submit_feedback(
 async def get_feedback(
     info: Info[GraphQLContext, None],
     location_id: str,
-    surf_timestamp: str,
+    surf_timestamp: datetime,
 ) -> Optional[FeedbackResult]:
     """Get feedback for a saved item."""
     if not info.context.is_authenticated:
         raise Exception("Not authenticated")
 
     user_id = info.context.user_id
-    session = info.context.db
+    session = info.context.db_read  # read-only query → reader
 
     result = await session.execute(
         select(Feedback).where(

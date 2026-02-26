@@ -1,12 +1,15 @@
 """Main GraphQL schema definition."""
 
-import strawberry
-from typing import Optional
-from fastapi import Depends, Request
-from strawberry.fastapi import GraphQLRouter
-from sqlalchemy.ext.asyncio import AsyncSession
+import logging
+from typing import AsyncGenerator, Optional
 
-from app.db.session import get_db
+import strawberry
+from datetime import datetime
+from fastapi import Request
+from strawberry.fastapi import GraphQLRouter
+from strawberry.extensions import SchemaExtension
+
+from app.db.session import create_writer_session, create_reader_session
 from app.services.auth import AuthService
 from app.graphql.context import GraphQLContext
 from app.graphql.types.user import User
@@ -49,7 +52,7 @@ class Query:
         self,
         info: strawberry.Info[GraphQLContext, None],
         location_id: str,
-        surf_timestamp: str,
+        surf_timestamp: datetime,
     ) -> Optional[FeedbackResult]:
         """Get feedback for a saved item."""
         return await feedback_resolvers.get_feedback(info, location_id, surf_timestamp)
@@ -137,25 +140,51 @@ class Mutation:
         return await feedback_resolvers.submit_feedback(info, input)
 
 
-schema = strawberry.Schema(query=Query, mutation=Mutation)
+_logger = logging.getLogger(__name__)
+
+
+class SessionCleanupExtension(SchemaExtension):
+    """Close DB sessions after each GraphQL request to prevent connection leaks."""
+
+    async def on_execute(self) -> AsyncGenerator[None, None]:
+        yield
+        context = self.execution_context.context
+        if hasattr(context, "close"):
+            try:
+                await context.close()
+            except Exception as e:
+                _logger.warning("Failed to close GraphQL DB sessions: %s", e)
+
+
+schema = strawberry.Schema(
+    query=Query,
+    mutation=Mutation,
+    extensions=[SessionCleanupExtension],
+)
 
 
 async def get_context(
     request: Request,
 ) -> GraphQLContext:
-    """Create GraphQL context with auth and database session."""
-    # Get database session
-    async for db in get_db():
-        # Extract and validate JWT from Authorization header
-        auth_header = request.headers.get("Authorization")
-        user_id = None
+    """Create GraphQL context with writer/reader database sessions.
 
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header[7:]
-            auth_service = AuthService(db)
-            user_id = await auth_service.verify_access_token(token)
+    Sessions are created directly from the factory (not via FastAPI Depends
+    generators) so they stay open for the lifetime of the GraphQL request.
+    Cleanup is handled by SessionCleanupExtension.on_execute.
+    """
+    db = create_writer_session()
+    db_read = create_reader_session()
 
-        return GraphQLContext(db=db, user_id=user_id)
+    # Extract and validate JWT from Authorization header
+    auth_header = request.headers.get("Authorization")
+    user_id = None
+
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        auth_service = AuthService(db_read)
+        user_id = await auth_service.verify_access_token(token)
+
+    return GraphQLContext(db=db, db_read=db_read, user_id=user_id)
 
 
 graphql_app = GraphQLRouter(

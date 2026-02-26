@@ -1,5 +1,6 @@
 """DataLoaders for batching and caching GraphQL queries."""
 
+from datetime import datetime
 from typing import Optional
 from collections import defaultdict
 
@@ -31,18 +32,18 @@ class FeedbackDataLoader:
 
         feedback_map: dict[str, str] = {}
         for fb in feedbacks:
-            key = f"{fb.location_id}#{fb.surf_timestamp}"
+            key = f"{fb.location_id}#{fb.surf_timestamp.isoformat()}"
             feedback_map[key] = fb.feedback_status
 
         self._cache[user_id] = feedback_map
         return feedback_map
 
     async def load_feedback(
-        self, user_id: int, location_id: str, surf_timestamp: str
+        self, user_id: int, location_id: str, surf_timestamp: datetime
     ) -> Optional[str]:
         """Load feedback status for a specific saved item."""
         feedback_map = await self.load_feedback_map(user_id)
-        key = f"{location_id}#{surf_timestamp}"
+        key = f"{location_id}#{surf_timestamp.isoformat()}"
         return feedback_map.get(key)
 
     def clear(self) -> None:

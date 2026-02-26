@@ -1,6 +1,7 @@
 """Saved items resolvers for GraphQL."""
 
 from datetime import datetime
+from dateutil.parser import isoparse
 from strawberry.types import Info
 
 from app.graphql.context import GraphQLContext
@@ -41,9 +42,14 @@ async def get_saved_items(info: Info[GraphQLContext, None]) -> SavedListResult:
     # Build response with joined data
     items = []
     for item in db_items:
-        location_id = item.get("LocationId", "")
-        surf_timestamp = item.get("SurfTimestamp", "")
-        key = f"{location_id}#{surf_timestamp}"
+        location_id = item.get("locationId", "")
+        surf_timestamp_raw = item.get("surfTimestamp", "")
+        # Normalize to naive datetime isoformat to match feedback DataLoader keys
+        try:
+            normalized_ts = isoparse(surf_timestamp_raw).replace(tzinfo=None).isoformat()
+        except (ValueError, TypeError):
+            normalized_ts = surf_timestamp_raw
+        key = f"{location_id}#{normalized_ts}"
         feedback_status = feedback_map.get(key)
         items.append(SavedItem.from_dynamodb(item, feedback_status))
 

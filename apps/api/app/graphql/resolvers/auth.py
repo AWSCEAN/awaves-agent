@@ -115,7 +115,7 @@ async def get_current_user(info: Info[GraphQLContext, None]) -> User:
 
     from app.repositories.user_repository import UserRepository
 
-    user_repo = UserRepository(info.context.db)
+    user_repo = UserRepository(info.context.db_read)
     user = await user_repo.get_by_id(info.context.user_id)
 
     if not user:
