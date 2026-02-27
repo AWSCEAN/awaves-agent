@@ -23,6 +23,8 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
 
+# Redirect sharp's libvips download away from flaky GitHub releases
+ENV npm_config_sharp_libvips_binary_host="https://npmmirror.com/mirrors/sharp-libvips"
 RUN pnpm install --frozen-lockfile
 
 # Copy source after install to preserve the cache layer above
