@@ -24,6 +24,6 @@ data:
   DYNAMODB_SURF_DATA_TABLE: "awaves-dev-surf-info"
   DYNAMODB_SAVED_LIST_TABLE: "awaves-dev-saved-list"
   DYNAMODB_LOCATIONS_TABLE: "awaves-dev-locations"
-  CORS_ORIGINS: "https://awaves.net,https://www.awaves.net,https://mobile.awaves.net"
+  CORS_ORIGINS: "https://awaves.net,https://www.awaves.net,https://web.awaves.net,https://mobile.awaves.net"
   INFERENCE_MODE: "sagemaker"
   SAGEMAKER_ENDPOINT_NAME: "awaves-dev-surf-index"

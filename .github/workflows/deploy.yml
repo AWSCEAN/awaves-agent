@@ -166,6 +166,7 @@ jobs:
         # bundles at build time. Setting them in K8s env has no effect.
         run: |
           docker build \
+            -f apps/web/Dockerfile \
             --build-arg NEXT_PUBLIC_API_URL=https://api.awaves.net \
             --build-arg NEXT_PUBLIC_CDN_URL=https://cdn.awaves.net \
             --build-arg NEXT_PUBLIC_MAPBOX_TOKEN=${{ vars.NEXT_PUBLIC_MAPBOX_TOKEN }} \
@@ -214,6 +215,7 @@ jobs:
         # Same Dockerfile as web — two ECR repos, two deployments (Option A).
         run: |
           docker build \
+            -f apps/web/Dockerfile \
             --build-arg NEXT_PUBLIC_API_URL=https://api.awaves.net \
             --build-arg NEXT_PUBLIC_CDN_URL=https://cdn.awaves.net \
             --build-arg NEXT_PUBLIC_MAPBOX_TOKEN=${{ vars.NEXT_PUBLIC_MAPBOX_TOKEN }} \
