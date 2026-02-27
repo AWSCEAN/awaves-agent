@@ -284,6 +284,9 @@ jobs:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Debug — verify assumed identity
+        run: aws sts get-caller-identity
+
       - name: Install Helm
         uses: azure/setup-helm@v4
 
