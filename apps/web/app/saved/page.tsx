@@ -8,7 +8,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import SurfLoadingScreen from '@/components/SurfLoadingScreen';
 import { useSavedItems } from '@/hooks/useSavedItems';
 import { surfService } from '@/lib/apiServices';
-import { getSavedLocale, saveLocale } from '@/lib/i18n';
+import { useLocale } from '@/components/LocaleProvider';
 import type { SavedItemResponse, FeedbackStatus, Language, SurfInfo } from '@/types';
 
 const translations = {
@@ -39,20 +39,10 @@ const translations = {
 };
 
 export default function SavedPage() {
-  const [lang, setLangState] = useState<Language>('en');
+  const { locale: lang, setLocale: setLang } = useLocale();
   const [feedbackMap, setFeedbackMap] = useState<Record<string, FeedbackStatus>>({});
 
   const t = translations[lang];
-
-  // Hydrate from persisted locale after mount
-  useEffect(() => {
-    setLangState(getSavedLocale());
-  }, []);
-
-  const setLang = (newLang: Language) => {
-    setLangState(newLang);
-    saveLocale(newLang);
-  };
 
   // Use GraphQL hook
   const {

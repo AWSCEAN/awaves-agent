@@ -3,13 +3,11 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import LogoOverlay from '@/components/LogoOverlay';
 import SurfLoadingScreen from '@/components/SurfLoadingScreen';
-import { getSavedLocale, saveLocale } from '@/lib/i18n';
-
-type Language = 'ko' | 'en';
+import { useLocale } from '@/components/LocaleProvider';
 
 const translations = {
   ko: {
@@ -49,19 +47,9 @@ const translations = {
 export default function LandingPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
-  const [lang, setLangState] = useState<Language>('en');
+  const { locale: lang, setLocale: setLang } = useLocale();
   const [navigating, setNavigating] = useState(false);
   const t = translations[lang];
-
-  // Hydrate from persisted locale after mount
-  useEffect(() => {
-    setLangState(getSavedLocale());
-  }, []);
-
-  const setLang = (newLang: Language) => {
-    setLangState(newLang);
-    saveLocale(newLang);
-  };
 
   const handleGetStarted = () => {
     if (isAuthenticated) {

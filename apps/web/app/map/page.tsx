@@ -16,7 +16,7 @@ import TimeSlotPickerPanel from '@/components/TimeSlotPickerPanel';
 import PredictionResultPanel from '@/components/PredictionResultPanel';
 import DatePickerInput from '@/components/DatePickerInput';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import LocaleProvider, { useLocale as useAppLocale } from '@/components/LocaleProvider';
+import { useLocale as useAppLocale } from '@/components/LocaleProvider';
 import type { SurfInfo, SavedListItem, SurferLevel, SurfingLevel, SurfGrade, PredictionResult } from '@/types';
 import type { OverlayMode, SpotSelectionData } from '@/components/EnhancedMapboxMap';
 import { TIME_SLOTS, getCurrentTimeSlot, localToUTC, getMetricsForLevel, surferLevelToKey } from '@/lib/services/surfInfoService';
@@ -1150,9 +1150,5 @@ export default function MapPageEnhanced() {
     return <SurfLoadingScreen />;
   }
 
-  return (
-    <LocaleProvider>
-      <MapPageContent />
-    </LocaleProvider>
-  );
+  return <MapPageContent />;
 }
