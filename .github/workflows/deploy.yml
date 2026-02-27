@@ -302,8 +302,21 @@ jobs:
             --namespace api \
             --set image.tag=${{ github.sha }} \
             --create-namespace \
-            --rollback-on-failure \
             --timeout 5m
+
+      - name: Debug — pod state after deploy attempt
+        if: always()
+        run: |
+          echo "=== Pods ==="
+          kubectl get pods -n api -o wide
+          echo "=== ExternalSecret ==="
+          kubectl get externalsecret -n api
+          echo "=== K8s secret exists? ==="
+          kubectl get secret awaves-api-secrets -n api 2>/dev/null && echo "Secret EXISTS" || echo "Secret NOT FOUND"
+          echo "=== Pod descriptions ==="
+          kubectl describe pods -n api -l app=fastapi-api
+          echo "=== Pod logs ==="
+          kubectl logs -n api -l app=fastapi-api --tail=80 --ignore-errors || true
 
   # ── CD: deploy web via Helm ──────────────────────────────────────────────────
   deploy-web:
