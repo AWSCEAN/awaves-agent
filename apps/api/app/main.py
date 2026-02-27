@@ -209,9 +209,6 @@ async def lifespan(app: FastAPI):
     # Initialize OpenSearch index and auto-seed if empty
     await OpenSearchService.create_index_if_not_exists()
     await _seed_locations_if_empty()
-    # Clear stale surf spots cache and pre-warm with fresh data (includes Korean fields)
-    await CacheService.invalidate_surf_spots()
-    await SurfDataRepository._get_all_spots_raw()
     yield
     # Shutdown: Close database, cache, and OpenSearch connections
     await close_db()
