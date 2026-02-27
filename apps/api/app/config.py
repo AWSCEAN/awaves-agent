@@ -120,7 +120,7 @@ class Settings(BaseSettings):
         """Get writer database URL. Falls back to DATABASE_URL for local/dev."""
         if self.db_writer_host:
             password = self.db_writer_password
-            ssl_query = f"?ssl=verify-full&ssl_min_protocol_version=TLSv1.2" if self.db_ssl_mode else ""
+            ssl_query = f"?ssl={self.db_ssl_mode}" if self.db_ssl_mode else ""
             return (
                 f"postgresql+asyncpg://{self.db_writer_user}:{password}"
                 f"@{self.db_writer_host}:{self.db_port}/{self.db_name}{ssl_query}"
@@ -132,7 +132,7 @@ class Settings(BaseSettings):
         """Get reader database URL. Falls back to DATABASE_URL for local/dev."""
         if self.db_reader_host:
             password = self.db_reader_password
-            ssl_query = f"?ssl=verify-full&ssl_min_protocol_version=TLSv1.2" if self.db_ssl_mode else ""
+            ssl_query = f"?ssl={self.db_ssl_mode}" if self.db_ssl_mode else ""
             return (
                 f"postgresql+asyncpg://{self.db_reader_user}:{password}"
                 f"@{self.db_reader_host}:{self.db_port}/{self.db_name}{ssl_query}"
