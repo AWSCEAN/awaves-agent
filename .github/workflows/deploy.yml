@@ -8,7 +8,7 @@
 #         --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1 \
 #         --client-id-list sts.amazonaws.com
 #
-#  2. Create IAM role `awaves-dev-cicd-policy` with trust policy:
+#  2. Create IAM role `awaves-dev-cicd-role` with trust policy:
 #       {
 #         "Version": "2012-10-17",
 #         "Statement": [{
@@ -30,7 +30,7 @@
 #
 #  3. Attach permission policy to the role:
 #       aws iam attach-role-policy \
-#         --role-name awaves-dev-cicd-policy \
+#         --role-name awaves-dev-cicd-role \
 #         --policy-arn arn:aws:iam::107570140649:policy/awaves-dev-cicd-policy
 #
 #     The policy must include:
@@ -64,7 +64,7 @@
 #       # Map the IAM role via EKS access entry (EKS 1.23+):
 #       aws eks create-access-entry \
 #         --cluster-name <EKS_CLUSTER_NAME> \
-#         --principal-arn arn:aws:iam::107570140649:role/awaves-dev-cicd-policy \
+#         --principal-arn arn:aws:iam::107570140649:role/awaves-dev-cicd-role \
 #         --type STANDARD \
 #         --kubernetes-groups helm-deployer
 #
@@ -84,7 +84,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  AWS_ROLE_ARN: arn:aws:iam::107570140649:role/awaves-dev-cicd-policy
+  AWS_ROLE_ARN: arn:aws:iam::107570140649:role/awaves-dev-cicd-role
   ECR_BACKEND: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-backend-api
   ECR_WEB: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-web-app
   ECR_MOBILE: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-mobile-app

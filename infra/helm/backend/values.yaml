@@ -24,9 +24,7 @@ hpa:
 
 ingress:
   host: api.awaves.net
-  # The value below was set by the backend engineer — verify it is an ACM cert ARN
-  # (format: arn:aws:acm:us-east-1:<account>:certificate/<id>) before deploying.
-  certificateArn: "arn:aws:elasticloadbalancing:us-east-1:107570140649:loadbalancer/app/k8s-awavesde-webappin-35d6501f04/501ecb569eeabe20"
+  certificateArn: "arn:aws:acm:us-east-1:107570140649:certificate/38c63594-12a0-40c3-9d3b-235ec3c73619"
   groupOrder: "3"
 
 serviceAccount:
