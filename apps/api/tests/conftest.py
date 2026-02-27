@@ -35,6 +35,9 @@ def _delete_test_users() -> None:
                     text("DELETE FROM users WHERE username = ANY(:names)"),
                     {"names": _TEST_USERNAMES},
                 )
+        except Exception:
+            # Table may not exist yet on a fresh database (e.g. CI) — nothing to clean.
+            pass
         finally:
             await engine.dispose()
 
