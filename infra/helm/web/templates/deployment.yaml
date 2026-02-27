@@ -37,11 +37,6 @@ spec:
               value: "https://api.awaves.net"
             - name: NEXT_PUBLIC_CDN_URL
               value: "https://cdn.awaves.net"
-            - name: NEXT_PUBLIC_MAPBOX_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: awaves-web-secrets
-                  key: mapbox-token
           resources:
             requests:
               cpu: {{ .Values.resources.requests.cpu | quote }}
