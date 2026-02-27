@@ -23,6 +23,7 @@ export interface SurfInfoConditions {
 export interface LevelMetrics {
   surfScore: number;          // 0-100
   surfGrade: SurfGrade;       // A/B/C/D
+  surfGradeNumeric: number;   // raw float from backend (e.g. 3.0, 2.5)
 }
 
 export interface SurfInfoDerivedMetrics {

@@ -10,7 +10,7 @@ export function getMetricsForLevel(
   derivedMetrics: SurfInfoDerivedMetrics | undefined,
   surferLevel: string = ''
 ): LevelMetrics {
-  const fallback: LevelMetrics = { surfScore: 0, surfGrade: 'D' as SurfGrade };
+  const fallback: LevelMetrics = { surfScore: 0, surfGrade: 'D' as SurfGrade, surfGradeNumeric: 0.0 };
   if (!derivedMetrics) return fallback;
   const levelKey = surferLevelToKey(surferLevel);
   return derivedMetrics[levelKey] ?? fallback;
@@ -186,14 +186,17 @@ export function generateSurfInfoForSpot(
         BEGINNER: {
           surfScore: round2(surfScore * 0.85),
           surfGrade: generateSurfGrade(surfScore * 0.85),
+          surfGradeNumeric: 0.0,
         },
         INTERMEDIATE: {
           surfScore: round2(surfScore),
           surfGrade: generateSurfGrade(surfScore),
+          surfGradeNumeric: 0.0,
         },
         ADVANCED: {
           surfScore: round2(surfScore * 1.1 > 100 ? 100 : surfScore * 1.1),
           surfGrade: generateSurfGrade(Math.min(100, surfScore * 1.1)),
+          surfGradeNumeric: 0.0,
         },
       },
       metadata: {

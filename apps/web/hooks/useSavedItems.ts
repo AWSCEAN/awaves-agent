@@ -149,7 +149,7 @@ export function useSavedItems() {
     surfTimestamp: string;
     surferLevel: string;
     surfScore: number;
-    surfGrade: string;
+    surfGrade: number;
     departureDate?: string;
     address?: string;
     region?: string;

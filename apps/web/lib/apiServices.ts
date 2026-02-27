@@ -351,6 +351,15 @@ export const surfService = {
     }
     return { success: false, error: response.error || 'Prediction failed' };
   },
+
+  async getLlmSummary(
+    locationId: string,
+    surfTimestamp: string,
+    surfingLevel: string
+  ): Promise<ApiResponse<{ status: 'loading' | 'success' | 'failed'; advice?: { ko: string; en: string } }>> {
+    const params = new URLSearchParams({ locationId, surfTimestamp, surfingLevel });
+    return apiRequest(`/surf/llm-summary?${params.toString()}`);
+  },
 };
 
 // Saved Spots Services

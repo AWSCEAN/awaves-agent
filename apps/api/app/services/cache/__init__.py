@@ -8,6 +8,7 @@ from app.services.cache.auth_cache import AuthCacheService
 from app.services.cache.saved_cache import SavedItemsCacheService
 from app.services.cache.surf_cache import SurfSpotsCacheService
 from app.services.cache.inference_cache import InferenceCacheService
+from app.services.cache.llm_cache import LlmCacheService
 
 
 class CacheService(
@@ -15,6 +16,7 @@ class CacheService(
     SavedItemsCacheService,
     SurfSpotsCacheService,
     InferenceCacheService,
+    LlmCacheService,
 ):
     """Unified cache service (backward compatible).
 
@@ -32,5 +34,6 @@ __all__ = [
     "SavedItemsCacheService",
     "SurfSpotsCacheService",
     "InferenceCacheService",
+    "LlmCacheService",
     "CacheService",
 ]
