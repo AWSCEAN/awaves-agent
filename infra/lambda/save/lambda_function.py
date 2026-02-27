@@ -181,7 +181,7 @@ def _detect_and_flag_changes(latest_per_location, r):
 
         # Paginated scan: find all saved items for this location
         saved_items = []
-        scan_kwargs = {"FilterExpression": Attr("LocationId").eq(location_id)}
+        scan_kwargs = {"FilterExpression": Attr("locationId").eq(location_id)}
         while True:
             resp = tbl.scan(**scan_kwargs)
             saved_items.extend(resp.get("Items", []))
@@ -202,7 +202,7 @@ def _detect_and_flag_changes(latest_per_location, r):
 
             # Map the user's SurferLevel directly to derivedMetrics key
             # (BEGINNER | INTERMEDIATE | ADVANCED — 1:1 match)
-            surfer_level = item.get("SurferLevel", "BEGINNER")
+            surfer_level = item.get("surferLevel", "BEGINNER")
             level_data = new_derived.get(surfer_level) or new_derived.get("BEGINNER", {})
             new_score = level_data.get("surfScore", 0.0)
             new_grade = level_data.get("surfGrade", "F")
