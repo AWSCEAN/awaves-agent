@@ -3,12 +3,10 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { authService } from '@/lib/apiServices';
-import { getSavedLocale, saveLocale } from '@/lib/i18n';
+import { useLocale } from '@/components/LocaleProvider';
 import type { SurferLevel } from '@/types';
-
-type Language = 'ko' | 'en';
 
 const levelConfig = {
   beginner: {
@@ -144,17 +142,8 @@ const translations = {
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [lang, setLangState] = useState<Language>('en');
+  const { locale: lang, setLocale: setLang } = useLocale();
   const [step, setStep] = useState(1);
-
-  useEffect(() => {
-    setLangState(getSavedLocale());
-  }, []);
-
-  const setLang = (newLang: Language) => {
-    setLangState(newLang);
-    saveLocale(newLang);
-  };
 
   // Step 1 fields
   const [username, setUsername] = useState('');

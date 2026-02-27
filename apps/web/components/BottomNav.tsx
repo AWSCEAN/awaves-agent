@@ -1,24 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { getSavedLocale, saveLocale } from '@/lib/i18n';
+import { useLocale } from '@/components/LocaleProvider';
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const [lang, setLang] = useState<'ko' | 'en'>('en');
-
-  useEffect(() => {
-    setLang(getSavedLocale());
-  }, []);
+  const { locale: lang, setLocale } = useLocale();
 
   const toggleLocale = () => {
-    const next = lang === 'ko' ? 'en' : 'ko';
-    setLang(next);
-    saveLocale(next);
-    // Reload page to apply locale change across all components
-    window.location.reload();
+    setLocale(lang === 'ko' ? 'en' : 'ko');
   };
 
   const navItems = [

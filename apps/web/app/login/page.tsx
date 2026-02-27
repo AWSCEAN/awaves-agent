@@ -3,13 +3,11 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { authService } from '@/lib/apiServices';
-import { getSavedLocale, saveLocale } from '@/lib/i18n';
+import { useLocale } from '@/components/LocaleProvider';
 import AwavesLogo from '@/components/AwavesLogo';
 import { useAuth } from '@/contexts/AuthContext';
-
-type Language = 'ko' | 'en';
 
 const translations = {
   ko: {
@@ -39,21 +37,12 @@ const translations = {
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
-  const [lang, setLangState] = useState<Language>('en');
+  const { locale: lang, setLocale: setLang } = useLocale();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const t = translations[lang];
-
-  useEffect(() => {
-    setLangState(getSavedLocale());
-  }, []);
-
-  const setLang = (newLang: Language) => {
-    setLangState(newLang);
-    saveLocale(newLang);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -6,11 +6,9 @@ import { useRouter } from 'next/navigation';
 import LogoOverlay from '@/components/LogoOverlay';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
-import { getSavedLocale, saveLocale } from '@/lib/i18n';
+import { useLocale } from '@/components/LocaleProvider';
 import { authService } from '@/lib/apiServices';
 import type { SurferLevel } from '@/types';
-
-type Language = 'ko' | 'en';
 
 const levelConfig = {
   beginner: {
@@ -95,16 +93,11 @@ const translations = {
 export default function MyPage() {
   const router = useRouter();
   const { user: authUser, logout, refreshAuth } = useAuth();
-  const [lang, setLangState] = useState<Language>('en');
+  const { locale: lang, setLocale: setLang } = useLocale();
   const [userLevel, setSurferLevel] = useState<SurferLevel>('beginner');
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const t = translations[lang];
-
-  // Hydrate from persisted locale after mount
-  useEffect(() => {
-    setLangState(getSavedLocale());
-  }, []);
 
   // Initialize userLevel from authUser
   useEffect(() => {
@@ -112,11 +105,6 @@ export default function MyPage() {
       setSurferLevel(authUser.user_level as SurferLevel);
     }
   }, [authUser]);
-
-  const setLang = (newLang: Language) => {
-    setLangState(newLang);
-    saveLocale(newLang);
-  };
 
   const handleSaveProfile = async () => {
     setIsSaving(true);
