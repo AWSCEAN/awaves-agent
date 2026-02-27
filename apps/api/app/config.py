@@ -106,6 +106,9 @@ class Settings(BaseSettings):
     sagemaker_local_endpoint: str = ""
     sagemaker_endpoint_name: str = ""
 
+    # LLM Summary - Lambda
+    llm_summary_lambda_name: str = "awaves-dev-bedrock-summary"
+
     # JWT
     jwt_secret_key: str = ""
     jwt_algorithm: str = "HS256"

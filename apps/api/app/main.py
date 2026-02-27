@@ -154,7 +154,7 @@ async def _seed_locations_table_if_empty() -> None:
 
 
 async def _seed_locations_if_empty() -> None:
-    """Auto-seed OpenSearch locations index from DynamoDB surf_info if empty."""
+    """Auto-seed OpenSearch locations index from DynamoDB locations table if empty."""
     doc_count = await OpenSearchService.get_document_count()
 
     if doc_count > 0:
@@ -165,36 +165,52 @@ async def _seed_locations_if_empty() -> None:
         logger.warning("Could not check OpenSearch document count, skipping seed.")
         return
 
-    logger.info("OpenSearch locations index is empty. Seeding from DynamoDB surf_info...")
-    spots = await SurfDataRepository.get_all_spots_unpaginated()
-    if not spots:
-        logger.warning("No spots found in DynamoDB surf_info, skipping seed.")
-        return
+    logger.info("OpenSearch locations index is empty. Seeding from DynamoDB locations table...")
 
-    seen_ids: set[str] = set()
-    locations: list[dict] = []
-    for spot in spots:
-        location_id = spot["locationId"]
-        if location_id in seen_ids:
-            continue
-        seen_ids.add(location_id)
-        locations.append({
-            "locationId": location_id,
-            "lat": spot["geo"]["lat"],
-            "lon": spot["geo"]["lng"],
-            "display_name": spot.get("address", "") or spot.get("name", ""),
-            "city": spot.get("city", ""),
-            "state": spot.get("region", ""),
-            "country": spot.get("country", ""),
-            # Korean fields
-            "display_name_ko": spot.get("addressKo", "") or spot.get("nameKo", "") or "",
-            "city_ko": spot.get("cityKo", "") or "",
-            "state_ko": spot.get("regionKo", "") or "",
-            "country_ko": spot.get("countryKo", "") or "",
-        })
+    session = aioboto3.Session(
+        aws_access_key_id=settings.aws_access_key_id or "dummy",
+        aws_secret_access_key=settings.aws_secret_access_key or "dummy",
+        region_name=settings.aws_region,
+    )
+    endpoint_url = settings.ddb_endpoint_url if settings.ddb_endpoint_url else None
+    config = Config(retries={"max_attempts": 3, "mode": "adaptive"}, connect_timeout=5, read_timeout=10)
 
-    indexed = await OpenSearchService.bulk_index_locations(locations)
-    logger.info("Seeded %d locations into OpenSearch from DynamoDB.", indexed)
+    try:
+        async with session.client("dynamodb", endpoint_url=endpoint_url, config=config) as client:
+            all_items: list[dict] = []
+            params: dict = {"TableName": settings.dynamodb_locations_table}
+            while True:
+                response = await client.scan(**params)
+                all_items.extend(response.get("Items", []))
+                if "LastEvaluatedKey" not in response:
+                    break
+                params["ExclusiveStartKey"] = response["LastEvaluatedKey"]
+
+        if not all_items:
+            logger.warning("No items found in DynamoDB locations table, skipping seed.")
+            return
+
+        locations: list[dict] = []
+        for item in all_items:
+            locations.append({
+                "locationId": item["locationId"]["S"],
+                "lat": float(item.get("lat", {}).get("N", "0")),
+                "lon": float(item.get("lon", {}).get("N", "0")),
+                "display_name": item.get("displayName", {}).get("S", ""),
+                "city": item.get("city", {}).get("S", ""),
+                "state": item.get("state", {}).get("S", ""),
+                "country": item.get("country", {}).get("S", ""),
+                "display_name_ko": item.get("displayNameKo", {}).get("S", ""),
+                "city_ko": item.get("cityKo", {}).get("S", ""),
+                "state_ko": item.get("stateKo", {}).get("S", ""),
+                "country_ko": item.get("countryKo", {}).get("S", ""),
+            })
+
+        indexed = await OpenSearchService.bulk_index_locations(locations)
+        logger.info("Seeded %d locations into OpenSearch from DynamoDB locations table.", indexed)
+
+    except Exception as e:
+        logger.warning("Failed to seed OpenSearch from DynamoDB locations table: %s", e)
 
 
 @asynccontextmanager

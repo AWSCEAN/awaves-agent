@@ -12,6 +12,7 @@ from app.schemas.surf import (
     SurfInfoResponse,
 )
 from app.services.prediction_service import get_surf_prediction
+from app.services.llm_summary_service import get_or_trigger_llm_summary
 from app.repositories.surf_data_repository import SurfDataRepository
 
 
@@ -119,6 +120,21 @@ async def get_recommendations(
         results, _ = await SurfDataRepository.get_all_spots(1, 10)
 
     return [SurfInfoResponse(**s) for s in results]
+
+
+@router.get("/llm-summary")
+async def get_llm_summary(
+    locationId: str = Query(..., description="LocationId format: lat#lng"),
+    surfTimestamp: str = Query(..., description="Surf timestamp (e.g. 2026-02-19T00:00:00Z)"),
+    surfingLevel: str = Query("INTERMEDIATE", description="BEGINNER, INTERMEDIATE, or ADVANCED"),
+) -> dict:
+    """Get AI-generated surf advice for a spot.
+
+    Returns immediately with status 'loading' on first call while the
+    Bedrock Lambda runs in the background.  Subsequent polls return the
+    cached result once available.
+    """
+    return await get_or_trigger_llm_summary(locationId, surfTimestamp, surfingLevel)
 
 
 @router.post("/predict")

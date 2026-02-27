@@ -61,7 +61,7 @@ async def get_surf_prediction(
     Returns full prediction dict ready for API response.
     """
     # 1. Check Redis cache
-    cached = await CacheService.get_inference_prediction(location_id, surf_date)
+    cached = await CacheService.get_inference_prediction(location_id, surf_timestamp=surf_date)
     if cached:
         prediction = cached
     else:
@@ -87,7 +87,7 @@ async def get_surf_prediction(
 
         # 4. Cache the result
         await CacheService.store_inference_prediction(
-            location_id, surf_date, prediction
+            location_id, surf_timestamp=surf_date, data=prediction
         )
 
     # 5. Add week info + spot name

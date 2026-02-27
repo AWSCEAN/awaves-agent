@@ -14,16 +14,16 @@ logger = logging.getLogger(__name__)
 class InferenceCacheService(BaseCacheService):
     """Cache service for ML inference predictions."""
 
-    INFERENCE_PREFIX = "awaves:search:inference"
+    INFERENCE_PREFIX = "awaves:surf:inference"
 
     @classmethod
-    def _inference_key(cls, location_id: str, surf_date: str) -> str:
+    def _inference_key(cls, location_id: str, surf_timestamp: str) -> str:
         """Generate cache key for inference prediction."""
-        return f"{cls.INFERENCE_PREFIX}:{location_id}:{surf_date}"
+        return f"{cls.INFERENCE_PREFIX}:{location_id}:{surf_timestamp}"
 
     @classmethod
     async def get_inference_prediction(
-        cls, location_id: str, surf_date: str
+        cls, location_id: str, surf_timestamp: str
     ) -> Optional[dict]:
         """Get cached inference prediction."""
         client = await cls.get_client()
@@ -32,7 +32,7 @@ class InferenceCacheService(BaseCacheService):
 
         try:
             with _redis_subsegment("Redis_Get"):
-                value = await client.get(cls._inference_key(location_id, surf_date))
+                value = await client.get(cls._inference_key(location_id, surf_timestamp))
             if value:
                 emit_cache_hit("inference")
                 return json.loads(value)
@@ -44,7 +44,7 @@ class InferenceCacheService(BaseCacheService):
 
     @classmethod
     async def store_inference_prediction(
-        cls, location_id: str, surf_date: str, data: dict
+        cls, location_id: str, surf_timestamp: str, data: dict
     ) -> None:
         """Store inference prediction in cache."""
         client = await cls.get_client()
@@ -53,8 +53,8 @@ class InferenceCacheService(BaseCacheService):
 
         try:
             await client.setex(
-                cls._inference_key(location_id, surf_date),
-                settings.cache_ttl_inference,
+                cls._inference_key(location_id, surf_timestamp),
+                settings.redis_ttl_seconds,
                 json.dumps(data),
             )
         except Exception as e:

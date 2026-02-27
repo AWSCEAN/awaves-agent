@@ -5,6 +5,7 @@ import { useLocale } from 'next-intl';
 import type { SurfInfo, SavedListItem } from '@/types';
 import { useSwipeDown } from '@/hooks/useSwipeDown';
 import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, getMetricsForLevel, surferLevelToKey } from '@/lib/services/surfInfoService';
+import { surfService } from '@/lib/apiServices';
 
 interface SpotDetailPanelProps {
   surfInfo: SurfInfo;
@@ -50,7 +51,9 @@ export default function SpotDetailPanel({
   const locale = useLocale();
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [forecastView, setForecastView] = useState<'table' | 'chart'>('table');
+  const [forecastView, setForecastView] = useState<'table' | 'chart'>('chart');
+  const [llmStatus, setLlmStatus] = useState<'idle' | 'loading' | 'success' | 'failed'>('idle');
+  const [llmAdvice, setLlmAdvice] = useState<{ ko: string; en: string } | null>(null);
   const swipe = useSwipeDown(onClose);
 
   // Mobile drag-to-resize state (30–85 vh range, default 40vh)
@@ -71,6 +74,46 @@ export default function SpotDetailPanel({
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, []);
+
+  // LLM summary polling
+  useEffect(() => {
+    setLlmStatus('loading');
+    setLlmAdvice(null);
+    let stopped = false;
+
+    const poll = async () => {
+      const effectiveLvl = ((surfInfo as unknown as { displayLevel?: string }).displayLevel) || surferLevel || 'INTERMEDIATE';
+      const res = await surfService.getLlmSummary(
+        surfInfo.locationId,
+        surfInfo.surfTimestamp,
+        effectiveLvl.toUpperCase(),
+      );
+      if (stopped) return;
+      if (res.success && res.data) {
+        if (res.data.status === 'success' && res.data.advice) {
+          setLlmAdvice(res.data.advice);
+          setLlmStatus('success');
+          return;
+        }
+        if (res.data.status === 'failed') {
+          setLlmStatus('failed');
+          return;
+        }
+      }
+      // Still loading — schedule next poll
+      if (!stopped) {
+        timerId = window.setTimeout(poll, 3000);
+      }
+    };
+
+    let timerId: number | undefined;
+    poll();
+
+    return () => {
+      stopped = true;
+      if (timerId) clearTimeout(timerId);
+    };
+  }, [surfInfo.locationId, surfInfo.surfTimestamp, surferLevel]);
 
   const handleResizeStart = useCallback((e: React.PointerEvent) => {
     dragStartY.current = e.clientY;
@@ -368,6 +411,29 @@ export default function SpotDetailPanel({
               <div className="font-bold text-ocean-800">{waterTemperature.toFixed(1)}°C</div>
             </div>
           </div>
+        </div>
+
+        {/* AI Surf Advice */}
+        <div className="bg-sand-50 rounded-xl p-2.5">
+          <h4 className="text-sm font-semibold text-ocean-800 mb-1 flex items-center gap-2">
+            <span className="text-base">🤖</span>
+            {locale === 'ko' ? 'AI 서핑 조언' : 'AI Surf Advice'}
+          </h4>
+          {llmStatus === 'loading' && (
+            <div className="animate-pulse text-xs text-ocean-500 py-2">
+              {locale === 'ko' ? '조건 분석 중...' : 'Analyzing conditions...'}
+            </div>
+          )}
+          {llmStatus === 'success' && llmAdvice && (
+            <p className="text-xs text-ocean-700 leading-relaxed py-1">
+              {locale === 'ko' ? llmAdvice.ko : llmAdvice.en}
+            </p>
+          )}
+          {llmStatus === 'failed' && (
+            <p className="text-xs text-ocean-400 py-2">
+              {locale === 'ko' ? '조언을 불러올 수 없습니다' : 'Could not generate advice'}
+            </p>
+          )}
         </div>
 
         {/* Hourly Forecast - Table or Chart */}
