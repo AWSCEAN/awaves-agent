@@ -287,14 +287,14 @@ jobs:
       - name: Debug — verify assumed identity
         run: aws sts get-caller-identity
 
+      - name: Debug — describe cluster directly
+        run: aws eks describe-cluster --name awaves-dev --region us-east-1 --query 'cluster.name'
+
       - name: Install Helm
         uses: azure/setup-helm@v4
 
       - name: Update kubeconfig
-        run: |
-          aws eks update-kubeconfig \
-            --region $AWS_REGION \
-            --name ${{ vars.EKS_CLUSTER_NAME }}
+        run: aws eks update-kubeconfig --region us-east-1 --name awaves-dev
 
       - name: Helm deploy backend
         run: |
@@ -323,10 +323,7 @@ jobs:
         uses: azure/setup-helm@v4
 
       - name: Update kubeconfig
-        run: |
-          aws eks update-kubeconfig \
-            --region $AWS_REGION \
-            --name ${{ vars.EKS_CLUSTER_NAME }}
+        run: aws eks update-kubeconfig --region us-east-1 --name awaves-dev
 
       - name: Helm deploy web
         run: |
@@ -355,10 +352,7 @@ jobs:
         uses: azure/setup-helm@v4
 
       - name: Update kubeconfig
-        run: |
-          aws eks update-kubeconfig \
-            --region $AWS_REGION \
-            --name ${{ vars.EKS_CLUSTER_NAME }}
+        run: aws eks update-kubeconfig --region us-east-1 --name awaves-dev
 
       - name: Helm deploy mobile
         run: |
