@@ -296,8 +296,17 @@ jobs:
             --namespace api \
             --set image.tag=${{ github.sha }} \
             --create-namespace \
-            --rollback-on-failure \
-            --timeout 5m
+            --timeout 10m
+
+      - name: Debug — pod logs after deploy attempt
+        if: always()
+        run: |
+          echo "=== Pods ==="
+          kubectl get pods -n api -o wide
+          echo "=== Pod logs ==="
+          kubectl logs -n api -l app=fastapi-api --tail=80 --ignore-errors || true
+          echo "=== Pod events ==="
+          kubectl describe pods -n api -l app=fastapi-api | tail -40
 
   # ── CD: deploy web via Helm ──────────────────────────────────────────────────
   deploy-web:
