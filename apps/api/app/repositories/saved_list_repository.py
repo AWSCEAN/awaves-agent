@@ -94,7 +94,6 @@ class SavedListRepository(BaseDynamoDBRepository):
         surfer_level: str,
         surf_score: float,
         surf_grade: float,
-        surf_safety_grade: str,
         address: Optional[str] = None,
         region: Optional[str] = None,
         country: Optional[str] = None,
@@ -116,7 +115,6 @@ class SavedListRepository(BaseDynamoDBRepository):
             "surferLevel": {"S": surfer_level},
             "surfScore": {"N": str(surf_score)},
             "surfGrade": {"N": str(surf_grade)},
-            "surfSafetyGrade": {"S": surf_safety_grade},
             "flagChange": {"BOOL": False},
         }
 

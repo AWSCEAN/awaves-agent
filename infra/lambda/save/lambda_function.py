@@ -30,8 +30,7 @@ ElastiCache key: awaves:surf:latest:{locationId}
 Saved-spot change detection:
   After writing surf data, scans awaves-dev-saved-list for users who have
   saved spots at each updated location, flags changed items with
-  flagChange=true, refreshes surfScore/surfGrade/surfSafetyGrade and
-  conditions, and invalidates their saved cache.
+  flagChange=true + changeMessage JSON, and invalidates their saved cache.
 """
 
 import csv
@@ -182,7 +181,7 @@ def _detect_and_flag_changes(latest_per_location, r):
 
         # Paginated scan: find all saved items for this location
         saved_items = []
-        scan_kwargs = {"FilterExpression": Attr("locationId").eq(location_id)}
+        scan_kwargs = {"FilterExpression": Attr("LocationId").eq(location_id)}
         while True:
             resp = tbl.scan(**scan_kwargs)
             saved_items.extend(resp.get("Items", []))
@@ -201,12 +200,12 @@ def _detect_and_flag_changes(latest_per_location, r):
             if not user_id or not sort_key:
                 continue
 
-            # Map the user's surferLevel directly to derivedMetrics key
+            # Map the user's SurferLevel directly to derivedMetrics key
             # (BEGINNER | INTERMEDIATE | ADVANCED — 1:1 match)
-            surfer_level = item.get("surferLevel", "BEGINNER")
+            surfer_level = item.get("SurferLevel", "BEGINNER")
             level_data = new_derived.get(surfer_level) or new_derived.get("BEGINNER", {})
             new_score = level_data.get("surfScore", 0.0)
-            new_safety_grade = level_data.get("surfGrade", "F")  # string letter grade → surfSafetyGrade
+            new_grade = level_data.get("surfGrade", "F")
 
             # Compare the 5 tracked metrics
             comparisons = [
@@ -216,7 +215,6 @@ def _detect_and_flag_changes(latest_per_location, r):
                 ("windSpeed",        item.get("windSpeed"),        new_conditions["windSpeed"]),
                 ("waterTemperature", item.get("waterTemperature"), new_conditions["waterTemperature"]),
             ]
-            # surfGrade (float) and surfSafetyGrade (string) are always refreshed alongside surfScore
             changes = []
             for field, old_val, new_val in comparisons:
                 if old_val is not None and _has_significant_change(old_val, new_val):
@@ -230,20 +228,21 @@ def _detect_and_flag_changes(latest_per_location, r):
                 continue
 
             # Flag the saved item with the latest values
+            change_message = json.dumps({"changes": changes})
             try:
                 tbl.update_item(
                     Key={"userId": user_id, "sortKey": sort_key},
                     UpdateExpression=(
-                        "SET flagChange = :fc, "
-                        "surfScore = :ss, surfGrade = :sg, surfSafetyGrade = :ssg, "
+                        "SET flagChange = :fc, changeMessage = :cm, "
+                        "surfScore = :ss, surfGrade = :sg, "
                         "waveHeight = :wh, wavePeriod = :wp, "
                         "windSpeed = :ws, waterTemperature = :wt"
                     ),
                     ExpressionAttributeValues={
                         ":fc": True,
+                        ":cm": change_message,
                         ":ss": _to_decimal(new_score),
-                        ":sg": _to_decimal(new_score),  # surfGrade is now float (same scale as surfScore)
-                        ":ssg": new_safety_grade,        # surfSafetyGrade is the letter grade string
+                        ":sg": new_grade,
                         ":wh": _to_decimal(new_conditions["waveHeight"]),
                         ":wp": _to_decimal(new_conditions["wavePeriod"]),
                         ":ws": _to_decimal(new_conditions["windSpeed"]),
