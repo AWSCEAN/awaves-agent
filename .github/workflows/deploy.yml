@@ -301,7 +301,8 @@ jobs:
           helm upgrade --install awaves-backend ./infra/helm/backend \
             --namespace api \
             --set image.tag=${{ github.sha }} \
-            --atomic \
+            --create-namespace \
+            --rollback-on-failure \
             --timeout 5m
 
   # ── CD: deploy web via Helm ──────────────────────────────────────────────────
@@ -330,7 +331,8 @@ jobs:
           helm upgrade --install awaves-web ./infra/helm/web \
             --namespace web \
             --set image.tag=${{ github.sha }} \
-            --atomic \
+            --create-namespace \
+            --rollback-on-failure \
             --timeout 5m
 
   # ── CD: deploy mobile via Helm ───────────────────────────────────────────────
@@ -359,5 +361,6 @@ jobs:
           helm upgrade --install awaves-mobile ./infra/helm/mobile \
             --namespace mobile \
             --set image.tag=${{ github.sha }} \
-            --atomic \
+            --create-namespace \
+            --rollback-on-failure \
             --timeout 5m
