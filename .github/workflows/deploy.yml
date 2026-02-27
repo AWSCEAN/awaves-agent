@@ -110,9 +110,10 @@ jobs:
           python-version: '3.11'
 
       - name: Run backend tests
+        working-directory: apps/api
         run: |
-          pip install -r apps/api/requirements.txt
-          pytest apps/api/tests/ -v
+          pip install -r requirements.txt
+          pytest tests/ -v
 
   # ── Build backend ────────────────────────────────────────────────────────────
   build-backend:
