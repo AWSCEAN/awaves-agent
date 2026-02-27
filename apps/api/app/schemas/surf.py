@@ -69,6 +69,7 @@ class ConditionsResponse(BaseModel):
 class LevelMetricsResponse(BaseModel):
     surfScore: float = 0
     surfGrade: str = "D"
+    surfGradeNumeric: float = 0.0
 
 
 class DerivedMetricsResponse(BaseModel):

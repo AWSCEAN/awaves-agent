@@ -438,19 +438,29 @@ class SurfDataRepository(BaseDynamoDBRepository):
             level_data = derived.get(level, {}).get("M", {})
             if level_data:
                 raw_grade = level_data.get("surfGrade", {}).get("S", "0")
+                try:
+                    grade_numeric = float(raw_grade)
+                except (ValueError, TypeError):
+                    grade_numeric = 0.0
                 derived_metrics[level] = {
                     "surfScore": float(level_data.get("surfScore", {}).get("N", "0")),
                     "surfGrade": cls._numeric_grade_to_letter(raw_grade),
+                    "surfGradeNumeric": grade_numeric,
                 }
         # Fallback for old flat format
         if not derived_metrics:
             raw_grade = derived.get("surfGrade", {}).get("S", "D")
             letter_grade = cls._numeric_grade_to_letter(raw_grade)
+            try:
+                grade_numeric = float(raw_grade)
+            except (ValueError, TypeError):
+                grade_numeric = 0.0
             flat_score = float(derived.get("surfScore", {}).get("N", "0"))
             for level in ("BEGINNER", "INTERMEDIATE", "ADVANCED"):
                 derived_metrics[level] = {
                     "surfScore": flat_score,
                     "surfGrade": letter_grade,
+                    "surfGradeNumeric": grade_numeric,
                 }
 
         display_name = location.get("displayName", {}).get("S", "")
