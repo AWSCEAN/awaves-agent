@@ -13,7 +13,7 @@ class FeedbackResult:
     id: int
     user_id: int
     location_id: str
-    surf_timestamp: str
+    surf_timestamp: datetime
     feedback_result: Optional[bool] = None
     feedback_status: FeedbackStatus
     created_at: datetime
@@ -46,5 +46,5 @@ class FeedbackInput:
     """Input for submitting feedback."""
 
     location_id: str
-    surf_timestamp: str
+    surf_timestamp: datetime
     feedback_status: FeedbackStatus

@@ -2,7 +2,9 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
+
+from app.core.exceptions import ConflictException, NotFoundException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.schemas.surf import SavedSpotRequest, SavedSpotResponse
@@ -42,10 +44,7 @@ async def save_spot(
     user_saved = MOCK_SAVED_SPOTS.get(user_id, [])
     for saved in user_saved:
         if saved["spot_id"] == request.spot_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Spot already saved",
-            )
+            raise ConflictException(message="Spot already saved")
 
     # Create saved spot
     saved_spot = {
@@ -75,10 +74,7 @@ async def remove_saved_spot(
             del MOCK_SAVED_SPOTS[user_id][i]
             return
 
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail="Saved spot not found",
-    )
+    raise NotFoundException(message="Saved spot not found")
 
 
 @router.patch("/{saved_id}", response_model=SavedSpotResponse)
@@ -95,7 +91,4 @@ async def update_saved_spot(
                 saved["notes"] = notes
             return SavedSpotResponse(**saved)
 
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail="Saved spot not found",
-    )
+    raise NotFoundException(message="Saved spot not found")

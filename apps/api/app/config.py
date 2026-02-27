@@ -62,8 +62,20 @@ class Settings(BaseSettings):
     port: int = 8001
     debug: bool = False
 
-    # Database
+    # Database — single URL (local/dev) or component-based (production)
     database_url: str = ""
+
+    # Production: component-based writer/reader URLs
+    db_writer_host: str = ""
+    db_reader_host: str = ""
+    db_port: int = 5432
+    db_name: str = ""
+    db_writer_user: str = ""
+    db_reader_user: str = ""
+    db_writer_password: str = ""
+    db_reader_password: str = ""
+    db_ssl_mode: str = ""
+    db_ssl_root_cert: str = ""
 
     # Redis/Cache
     cache_url: str = ""
@@ -102,6 +114,30 @@ class Settings(BaseSettings):
 
     # CORS
     cors_origins: str = ""
+
+    @property
+    def db_writer_url(self) -> str:
+        """Get writer database URL. Falls back to DATABASE_URL for local/dev."""
+        if self.db_writer_host:
+            password = self.db_writer_password
+            ssl_query = f"?ssl=verify-full&ssl_min_protocol_version=TLSv1.2" if self.db_ssl_mode else ""
+            return (
+                f"postgresql+asyncpg://{self.db_writer_user}:{password}"
+                f"@{self.db_writer_host}:{self.db_port}/{self.db_name}{ssl_query}"
+            )
+        return self.database_url
+
+    @property
+    def db_reader_url(self) -> str:
+        """Get reader database URL. Falls back to DATABASE_URL for local/dev."""
+        if self.db_reader_host:
+            password = self.db_reader_password
+            ssl_query = f"?ssl=verify-full&ssl_min_protocol_version=TLSv1.2" if self.db_ssl_mode else ""
+            return (
+                f"postgresql+asyncpg://{self.db_reader_user}:{password}"
+                f"@{self.db_reader_host}:{self.db_port}/{self.db_name}{ssl_query}"
+            )
+        return self.database_url
 
     @property
     def cors_origins_list(self) -> list[str]:

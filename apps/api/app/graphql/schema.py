@@ -1,12 +1,20 @@
 """Main GraphQL schema definition."""
 
-import strawberry
-from typing import Optional
-from fastapi import Depends, Request
-from strawberry.fastapi import GraphQLRouter
-from sqlalchemy.ext.asyncio import AsyncSession
+import logging
+from typing import AsyncGenerator, List, Optional
 
-from app.db.session import get_db
+import strawberry
+from datetime import datetime
+from fastapi import Request
+from graphql import GraphQLError
+from strawberry.fastapi import GraphQLRouter
+from strawberry.extensions import SchemaExtension
+from strawberry.http import GraphQLHTTPResponse
+from strawberry.types import ExecutionContext, ExecutionResult
+
+from app.config import settings
+from app.core.exceptions import BaseAppException, UnauthorizedException
+from app.db.session import create_writer_session, create_reader_session
 from app.services.auth import AuthService
 from app.graphql.context import GraphQLContext
 from app.graphql.types.user import User
@@ -49,7 +57,7 @@ class Query:
         self,
         info: strawberry.Info[GraphQLContext, None],
         location_id: str,
-        surf_timestamp: str,
+        surf_timestamp: datetime,
     ) -> Optional[FeedbackResult]:
         """Get feedback for a saved item."""
         return await feedback_resolvers.get_feedback(info, location_id, surf_timestamp)
@@ -137,28 +145,129 @@ class Mutation:
         return await feedback_resolvers.submit_feedback(info, input)
 
 
-schema = strawberry.Schema(query=Query, mutation=Mutation)
+_logger = logging.getLogger(__name__)
+
+
+class SessionCleanupExtension(SchemaExtension):
+    """Close DB sessions after each GraphQL request to prevent connection leaks."""
+
+    async def on_execute(self) -> AsyncGenerator[None, None]:
+        yield
+        context = self.execution_context.context
+        if hasattr(context, "close"):
+            try:
+                await context.close()
+            except Exception as e:
+                _logger.warning("Failed to close GraphQL DB sessions: %s", e)
+
+
+def process_graphql_errors(
+    errors: List[GraphQLError],
+    execution_context: Optional[ExecutionContext] = None,
+) -> List[GraphQLError]:
+    """Format GraphQL errors consistently.
+
+    - Maps BaseAppException to structured extensions
+    - Maps "Not authenticated" to UNAUTHORIZED
+    - Hides internal details in production
+    """
+    processed: List[GraphQLError] = []
+    for error in errors:
+        original = error.original_error
+
+        if original is None:
+            # GraphQL syntax / validation error — pass through
+            processed.append(error)
+            continue
+
+        if isinstance(original, BaseAppException):
+            app_exc = original
+        elif "Not authenticated" in str(original):
+            app_exc = UnauthorizedException(message="Not authenticated")
+        else:
+            _logger.error(
+                "Unhandled GraphQL error: %s",
+                str(original),
+                exc_info=original,
+            )
+            app_exc = None
+
+        if app_exc is not None:
+            processed.append(
+                GraphQLError(
+                    message=app_exc.message,
+                    nodes=error.nodes,
+                    path=error.path,
+                    extensions={
+                        "code": app_exc.error_code,
+                        "status_code": app_exc.status_code,
+                    },
+                )
+            )
+        else:
+            msg = (
+                f"{type(original).__name__}: {original}"
+                if settings.env in ("local", "dev", "development")
+                else "An unexpected error occurred"
+            )
+            processed.append(
+                GraphQLError(
+                    message=msg,
+                    nodes=error.nodes,
+                    path=error.path,
+                    extensions={"code": "INTERNAL_ERROR"},
+                )
+            )
+
+    return processed
+
+
+schema = strawberry.Schema(
+    query=Query,
+    mutation=Mutation,
+    extensions=[SessionCleanupExtension],
+)
 
 
 async def get_context(
     request: Request,
 ) -> GraphQLContext:
-    """Create GraphQL context with auth and database session."""
-    # Get database session
-    async for db in get_db():
-        # Extract and validate JWT from Authorization header
-        auth_header = request.headers.get("Authorization")
-        user_id = None
+    """Create GraphQL context with writer/reader database sessions.
 
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header[7:]
-            auth_service = AuthService(db)
-            user_id = await auth_service.verify_access_token(token)
+    Sessions are created directly from the factory (not via FastAPI Depends
+    generators) so they stay open for the lifetime of the GraphQL request.
+    Cleanup is handled by SessionCleanupExtension.on_execute.
+    """
+    db = create_writer_session()
+    db_read = create_reader_session()
 
-        return GraphQLContext(db=db, user_id=user_id)
+    # Extract and validate JWT from Authorization header
+    auth_header = request.headers.get("Authorization")
+    user_id = None
+
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        auth_service = AuthService(db_read)
+        user_id = await auth_service.verify_access_token(token)
+
+    return GraphQLContext(db=db, db_read=db_read, user_id=user_id)
 
 
-graphql_app = GraphQLRouter(
+class ErrorFormattingGraphQLRouter(GraphQLRouter):
+    """GraphQLRouter that formats errors through process_graphql_errors."""
+
+    async def process_result(
+        self, request: Request, result: ExecutionResult,
+    ) -> GraphQLHTTPResponse:
+        if result.errors:
+            result = ExecutionResult(
+                data=result.data,
+                errors=process_graphql_errors(result.errors),
+            )
+        return await super().process_result(request, result)
+
+
+graphql_app = ErrorFormattingGraphQLRouter(
     schema,
     context_getter=get_context,
 )

@@ -5,6 +5,8 @@ from typing import Optional
 from strawberry.types import Info
 from sqlalchemy import select
 
+from app.core.exceptions import UnauthorizedException
+from app.core.timezone import now_kst
 from app.graphql.context import GraphQLContext
 from app.graphql.types.feedback import FeedbackResult, FeedbackResponse, FeedbackInput
 from app.graphql.types.saved import FeedbackStatus
@@ -17,17 +19,20 @@ async def submit_feedback(
 ) -> FeedbackResponse:
     """Submit feedback for a saved item."""
     if not info.context.is_authenticated:
-        raise Exception("Not authenticated")
+        raise UnauthorizedException(message="Not authenticated")
 
     user_id = info.context.user_id
     session = info.context.db
+
+    # Strip timezone info — DB column is TIMESTAMP WITHOUT TIME ZONE
+    surf_ts = input.surf_timestamp.replace(tzinfo=None)
 
     # Check if feedback already exists
     existing = await session.execute(
         select(Feedback).where(
             Feedback.user_id == user_id,
             Feedback.location_id == input.location_id,
-            Feedback.surf_timestamp == input.surf_timestamp,
+            Feedback.surf_timestamp == surf_ts,
         )
     )
     if existing.scalar_one_or_none():
@@ -46,10 +51,10 @@ async def submit_feedback(
     feedback = Feedback(
         user_id=user_id,
         location_id=input.location_id,
-        surf_timestamp=input.surf_timestamp,
+        surf_timestamp=surf_ts,
         feedback_result=feedback_result,
         feedback_status=input.feedback_status.value,
-        created_at=datetime.utcnow(),
+        created_at=now_kst(),
     )
 
     session.add(feedback)
@@ -65,20 +70,23 @@ async def submit_feedback(
 async def get_feedback(
     info: Info[GraphQLContext, None],
     location_id: str,
-    surf_timestamp: str,
+    surf_timestamp: datetime,
 ) -> Optional[FeedbackResult]:
     """Get feedback for a saved item."""
     if not info.context.is_authenticated:
-        raise Exception("Not authenticated")
+        raise UnauthorizedException(message="Not authenticated")
 
     user_id = info.context.user_id
-    session = info.context.db
+    session = info.context.db_read  # read-only query → reader
+
+    # Strip timezone info — DB column is TIMESTAMP WITHOUT TIME ZONE
+    surf_ts = surf_timestamp.replace(tzinfo=None)
 
     result = await session.execute(
         select(Feedback).where(
             Feedback.user_id == user_id,
             Feedback.location_id == location_id,
-            Feedback.surf_timestamp == surf_timestamp,
+            Feedback.surf_timestamp == surf_ts,
         )
     )
     feedback = result.scalar_one_or_none()

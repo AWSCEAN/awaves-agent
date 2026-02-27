@@ -1,0 +1,366 @@
+# Deploy to AWS EKS — triggered on every push to main.
+#
+# ── One-time AWS setup (do this before the first run) ─────────────────────────
+#
+#  1. Create GitHub OIDC provider in IAM (one per AWS account):
+#       aws iam create-open-id-connect-provider \
+#         --url https://token.actions.githubusercontent.com \
+#         --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1 \
+#         --client-id-list sts.amazonaws.com
+#
+#  2. Create IAM role `awaves-dev-cicd-role` with trust policy:
+#       {
+#         "Version": "2012-10-17",
+#         "Statement": [{
+#           "Effect": "Allow",
+#           "Principal": {
+#             "Federated": "arn:aws:iam::107570140649:oidc-provider/token.actions.githubusercontent.com"
+#           },
+#           "Action": "sts:AssumeRoleWithWebIdentity",
+#           "Condition": {
+#             "StringEquals": {
+#               "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+#             },
+#             "StringLike": {
+#               "token.actions.githubusercontent.com:sub": "repo:AWSCEAN/awaves-agent:*"
+#             }
+#           }
+#         }]
+#       }
+#
+#  3. Attach permission policy to the role:
+#       aws iam attach-role-policy \
+#         --role-name awaves-dev-cicd-role \
+#         --policy-arn arn:aws:iam::107570140649:policy/awaves-dev-cicd-policy
+#
+#     The policy must include:
+#       ECR  — ecr:GetAuthorizationToken, ecr:BatchCheckLayerAvailability,
+#               ecr:InitiateLayerUpload, ecr:UploadLayerPart,
+#               ecr:CompleteLayerUpload, ecr:PutImage
+#               (scoped to the three ECR repo ARNs)
+#       EKS  — eks:DescribeCluster
+#               (required for aws eks update-kubeconfig — add if currently missing)
+#       S3   — s3:PutObject, s3:GetObject, s3:DeleteObject, s3:ListBucket
+#               (scoped to arn:aws:s3:::awaves-frontend-dev-107570140649 only)
+#       SNS  — sns:Publish
+#               (scoped to arn:aws:sns:us-east-1:107570140649:awaves-dev-alerts)
+#
+#  4. Grant the role Helm deploy access in EKS (least privilege — NOT system:masters).
+#     Create a scoped ClusterRole and map the IAM role via EKS access entry:
+#
+#       # Apply the ClusterRole once to the cluster:
+#       kubectl apply -f - <<EOF
+#       apiVersion: rbac.authorization.k8s.io/v1
+#       kind: ClusterRole
+#       metadata:
+#         name: helm-deployer
+#       rules:
+#         - apiGroups: ["", "apps", "autoscaling", "networking.k8s.io",
+#                       "external-secrets.io"]
+#           resources: ["deployments", "services", "configmaps",
+#                       "horizontalpodautoscalers", "ingresses",
+#                       "serviceaccounts", "externalsecrets"]
+#           verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+#       EOF
+#
+#       # Map the IAM role via EKS access entry (EKS 1.23+):
+#       aws eks create-access-entry \
+#         --cluster-name <EKS_CLUSTER_NAME> \
+#         --principal-arn arn:aws:iam::107570140649:role/awaves-dev-cicd-role \
+#         --type STANDARD \
+#         --kubernetes-groups helm-deployer
+#
+# ── GitHub repository setup ────────────────────────────────────────────────────
+#
+#  Variables (Settings → Secrets and variables → Actions → Variables):
+#    EKS_CLUSTER_NAME           — your EKS cluster name (e.g. awaves-dev-eks)
+#    NEXT_PUBLIC_MAPBOX_TOKEN   — Mapbox public token (pk.eyJ1...) — not a secret
+#
+#  Secrets (Settings → Secrets and variables → Actions → Secrets):
+#    DISCORD_ALERT_SNS_ARN      — arn:aws:sns:us-east-1:107570140649:awaves-dev-alerts
+#
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: Deploy to AWS EKS
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ROLE_ARN: arn:aws:iam::107570140649:role/awaves-dev-cicd-role
+  ECR_BACKEND: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-backend-api
+  ECR_WEB: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-web-app
+  ECR_MOBILE: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-mobile-app
+  S3_BUCKET: awaves-frontend-dev-107570140649
+
+# Required for GitHub OIDC — no static AWS keys stored anywhere
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # ── Notify Discord: deployment triggered ─────────────────────────────────────
+  notify:
+    name: Notify Discord
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Publish deployment notification to SNS
+        run: |
+          aws sns publish \
+            --region $AWS_REGION \
+            --topic-arn ${{ secrets.DISCORD_ALERT_SNS_ARN }} \
+            --message "{\"type\":\"deployment\",\"branch\":\"${{ github.ref_name }}\",\"commit\":\"${{ github.sha }}\",\"actor\":\"${{ github.actor }}\",\"repo\":\"${{ github.repository }}\"}"
+
+  # ── CI: run tests before any build ──────────────────────────────────────────
+  ci:
+    name: Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: awaves_writer
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: awaves
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      ENV: local
+      DATABASE_URL: postgresql+asyncpg://awaves_writer:testpass@localhost:5432/awaves
+      JWT_SECRET_KEY: ci-test-secret-key
+      CORS_ORIGINS: http://localhost:3000
+      AWS_REGION: us-east-1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run backend tests
+        working-directory: apps/api
+        run: |
+          pip install -r requirements.txt
+          pytest tests/ -v
+
+  # ── Build backend ────────────────────────────────────────────────────────────
+  build-backend:
+    name: Build backend image
+    needs: ci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push backend image
+        run: |
+          docker build \
+            -t $ECR_BACKEND:${{ github.sha }} \
+            -t $ECR_BACKEND:latest \
+            apps/api/
+
+          docker push $ECR_BACKEND:${{ github.sha }}
+          docker push $ECR_BACKEND:latest
+
+  # ── Build web + S3 static asset sync ────────────────────────────────────────
+  build-web:
+    name: Build web image + S3 sync
+    needs: ci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build web image
+        # NEXT_PUBLIC_* vars must be build-args — Next.js inlines them into JS
+        # bundles at build time. Setting them in K8s env has no effect.
+        run: |
+          docker build \
+            -f apps/web/Dockerfile \
+            --build-arg NEXT_PUBLIC_API_URL=https://api.awaves.net \
+            --build-arg NEXT_PUBLIC_CDN_URL=https://cdn.awaves.net \
+            --build-arg NEXT_PUBLIC_MAPBOX_TOKEN=${{ vars.NEXT_PUBLIC_MAPBOX_TOKEN }} \
+            -t $ECR_WEB:${{ github.sha }} \
+            -t $ECR_WEB:latest \
+            .
+
+      - name: Push web image
+        run: |
+          docker push $ECR_WEB:${{ github.sha }}
+          docker push $ECR_WEB:latest
+
+      - name: Extract static assets and sync to S3
+        # Files are content-hashed — immutable cache is safe.
+        # No CloudFront invalidation needed: new hashes = new cache keys.
+        run: |
+          CONTAINER_ID=$(docker create $ECR_WEB:${{ github.sha }})
+          docker cp $CONTAINER_ID:/app/apps/web/.next/static ./static-out
+          docker rm $CONTAINER_ID
+
+          aws s3 sync ./static-out \
+            s3://$S3_BUCKET/_next/static/ \
+            --cache-control "public, max-age=31536000, immutable" \
+            --delete \
+            --region $AWS_REGION
+
+  # ── Build mobile ─────────────────────────────────────────────────────────────
+  build-mobile:
+    name: Build mobile image
+    needs: ci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push mobile image
+        # Same Dockerfile as web — two ECR repos, two deployments (Option A).
+        run: |
+          docker build \
+            -f apps/web/Dockerfile \
+            --build-arg NEXT_PUBLIC_API_URL=https://api.awaves.net \
+            --build-arg NEXT_PUBLIC_CDN_URL=https://cdn.awaves.net \
+            --build-arg NEXT_PUBLIC_MAPBOX_TOKEN=${{ vars.NEXT_PUBLIC_MAPBOX_TOKEN }} \
+            -t $ECR_MOBILE:${{ github.sha }} \
+            -t $ECR_MOBILE:latest \
+            .
+
+          docker push $ECR_MOBILE:${{ github.sha }}
+          docker push $ECR_MOBILE:latest
+
+  # ── CD: deploy backend via Helm ──────────────────────────────────────────────
+  deploy-backend:
+    name: Deploy backend
+    needs: build-backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --region $AWS_REGION \
+            --name ${{ vars.EKS_CLUSTER_NAME }}
+
+      - name: Helm deploy backend
+        run: |
+          helm upgrade --install awaves-backend ./infra/helm/backend \
+            --namespace api \
+            --set image.tag=${{ github.sha }} \
+            --atomic \
+            --timeout 5m
+
+  # ── CD: deploy web via Helm ──────────────────────────────────────────────────
+  deploy-web:
+    name: Deploy web
+    needs: build-web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --region $AWS_REGION \
+            --name ${{ vars.EKS_CLUSTER_NAME }}
+
+      - name: Helm deploy web
+        run: |
+          helm upgrade --install awaves-web ./infra/helm/web \
+            --namespace web \
+            --set image.tag=${{ github.sha }} \
+            --atomic \
+            --timeout 5m
+
+  # ── CD: deploy mobile via Helm ───────────────────────────────────────────────
+  deploy-mobile:
+    name: Deploy mobile
+    needs: build-mobile
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --region $AWS_REGION \
+            --name ${{ vars.EKS_CLUSTER_NAME }}
+
+      - name: Helm deploy mobile
+        run: |
+          helm upgrade --install awaves-mobile ./infra/helm/mobile \
+            --namespace mobile \
+            --set image.tag=${{ github.sha }} \
+            --atomic \
+            --timeout 5m

@@ -6,6 +6,7 @@ from typing import Optional
 from sqlalchemy import BigInteger, Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.timezone import now_kst
 from app.db.session import Base
 
 
@@ -21,7 +22,7 @@ class User(Base):
     privacy_consent_yn: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     last_login_dt: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
+        DateTime, default=now_kst, nullable=False
     )
 
     def __repr__(self) -> str:

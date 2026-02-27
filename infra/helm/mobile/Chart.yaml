@@ -1,0 +1,6 @@
+apiVersion: v2
+name: awaves-mobile
+description: Next.js mobile WebView frontend for awaves
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

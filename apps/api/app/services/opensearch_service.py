@@ -57,7 +57,9 @@ class OpenSearchService:
                 logger.error("OpenSearch connection failed: %s", e)
                 emit_external_api_failure("OpenSearch")
                 cls._available = False
-                cls._client = None
+                if cls._client:
+                    await cls._client.close()
+                    cls._client = None
                 return None
 
         return cls._client

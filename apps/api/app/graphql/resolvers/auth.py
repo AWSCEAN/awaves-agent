@@ -3,6 +3,7 @@
 import strawberry
 from strawberry.types import Info
 
+from app.core.exceptions import NotFoundException, UnauthorizedException
 from app.graphql.context import GraphQLContext
 from app.graphql.types.auth import AuthResponse, AuthTokens, LoginResult, LoginInput, RegisterInput, RefreshTokenInput
 from app.graphql.types.user import User
@@ -111,14 +112,14 @@ async def register(
 async def get_current_user(info: Info[GraphQLContext, None]) -> User:
     """Get current user query resolver."""
     if not info.context.is_authenticated:
-        raise Exception("Not authenticated")
+        raise UnauthorizedException(message="Not authenticated")
 
     from app.repositories.user_repository import UserRepository
 
-    user_repo = UserRepository(info.context.db)
+    user_repo = UserRepository(info.context.db_read)
     user = await user_repo.get_by_id(info.context.user_id)
 
     if not user:
-        raise Exception("User not found")
+        raise NotFoundException(message="User not found")
 
     return User.from_model(user)

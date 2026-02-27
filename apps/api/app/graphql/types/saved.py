@@ -33,7 +33,7 @@ class SavedItem:
     water_temperature: Optional[float] = None
     surfer_level: str
     surf_score: float
-    surf_grade: str
+    surf_grade: float
     flag_change: bool = False
     change_message: Optional[str] = None
     feedback_status: Optional[FeedbackStatus] = None
@@ -41,31 +41,31 @@ class SavedItem:
     @classmethod
     def from_dynamodb(cls, item: dict, feedback_status: Optional[str] = None) -> "SavedItem":
         """Create SavedItem from DynamoDB item."""
-        location_id = item.get("LocationId", "")
-        surf_timestamp = item.get("SurfTimestamp", "")
-        location_surf_key = item.get("SortKey", f"{location_id}#{surf_timestamp}")
+        location_id = item.get("locationId", "")
+        surf_timestamp = item.get("surfTimestamp", "")
+        location_surf_key = item.get("sortKey", f"{location_id}#{surf_timestamp}")
 
         fb_status = None
         if feedback_status:
             fb_status = FeedbackStatus(feedback_status)
 
         return cls(
-            user_id=item.get("UserId", ""),
+            user_id=item.get("userId", ""),
             location_surf_key=location_surf_key,
             location_id=location_id,
             surf_timestamp=surf_timestamp,
-            saved_at=item.get("SavedAt", ""),
-            departure_date=item.get("DepartureDate"),
-            address=item.get("Address"),
-            region=item.get("Region"),
-            country=item.get("Country"),
+            saved_at=item.get("savedAt", ""),
+            departure_date=item.get("departureDate"),
+            address=item.get("address"),
+            region=item.get("region"),
+            country=item.get("country"),
             wave_height=item.get("waveHeight"),
             wave_period=item.get("wavePeriod"),
             wind_speed=item.get("windSpeed"),
             water_temperature=item.get("waterTemperature"),
-            surfer_level=item.get("SurferLevel", ""),
+            surfer_level=item.get("surferLevel", ""),
             surf_score=item.get("surfScore", 0),
-            surf_grade=item.get("surfGrade", ""),
+            surf_grade=float(item.get("surfGrade", 0)),
             flag_change=item.get("flagChange", False),
             change_message=item.get("changeMessage"),
             feedback_status=fb_status,
@@ -105,7 +105,7 @@ class SaveItemInput:
     water_temperature: Optional[float] = None
     surfer_level: str
     surf_score: float
-    surf_grade: str
+    surf_grade: float
 
 
 @strawberry.input

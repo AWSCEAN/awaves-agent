@@ -1,8 +1,10 @@
 """Saved items resolvers for GraphQL."""
 
 from datetime import datetime
+from dateutil.parser import isoparse
 from strawberry.types import Info
 
+from app.core.exceptions import NotFoundException, UnauthorizedException
 from app.graphql.context import GraphQLContext
 from app.graphql.types.saved import (
     SavedItem,
@@ -19,7 +21,7 @@ from app.services.cache import SavedItemsCacheService as CacheService
 async def get_saved_items(info: Info[GraphQLContext, None]) -> SavedListResult:
     """Get all saved items for the current user."""
     if not info.context.is_authenticated:
-        raise Exception("Not authenticated")
+        raise UnauthorizedException(message="Not authenticated")
 
     user_id = str(info.context.user_id)
 
@@ -41,9 +43,14 @@ async def get_saved_items(info: Info[GraphQLContext, None]) -> SavedListResult:
     # Build response with joined data
     items = []
     for item in db_items:
-        location_id = item.get("LocationId", "")
-        surf_timestamp = item.get("SurfTimestamp", "")
-        key = f"{location_id}#{surf_timestamp}"
+        location_id = item.get("locationId", "")
+        surf_timestamp_raw = item.get("surfTimestamp", "")
+        # Normalize to naive datetime isoformat to match feedback DataLoader keys
+        try:
+            normalized_ts = isoparse(surf_timestamp_raw).replace(tzinfo=None).isoformat()
+        except (ValueError, TypeError):
+            normalized_ts = surf_timestamp_raw
+        key = f"{location_id}#{normalized_ts}"
         feedback_status = feedback_map.get(key)
         items.append(SavedItem.from_dynamodb(item, feedback_status))
 
@@ -57,7 +64,7 @@ async def get_saved_item(
 ) -> SavedItem:
     """Get a specific saved item."""
     if not info.context.is_authenticated:
-        raise Exception("Not authenticated")
+        raise UnauthorizedException(message="Not authenticated")
 
     user_id = str(info.context.user_id)
 
@@ -68,7 +75,7 @@ async def get_saved_item(
     )
 
     if not item:
-        raise Exception("Saved item not found")
+        raise NotFoundException(message="Saved item not found")
 
     return SavedItem.from_dynamodb(item)
 
@@ -79,7 +86,7 @@ async def save_item(
 ) -> SavedItemResponse:
     """Save a surf location."""
     if not info.context.is_authenticated:
-        raise Exception("Not authenticated")
+        raise UnauthorizedException(message="Not authenticated")
 
     user_id = str(info.context.user_id)
     saved_at = datetime.utcnow().isoformat() + "Z"
@@ -122,7 +129,7 @@ async def delete_saved_item(
 ) -> bool:
     """Delete a saved item."""
     if not info.context.is_authenticated:
-        raise Exception("Not authenticated")
+        raise UnauthorizedException(message="Not authenticated")
 
     user_id = str(info.context.user_id)
 
@@ -145,7 +152,7 @@ async def acknowledge_change(
 ) -> bool:
     """Acknowledge a change notification."""
     if not info.context.is_authenticated:
-        raise Exception("Not authenticated")
+        raise UnauthorizedException(message="Not authenticated")
 
     user_id = str(info.context.user_id)
 

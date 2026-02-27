@@ -142,14 +142,14 @@ def update_dynamodb(dynamodb_resource, locations: list[dict], dry_run: bool = Fa
                     "locationId": loc["locationId"],
                     "lat": Decimal(str(loc["lat"])),
                     "lon": Decimal(str(loc["lon"])),
-                    "display_name": loc["display_name"],
+                    "displayName": loc["display_name"],
                     "city": loc["city"],
                     "state": loc["state"],
                     "country": loc["country"],
-                    "display_name_ko": loc.get("display_name_ko", ""),
-                    "city_ko": loc.get("city_ko", ""),
-                    "state_ko": loc.get("state_ko", ""),
-                    "country_ko": loc.get("country_ko", ""),
+                    "displayNameKo": loc.get("display_name_ko", ""),
+                    "cityKo": loc.get("city_ko", ""),
+                    "stateKo": loc.get("state_ko", ""),
+                    "countryKo": loc.get("country_ko", ""),
                 }
                 batch.put_item(Item=item)
                 stats["updated"] += 1

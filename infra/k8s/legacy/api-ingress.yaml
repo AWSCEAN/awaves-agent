@@ -15,7 +15,7 @@ metadata:
     kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/certificate-arn: <ACM_CERT_ARN>
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:elasticloadbalancing:us-east-1:107570140649:loadbalancer/app/k8s-awavesde-webappin-35d6501f04/501ecb569eeabe20
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
     alb.ingress.kubernetes.io/group.name: awaves-frontend
     alb.ingress.kubernetes.io/group.order: "3"

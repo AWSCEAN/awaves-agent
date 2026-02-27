@@ -203,20 +203,20 @@ def ingest_to_dynamodb(dynamodb_resource, locations: list[dict]):
                 "locationId": loc["locationId"],
                 "lat": Decimal(str(loc["lat"])),
                 "lon": Decimal(str(loc["lon"])),
-                "display_name": loc["display_name"],
+                "displayName": loc["display_name"],
                 "city": loc["city"],
                 "state": loc["state"],
                 "country": loc["country"],
             }
             # Add Korean fields if present
             if loc.get("display_name_ko"):
-                item["display_name_ko"] = loc["display_name_ko"]
+                item["displayNameKo"] = loc["display_name_ko"]
             if loc.get("city_ko"):
-                item["city_ko"] = loc["city_ko"]
+                item["cityKo"] = loc["city_ko"]
             if loc.get("state_ko"):
-                item["state_ko"] = loc["state_ko"]
+                item["stateKo"] = loc["state_ko"]
             if loc.get("country_ko"):
-                item["country_ko"] = loc["country_ko"]
+                item["countryKo"] = loc["country_ko"]
 
             batch.put_item(Item=item)
             count += 1

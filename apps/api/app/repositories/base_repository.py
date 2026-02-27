@@ -26,6 +26,9 @@ def dynamodb_subsegment(name: str = "DynamoDB_Query"):
         return
 
     subsegment = recorder.begin_subsegment(name)
+    if subsegment is None:
+        yield
+        return
     try:
         yield
     except Exception as exc:

@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 
+from app.core.timezone import now_kst
 from app.services.cache.base import BaseCacheService, _redis_subsegment
 from app.middleware.metrics import emit_cache_hit, emit_cache_miss
 
@@ -39,7 +40,7 @@ class AuthCacheService(BaseCacheService):
                 "token": token,
                 "expiresAt": expires_at.isoformat(),
             })
-            ttl = int((expires_at - datetime.utcnow()).total_seconds())
+            ttl = int((expires_at - now_kst()).total_seconds())
             if ttl > 0:
                 await client.setex(key, ttl, value)
         except Exception as e:

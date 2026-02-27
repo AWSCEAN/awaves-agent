@@ -1,0 +1,35 @@
+image:
+  repository: 107570140649.dkr.ecr.us-east-1.amazonaws.com/awaves-dev-web-app
+  tag: latest
+  pullPolicy: Always
+
+replicaCount: 2
+
+service:
+  port: 80
+  targetPort: 3000
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "256Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+hpa:
+  minReplicas: 2
+  maxReplicas: 10
+  cpuUtilization: 70
+
+ingress:
+  host: web.awaves.net
+  certificateArn: "arn:aws:acm:us-east-1:107570140649:certificate/38c63594-12a0-40c3-9d3b-235ec3c73619"
+  groupOrder: "1"
+
+serviceAccount:
+  name: awaves-web-sa
+  irsaRoleArn: arn:aws:iam::107570140649:role/awaves-dev-web-app
+
+imagePullSecrets:
+  - name: ecr-secret

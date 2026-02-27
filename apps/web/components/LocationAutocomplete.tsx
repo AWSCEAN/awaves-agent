@@ -51,13 +51,13 @@ export default function LocationAutocomplete({
 
       spots.forEach((spot) => {
         locations.push({
-          id: spot.LocationId,
+          id: spot.locationId,
           // Fallback to address or LocationId so the option always has a display name
-          name: spot.name || spot.address || spot.LocationId,
+          name: spot.name || spot.address || spot.locationId,
           nameKo: spot.nameKo || spot.addressKo,
           type: 'spot',
           // Extra text searched against but not displayed
-          searchText: [spot.address, spot.region, spot.country, spot.LocationId].filter(Boolean).join(' '),
+          searchText: [spot.address, spot.region, spot.country, spot.locationId].filter(Boolean).join(' '),
         });
         if (spot.region && !regionSet.has(spot.region)) {
           regionSet.add(spot.region);

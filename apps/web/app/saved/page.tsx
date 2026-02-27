@@ -76,7 +76,7 @@ export default function SavedPage() {
       if (response.success && response.data) {
         const nameMap = new Map<string, { name: string; nameKo?: string; city?: string; region?: string; country?: string; cityKo?: string; regionKo?: string; countryKo?: string }>();
         (response.data as SurfInfo[]).forEach((spot) => {
-          nameMap.set(spot.LocationId, {
+          nameMap.set(spot.locationId, {
             name: spot.name,
             nameKo: spot.nameKo,
             city: spot.city,

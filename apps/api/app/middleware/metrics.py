@@ -41,7 +41,12 @@ def _get_cw_client():
 
 
 def _put_metric(name: str, value: float, unit: str, dimensions: Optional[list] = None) -> None:
-    """Publish a single metric data point to CloudWatch (fire-and-forget)."""
+    """Publish a single metric data point to CloudWatch (fire-and-forget).
+
+    No-op in local environment to avoid InvalidClientTokenId errors.
+    """
+    if settings.env == "local":
+        return
     try:
         metric_data = {
             "MetricName": name,

@@ -23,8 +23,16 @@ _xray_recorder = None
 
 
 def init_tracing() -> None:
-    """Initialise X-Ray SDK and auto-patch supported libraries."""
+    """Initialise X-Ray SDK and auto-patch supported libraries.
+
+    Skipped in local environment where no X-Ray daemon is running.
+    """
     global _xray_recorder
+
+    if settings.env == "local":
+        logger.info("X-Ray tracing disabled (env=local)")
+        return
+
     try:
         from aws_xray_sdk.core import xray_recorder, patch_all
 

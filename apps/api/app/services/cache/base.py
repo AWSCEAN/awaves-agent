@@ -25,6 +25,9 @@ def _redis_subsegment(name: str = "Redis_Get"):
         return
 
     subsegment = recorder.begin_subsegment(name)
+    if subsegment is None:
+        yield
+        return
     try:
         yield
     except Exception as exc:
@@ -39,6 +42,7 @@ class BaseCacheService:
 
     _client: Optional[redis.Redis] = None
     _available: bool = True
+    _connected_logged: bool = False
 
     @classmethod
     async def get_client(cls) -> Optional[redis.Redis]:
@@ -65,7 +69,9 @@ class BaseCacheService:
                 )
                 # Test connection
                 await cls._client.ping()
-                logger.info("Redis cache connected successfully")
+                if not cls._connected_logged:
+                    logger.info("Redis cache connected successfully")
+                    cls._connected_logged = True
             except Exception as e:
                 logger.warning(f"Redis cache unavailable: {e}. Session caching disabled.")
                 cls._available = False

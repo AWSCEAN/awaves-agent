@@ -2,7 +2,9 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Query
+
+from app.core.exceptions import NotFoundException
 from pydantic import BaseModel, Field
 
 from app.schemas.surf import (
@@ -99,9 +101,9 @@ async def get_spot(
     """Get a specific surf spot by LocationId."""
     results = await SurfDataRepository.get_spot_data(spot_id, date)
     if not results:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Spot not found")
+        raise NotFoundException(message="Spot not found")
 
-    latest = max(results, key=lambda r: r["SurfTimestamp"])
+    latest = max(results, key=lambda r: r["surfTimestamp"])
     return SurfInfoResponse(**latest)
 
 

@@ -15,6 +15,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.core.logging import setup_json_logging
 from app.core.tracing import init_tracing, XRayMiddleware
+from app.core.middleware import TraceIdMiddleware
+from app.core.handlers import register_exception_handlers
 from app.middleware.metrics import CloudWatchMetricsMiddleware
 from app.db.session import close_db, init_db
 from app.routers import auth, feedback, register, saved, search, surf
@@ -75,8 +77,34 @@ async def _seed_locations_table_if_empty() -> None:
             # Check if any items exist (scan with limit 1)
             resp = await client.scan(TableName=settings.dynamodb_locations_table, Limit=1)
             if resp.get("Items"):
-                logger.info("DynamoDB locations table already has data, skipping CSV seed.")
-                return
+                # Check if data uses old snake_case field names
+                sample = resp["Items"][0]
+                if "display_name" in sample and "displayName" not in sample:
+                    logger.info("Locations table has old snake_case fields, clearing for re-seed...")
+                    # Delete all items and re-seed
+                    scan_resp = await client.scan(
+                        TableName=settings.dynamodb_locations_table,
+                        ProjectionExpression="locationId",
+                    )
+                    for item in scan_resp.get("Items", []):
+                        await client.delete_item(
+                            TableName=settings.dynamodb_locations_table,
+                            Key={"locationId": item["locationId"]},
+                        )
+                    while scan_resp.get("LastEvaluatedKey"):
+                        scan_resp = await client.scan(
+                            TableName=settings.dynamodb_locations_table,
+                            ProjectionExpression="locationId",
+                            ExclusiveStartKey=scan_resp["LastEvaluatedKey"],
+                        )
+                        for item in scan_resp.get("Items", []):
+                            await client.delete_item(
+                                TableName=settings.dynamodb_locations_table,
+                                Key={"locationId": item["locationId"]},
+                            )
+                else:
+                    logger.info("DynamoDB locations table already has data, skipping CSV seed.")
+                    return
 
         # Table is empty — seed from CSV
         logger.info("Seeding DynamoDB locations table from Korean CSV...")
@@ -95,14 +123,14 @@ async def _seed_locations_table_if_empty() -> None:
                     "locationId": {"S": location_id},
                     "lat": {"N": lat},
                     "lon": {"N": lon},
-                    "display_name": {"S": row.get("display_name", "").strip()},
+                    "displayName": {"S": row.get("display_name", "").strip()},
                     "city": {"S": row.get("city", "").strip()},
                     "state": {"S": row.get("state", "").strip()},
                     "country": {"S": row.get("country", "").strip()},
-                    "display_name_ko": {"S": row.get("display_name_kr", "").strip()},
-                    "city_ko": {"S": row.get("city_kr", "").strip()},
-                    "state_ko": {"S": row.get("state_kr", "").strip()},
-                    "country_ko": {"S": row.get("country_kr", "").strip()},
+                    "displayNameKo": {"S": row.get("display_name_kr", "").strip()},
+                    "cityKo": {"S": row.get("city_kr", "").strip()},
+                    "stateKo": {"S": row.get("state_kr", "").strip()},
+                    "countryKo": {"S": row.get("country_kr", "").strip()},
                 })
 
         # Batch write (max 25 items per batch)
@@ -146,7 +174,7 @@ async def _seed_locations_if_empty() -> None:
     seen_ids: set[str] = set()
     locations: list[dict] = []
     for spot in spots:
-        location_id = spot["LocationId"]
+        location_id = spot["locationId"]
         if location_id in seen_ids:
             continue
         seen_ids.add(location_id)
@@ -175,6 +203,7 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize database tables and DynamoDB
     await init_db()
     await SavedListRepository.create_table_if_not_exists()
+    await SurfDataRepository.create_table_if_not_exists()
     # Seed locations DynamoDB table with Korean address data from CSV
     await _seed_locations_table_if_empty()
     # Initialize OpenSearch index and auto-seed if empty
@@ -199,6 +228,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Global exception handlers
+register_exception_handlers(app)
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -208,9 +240,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Observability middleware (order: X-Ray outermost → Metrics inner)
+# Observability middleware (last added = outermost = executes first)
 app.add_middleware(XRayMiddleware)
 app.add_middleware(CloudWatchMetricsMiddleware)
+app.add_middleware(TraceIdMiddleware)
 
 # Include routers
 # Include routers
