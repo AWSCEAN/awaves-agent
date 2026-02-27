@@ -37,13 +37,22 @@ class OpenSearchService:
 
         if cls._client is None:
             try:
+                host = settings.opensearch_host
+                use_ssl = settings.opensearch_port == 443
+                if host.startswith("https://"):
+                    host = host[len("https://"):]
+                    use_ssl = True
+                elif host.startswith("http://"):
+                    host = host[len("http://"):]
+
                 cls._client = AsyncOpenSearch(
                     hosts=[{
-                        "host": settings.opensearch_host,
+                        "host": host,
                         "port": settings.opensearch_port,
                     }],
-                    use_ssl=False,
+                    use_ssl=use_ssl,
                     verify_certs=False,
+                    ssl_show_warn=False,
                     timeout=10,
                     max_retries=3,
                     retry_on_timeout=True,
