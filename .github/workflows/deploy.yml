@@ -284,12 +284,6 @@ jobs:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Debug — verify assumed identity
-        run: aws sts get-caller-identity
-
-      - name: Debug — describe cluster directly
-        run: aws eks describe-cluster --name awaves-dev --region us-east-1 --query 'cluster.name'
-
       - name: Install Helm
         uses: azure/setup-helm@v4
 
@@ -302,21 +296,8 @@ jobs:
             --namespace api \
             --set image.tag=${{ github.sha }} \
             --create-namespace \
+            --rollback-on-failure \
             --timeout 5m
-
-      - name: Debug — pod state after deploy attempt
-        if: always()
-        run: |
-          echo "=== Pods ==="
-          kubectl get pods -n api -o wide
-          echo "=== ExternalSecret ==="
-          kubectl get externalsecret -n api
-          echo "=== K8s secret exists? ==="
-          kubectl get secret awaves-api-secrets -n api 2>/dev/null && echo "Secret EXISTS" || echo "Secret NOT FOUND"
-          echo "=== Pod descriptions ==="
-          kubectl describe pods -n api -l app=fastapi-api
-          echo "=== Pod logs ==="
-          kubectl logs -n api -l app=fastapi-api --tail=80 --ignore-errors || true
 
   # ── CD: deploy web via Helm ──────────────────────────────────────────────────
   deploy-web:

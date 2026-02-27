@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ssl
 from collections.abc import AsyncGenerator
 from typing import Optional
 
@@ -9,6 +10,21 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
 from app.config import settings
+
+
+def _build_ssl_connect_args() -> dict:
+    """Build asyncpg connect_args with SSL when db_ssl_mode is configured.
+
+    Passes SSL directly to asyncpg instead of via URL query params.
+    SQLAlchemy 2.0+ injects ssl_min_protocol_version when processing ?ssl=
+    URL params, which asyncpg 0.30 does not accept as a keyword argument.
+    """
+    if not settings.db_ssl_mode:
+        return {}
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return {"ssl": ctx}
 
 
 class Base(DeclarativeBase):
@@ -42,6 +58,7 @@ def _get_writer_engine() -> AsyncEngine:
             pool_pre_ping=True,
             pool_size=5,
             max_overflow=10,
+            connect_args=_build_ssl_connect_args(),
         )
     return _writer_engine
 
@@ -66,6 +83,7 @@ def _get_reader_engine() -> AsyncEngine:
             pool_pre_ping=True,
             pool_size=5,
             max_overflow=10,
+            connect_args=_build_ssl_connect_args(),
         )
     return _reader_engine
 
