@@ -101,9 +101,7 @@ async def _invoke_lambda_and_cache(
 ) -> None:
     """Invoke the Bedrock summary Lambda and cache the result."""
     session = aioboto3.Session(
-        aws_access_key_id=settings.aws_access_key_id or None,
-        aws_secret_access_key=settings.aws_secret_access_key or None,
-        region_name=settings.aws_region or "us-east-1",
+        region_name=settings.aws_region or "us-east-1"
     )
     config = Config(
         retries={"max_attempts": 2, "mode": "adaptive"},

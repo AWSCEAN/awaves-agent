@@ -33,9 +33,7 @@ def _get_cw_client():
     if _cw_client is None:
         _cw_client = boto3.client(
             "cloudwatch",
-            region_name=settings.aws_region or "us-east-1",
-            aws_access_key_id=settings.aws_access_key_id or None,
-            aws_secret_access_key=settings.aws_secret_access_key or None,
+            region_name=settings.aws_region or "us-east-1"
         )
     return _cw_client
 

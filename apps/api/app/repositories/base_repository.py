@@ -47,12 +47,15 @@ class BaseDynamoDBRepository:
 
     @classmethod
     def _get_session(cls) -> aioboto3.Session:
-        """Get or create aioboto3 session."""
+        """Get or create aioboto3 session.
+
+        Does not pass explicit credentials to allow automatic credential resolution:
+        - Local: uses AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY env vars if set
+        - Production (EKS): uses IRSA (IAM Roles for Service Accounts)
+        """
         if cls._session is None:
             cls._session = aioboto3.Session(
-                aws_access_key_id=settings.aws_access_key_id or "dummy",
-                aws_secret_access_key=settings.aws_secret_access_key or "dummy",
-                region_name=settings.aws_region,
+                region_name=settings.aws_region
             )
         return cls._session
 

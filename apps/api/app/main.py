@@ -45,9 +45,7 @@ async def _seed_locations_table_if_empty() -> None:
         return
 
     session = aioboto3.Session(
-        aws_access_key_id=settings.aws_access_key_id or "dummy",
-        aws_secret_access_key=settings.aws_secret_access_key or "dummy",
-        region_name=settings.aws_region,
+        region_name=settings.aws_region
     )
     endpoint_url = settings.ddb_endpoint_url if settings.ddb_endpoint_url else None
     config = Config(retries={"max_attempts": 3, "mode": "adaptive"}, connect_timeout=5, read_timeout=10)
@@ -168,9 +166,7 @@ async def _seed_locations_if_empty() -> None:
     logger.info("OpenSearch locations index is empty. Seeding from DynamoDB locations table...")
 
     session = aioboto3.Session(
-        aws_access_key_id=settings.aws_access_key_id or "dummy",
-        aws_secret_access_key=settings.aws_secret_access_key or "dummy",
-        region_name=settings.aws_region,
+        region_name=settings.aws_region
     )
     endpoint_url = settings.ddb_endpoint_url if settings.ddb_endpoint_url else None
     config = Config(retries={"max_attempts": 3, "mode": "adaptive"}, connect_timeout=5, read_timeout=10)
