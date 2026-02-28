@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import type { ReactNode } from 'react';
 import type { UserV2 } from '@/types';
 import { authService, isAccessTokenExpired } from '@/lib/apiServices';
+import { apolloClient } from '@/lib/apollo/client';
 
 interface AuthContextType {
   user: UserV2 | null;
@@ -76,6 +77,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (username: string, password: string): Promise<boolean> => {
     const result = await authService.login({ username, password });
     if (result.success && result.data?.user) {
+      // Clear Apollo cache on login to prevent stale data from previous sessions
+      await apolloClient.clearStore();
       setUser(result.data.user);
       return true;
     }
@@ -84,6 +87,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     await authService.logout();
+    // Clear Apollo Client cache to prevent data leakage between users
+    await apolloClient.clearStore();
     setUser(null);
   };
 

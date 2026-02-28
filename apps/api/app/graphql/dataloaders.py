@@ -1,5 +1,6 @@
 """DataLoaders for batching and caching GraphQL queries."""
 
+import logging
 from datetime import datetime
 from typing import Optional
 from collections import defaultdict
@@ -8,6 +9,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.feedback import Feedback
+
+logger = logging.getLogger(__name__)
 
 
 class FeedbackDataLoader:
@@ -25,15 +28,33 @@ class FeedbackDataLoader:
         if user_id in self._cache:
             return self._cache[user_id]
 
-        result = await self.session.execute(
-            select(Feedback).where(Feedback.user_id == user_id)
-        )
-        feedbacks = result.scalars().all()
-
         feedback_map: dict[str, str] = {}
-        for fb in feedbacks:
-            key = f"{fb.location_id}#{fb.surf_timestamp.isoformat()}"
-            feedback_map[key] = fb.feedback_status
+
+        try:
+            result = await self.session.execute(
+                select(Feedback).where(Feedback.user_id == user_id)
+            )
+            feedbacks = result.scalars().all()
+
+            for fb in feedbacks:
+                # Defensive check: skip if surf_timestamp is None
+                if fb.surf_timestamp is None:
+                    logger.warning(
+                        f"Skipping feedback with NULL surf_timestamp: "
+                        f"user_id={user_id}, location_id={fb.location_id}"
+                    )
+                    continue
+
+                key = f"{fb.location_id}#{fb.surf_timestamp.isoformat()}"
+                feedback_map[key] = fb.feedback_status
+
+        except Exception as e:
+            logger.error(
+                f"Failed to load feedback for user_id={user_id}: {type(e).__name__}: {e}",
+                exc_info=True
+            )
+            # Return empty map on error to allow saved items query to succeed
+            # without feedback data
 
         self._cache[user_id] = feedback_map
         return feedback_map

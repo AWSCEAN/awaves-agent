@@ -1,15 +1,12 @@
 """
-Fix surfGrade values in the awaves-dev-saved-list DynamoDB table.
+Revert surfGrade values in saved_list table from String to Number.
 
-Scans all items and converts any Number type surfGrade values to String type
-with letter grades (e.g. {"N": "3.0"} -> {"S": "A"}).
-
-This fixes the ProgrammingError that occurs when GraphQL tries to return
-a float value for a field defined as str.
+This script converts letter grade strings (e.g., "A", "B") stored as String type
+back to their numeric equivalents (e.g., 4.0, 3.0) stored as Number type.
 
 Usage:
     cd apps/api
-    python -m app.scripts.fix_saved_list_grades [--dry-run]
+    python -m app.scripts.revert_saved_list_grades_to_numeric [--dry-run]
 """
 
 import sys
@@ -20,13 +17,13 @@ from app.config import settings
 
 TABLE_NAME = settings.dynamodb_saved_list_table or "awaves-dev-saved-list"
 
-# Mapping of numeric values to letter grades
-NUMERIC_TO_LETTER: dict[str, str] = {
-    "4.0": "A",
-    "3.0": "B",
-    "2.0": "C",
-    "1.0": "D",
-    "0.0": "E",
+# Reverse mapping of letter grades to numeric values
+LETTER_TO_NUMERIC: dict[str, str] = {
+    "A": "4.0",
+    "B": "3.0",
+    "C": "2.0",
+    "D": "1.0",
+    "E": "0.0",
 }
 
 
@@ -43,18 +40,18 @@ def scan_all_items(client) -> list[dict]:
     return items
 
 
-def get_fix_value(grade_attr: dict) -> str | None:
-    """Return the letter grade if this surfGrade needs fixing, else None.
+def get_numeric_value(grade_attr: dict) -> str | None:
+    """Return the numeric value if this surfGrade needs fixing, else None.
 
-    Converts Number type surfGrade to String type with letter grade:
-      - {"N": "4.0"} -> "A"
-      - {"N": "3.0"} -> "B"
+    Converts String type letter grades to numeric strings:
+      - {"S": "A"} -> "4.0"
+      - {"S": "B"} -> "3.0"
     etc.
     """
-    if "N" in grade_attr:
-        numeric_val = grade_attr["N"]
-        # Convert to letter grade
-        return NUMERIC_TO_LETTER.get(numeric_val, numeric_val)
+    if "S" in grade_attr:
+        letter_val = grade_attr["S"]
+        if letter_val in LETTER_TO_NUMERIC:
+            return LETTER_TO_NUMERIC[letter_val]
     return None
 
 
@@ -73,7 +70,7 @@ def main():
 
     print(f"Scanning table: {TABLE_NAME}")
     if dry_run:
-        print("(DRY RUN — no writes will be performed)")
+        print("(DRY RUN - no writes will be performed)")
 
     items = scan_all_items(client)
     print(f"Total items scanned: {len(items)}")
@@ -87,14 +84,14 @@ def main():
         sort_key = item["sortKey"]["S"]
 
         grade_attr = item.get("surfGrade", {})
-        new_val = get_fix_value(grade_attr)
+        numeric_val = get_numeric_value(grade_attr)
 
-        if new_val is None:
+        if numeric_val is None:
             skipped += 1
             continue
 
-        old_repr = grade_attr.get("N", "?")
-        print(f"  {user_id} | {sort_key} | surfGrade: {old_repr} (N) -> \"{new_val}\" (S)")
+        old_repr = grade_attr.get("S", "?")
+        print(f"  {user_id} | {sort_key} | surfGrade: \"{old_repr}\" (S) -> {numeric_val} (N)")
 
         if dry_run:
             updated += 1
@@ -108,7 +105,7 @@ def main():
                     "sortKey": item["sortKey"],
                 },
                 UpdateExpression="SET surfGrade = :sg",
-                ExpressionAttributeValues={":sg": {"S": new_val}},
+                ExpressionAttributeValues={":sg": {"N": numeric_val}},
             )
             updated += 1
         except Exception as e:

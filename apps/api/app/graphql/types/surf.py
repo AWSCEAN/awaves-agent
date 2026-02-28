@@ -27,7 +27,7 @@ class DerivedMetricsGQL:
     """Prediction derived metrics."""
 
     surf_score: float
-    surf_grade: str
+    surf_grade: float  # Numeric grade: 0.0-4.0
     surfing_level: str
 
 

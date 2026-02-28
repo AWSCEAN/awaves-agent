@@ -29,7 +29,7 @@ class SavedItemRequest(BaseModel):
     # User/Surf ratings
     surfer_level: str = Field(..., description="User's surf skill level")
     surf_score: float = Field(..., ge=0, le=100)
-    surf_grade: str = Field(..., description="Surf grade (A/B/C/D/E)")
+    surf_grade: float = Field(..., description="Surf grade (4.0=A, 3.0=B, 2.0=C, 1.0=D, 0.0=E)")
 
 
 class SavedItemResponse(BaseModel):
@@ -56,7 +56,7 @@ class SavedItemResponse(BaseModel):
     # User/Surf ratings
     surfer_level: str
     surf_score: float
-    surf_grade: str
+    surf_grade: float
 
     # Change notification
     flag_change: bool = False
@@ -96,7 +96,7 @@ class SavedItemResponse(BaseModel):
             water_temperature=item.get("waterTemperature"),
             surfer_level=item.get("surferLevel", ""),
             surf_score=item.get("surfScore", 0),
-            surf_grade=item.get("surfGrade", ""),
+            surf_grade=float(item.get("surfGrade", 0.0)),
             flag_change=item.get("flagChange", False),
             change_message=item.get("changeMessage"),
             feedback_status=feedback_status,

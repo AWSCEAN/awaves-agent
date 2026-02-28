@@ -76,7 +76,10 @@ async def register(
     input: RegisterInput,
 ) -> AuthResponse:
     """Register mutation resolver."""
-    user_service = UserService(info.context.db)
+    from app.repositories.user_repository import UserRepository
+
+    user_repo = UserRepository(info.context.db)
+    user_service = UserService(user_repo)
     result = await user_service.register(
         username=input.username,
         password=input.password,

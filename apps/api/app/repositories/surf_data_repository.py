@@ -409,16 +409,16 @@ class SurfDataRepository(BaseDynamoDBRepository):
         """Convert numeric grade (e.g. '3.0') to letter grade, or pass through."""
         try:
             val = float(grade_str)
-            if val >= 3.0:
-                return "A+"
-            elif val >= 2.5:
+            if val >= 4.0:
                 return "A"
-            elif val >= 2.0:
+            elif val >= 3.0:
                 return "B"
-            elif val >= 1.0:
+            elif val >= 2.0:
                 return "C"
-            else:
+            elif val >= 1.0:
                 return "D"
+            else:
+                return "E"
         except (ValueError, TypeError):
             return grade_str
 

@@ -38,7 +38,7 @@ async def predict_surf(
             geo=GeoGQL(lat=geo.get("lat", 0), lng=geo.get("lng", 0)),
             derived_metrics=DerivedMetricsGQL(
                 surf_score=dm.get("surfScore", 0),
-                surf_grade=dm.get("surfGrade", "D"),
+                surf_grade=float(dm.get("surfGrade", 1.0)),  # Numeric grade, default to 1.0 (D)
                 surfing_level=dm.get("surfingLevel", "INTERMEDIATE"),
             ),
             metadata=PredictionMetadataGQL(

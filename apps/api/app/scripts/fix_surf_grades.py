@@ -1,7 +1,7 @@
 """
 Fix surfGrade values in the awaves-dev-surf-info DynamoDB table.
 
-Scans all items and converts any letter-grade strings (e.g. "A+", "B")
+Scans all items and converts any letter-grade strings (e.g. "A", "B")
 stored in derivedMetrics.{LEVEL}.surfGrade back to float-formatted
 numeric strings (e.g. "3.0", "2.0").
 
@@ -20,11 +20,11 @@ TABLE_NAME = settings.dynamodb_surf_data_table or "awaves-dev-surf-info"
 
 # Reverse mapping of _numeric_grade_to_letter from surf_data_repository.py
 LETTER_TO_NUMERIC: dict[str, str] = {
-    "A+": "3.0",
-    "A": "2.5",
-    "B": "2.0",
-    "C": "1.0",
-    "D": "0.0",
+    "A": "4.0",
+    "B": "3.0",
+    "C": "2.0",
+    "D": "1.0",
+    "E": "0.0",
 }
 
 LEVELS = ("BEGINNER", "INTERMEDIATE", "ADVANCED")

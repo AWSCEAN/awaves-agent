@@ -5,6 +5,21 @@ from typing import Optional
 from enum import Enum
 
 
+def _numeric_grade_to_letter(grade: float) -> str:
+    """Convert numeric surf grade (0.0-4.0) to letter grade (A-E)."""
+    rounded = round(grade)
+    if rounded >= 4:
+        return "A"
+    elif rounded == 3:
+        return "B"
+    elif rounded == 2:
+        return "C"
+    elif rounded == 1:
+        return "D"
+    else:
+        return "E"
+
+
 @strawberry.enum
 class FeedbackStatus(Enum):
     """Feedback status enum."""
@@ -23,6 +38,10 @@ class SavedItem:
     location_id: str
     surf_timestamp: str
     saved_at: str
+    surf_score: float
+    surf_grade: float  # Numeric grade: 0.0-4.0 (stored in DynamoDB as Number type)
+    surfer_level: str
+    flag_change: bool = False
     departure_date: Optional[str] = None
     address: Optional[str] = None
     region: Optional[str] = None
@@ -31,16 +50,15 @@ class SavedItem:
     wave_period: Optional[float] = None
     wind_speed: Optional[float] = None
     water_temperature: Optional[float] = None
-    surfer_level: str
-    surf_score: float
-    surf_grade: str
-    flag_change: bool = False
     change_message: Optional[str] = None
     feedback_status: Optional[FeedbackStatus] = None
 
     @classmethod
     def from_dynamodb(cls, item: dict, feedback_status: Optional[str] = None) -> "SavedItem":
-        """Create SavedItem from DynamoDB item."""
+        """Create SavedItem from DynamoDB item.
+
+        Returns numeric surfGrade (0.0-4.0) as stored in DynamoDB.
+        """
         location_id = item.get("locationId", "")
         surf_timestamp = item.get("surfTimestamp", "")
         location_surf_key = item.get("sortKey", f"{location_id}#{surf_timestamp}")
@@ -55,6 +73,10 @@ class SavedItem:
             location_id=location_id,
             surf_timestamp=surf_timestamp,
             saved_at=item.get("savedAt", ""),
+            surf_score=item.get("surfScore", 0),
+            surf_grade=item.get("surfGrade", 0),
+            surfer_level=item.get("surferLevel", ""),
+            flag_change=item.get("flagChange", False),
             departure_date=item.get("departureDate"),
             address=item.get("address"),
             region=item.get("region"),
@@ -63,10 +85,6 @@ class SavedItem:
             wave_period=item.get("wavePeriod"),
             wind_speed=item.get("windSpeed"),
             water_temperature=item.get("waterTemperature"),
-            surfer_level=item.get("surferLevel", ""),
-            surf_score=item.get("surfScore", 0),
-            surf_grade=item.get("surfGrade", ""),
-            flag_change=item.get("flagChange", False),
             change_message=item.get("changeMessage"),
             feedback_status=fb_status,
         )
@@ -105,7 +123,7 @@ class SaveItemInput:
     water_temperature: Optional[float] = None
     surfer_level: str
     surf_score: float
-    surf_grade: str
+    surf_grade: float  # Numeric grade: 0.0-4.0
 
 
 @strawberry.input

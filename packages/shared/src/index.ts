@@ -155,7 +155,7 @@ export interface SavedItemResponse {
   water_temperature?: number;
   surfer_level: string;
   surf_score: number;
-  surf_grade: string;
+  surf_grade: number;  // Numeric grade: 0.0-4.0 (from GraphQL Float)
   flag_change: boolean;
   change_message?: string;
   feedback_status?: FeedbackStatus;

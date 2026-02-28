@@ -28,7 +28,7 @@ interface SavedItemGraphQL {
   waterTemperature?: number;
   surferLevel: string;
   surfScore: number;
-  surfGrade: string;
+  surfGrade: number;  // GraphQL response returns numeric grade (0.0-4.0)
   flagChange: boolean;
   changeMessage?: string;
   feedbackStatus?: FeedbackStatus;
@@ -149,7 +149,7 @@ export function useSavedItems() {
     surfTimestamp: string;
     surferLevel: string;
     surfScore: number;
-    surfGrade: number;
+    surfGrade: number;  // Changed to number - frontend sends numeric value
     departureDate?: string;
     address?: string;
     region?: string;
@@ -159,8 +159,15 @@ export function useSavedItems() {
     windSpeed?: number;
     waterTemperature?: number;
   }) => {
-    const result = await saveItemMutation({ variables: { input } });
-    return result.data?.saveItem;
+    console.log('🔍 Saving item with surfGrade:', input.surfGrade, 'type:', typeof input.surfGrade);
+    try {
+      const result = await saveItemMutation({ variables: { input } });
+      console.log('✅ Save result:', result.data?.saveItem);
+      return result.data?.saveItem;
+    } catch (error) {
+      console.error('❌ Save error:', error);
+      throw error;
+    }
   };
 
   const deleteItem = async (locationSurfKey: string) => {

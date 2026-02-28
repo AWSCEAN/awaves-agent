@@ -1,11 +1,14 @@
 """Saved items resolvers for GraphQL."""
 
+import logging
 from datetime import datetime
 from dateutil.parser import isoparse
 from strawberry.types import Info
 
 from app.core.exceptions import NotFoundException, UnauthorizedException
 from app.graphql.context import GraphQLContext
+
+logger = logging.getLogger(__name__)
 from app.graphql.types.saved import (
     SavedItem,
     SavedListResult,
@@ -24,14 +27,18 @@ async def get_saved_items(info: Info[GraphQLContext, None]) -> SavedListResult:
         raise UnauthorizedException(message="Not authenticated")
 
     user_id = str(info.context.user_id)
+    logger.info(f"Fetching saved items for user_id={user_id}")
 
     # Try cache first
     cached_items = await CacheService.get_saved_items(user_id)
     if cached_items is not None:
+        logger.info(f"Cache hit for user_id={user_id}, found {len(cached_items)} items")
         db_items = cached_items
     else:
         # Fallback to DynamoDB
+        logger.info(f"Cache miss for user_id={user_id}, querying DynamoDB")
         db_items = await SavedListRepository.get_saved_list(user_id)
+        logger.info(f"DynamoDB returned {len(db_items)} items for user_id={user_id}")
         # Cache even empty lists to avoid repeated DynamoDB hits
         await CacheService.store_saved_items(user_id, db_items)
 
@@ -43,6 +50,14 @@ async def get_saved_items(info: Info[GraphQLContext, None]) -> SavedListResult:
     # Build response with joined data
     items = []
     for item in db_items:
+        # Verify the item belongs to the requesting user
+        item_user_id = item.get("userId", "")
+        if item_user_id != user_id:
+            logger.error(
+                f"DATA MISMATCH: user_id={user_id} received item belonging to user_id={item_user_id}. "
+                f"This indicates a cache or database query bug!"
+            )
+
         location_id = item.get("locationId", "")
         surf_timestamp_raw = item.get("surfTimestamp", "")
         # Normalize to naive datetime isoformat to match feedback DataLoader keys
@@ -54,6 +69,7 @@ async def get_saved_items(info: Info[GraphQLContext, None]) -> SavedListResult:
         feedback_status = feedback_map.get(key)
         items.append(SavedItem.from_dynamodb(item, feedback_status))
 
+    logger.info(f"Returning {len(items)} saved items for user_id={user_id}")
     return SavedListResult(items=items, total=len(items))
 
 

@@ -19,7 +19,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { useLocale as useAppLocale } from '@/components/LocaleProvider';
 import type { SurfInfo, SavedListItem, SurferLevel, SurfingLevel, SurfGrade, PredictionResult } from '@/types';
 import type { OverlayMode, SpotSelectionData } from '@/components/EnhancedMapboxMap';
-import { TIME_SLOTS, getCurrentTimeSlot, localToUTC, getMetricsForLevel, surferLevelToKey } from '@/lib/services/surfInfoService';
+import { TIME_SLOTS, getCurrentTimeSlot, localToUTC, getMetricsForLevel, surferLevelToKey, convertSurfGradeToLabel } from '@/lib/services/surfInfoService';
 import { surfService } from '@/lib/apiServices';
 import { useSavedItems } from '@/hooks/useSavedItems';
 import SurfLoadingScreen from '@/components/SurfLoadingScreen';
@@ -147,7 +147,7 @@ function MapPageContent() {
       waterTemperature: item.water_temperature || 0,
       surfingLevel: (item.surfer_level?.toUpperCase() || 'BEGINNER') as SurfingLevel,
       surfScore: item.surf_score,
-      surfGrade: (item.surf_grade || 'D') as SurfGrade,
+      surfGrade: convertSurfGradeToLabel(item.surf_grade),
       name: item.address || item.location_id,
       nameKo: undefined,
     })),
