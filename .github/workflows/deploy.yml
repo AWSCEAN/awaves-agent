@@ -360,7 +360,7 @@ jobs:
             --timeout 5m
 
   # ── Notify: success or failure ────────────────────────────────────────────
-    notify-result:
+  notify-result:
     name: Notify Discord (result)
     runs-on: ubuntu-latest
     needs:
