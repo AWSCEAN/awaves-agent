@@ -117,7 +117,7 @@ jobs:
           aws sns publish \
             --region $AWS_REGION \
             --topic-arn ${{ secrets.DISCORD_ALERT_SNS_ARN }} \
-            --message "{\"type\":\"deployment\",\"branch\":\"${{ github.ref_name }}\",\"commit\":\"${{ github.sha }}\",\"actor\":\"${{ github.actor }}\",\"repo\":\"${{ github.repository }}\"}"
+            --message "{\"type\":\"deployment\",\"status\":\"triggered\",\"branch\":\"${{ github.ref_name }}\",\"commit\":\"${{ github.sha }}\",\"actor\":\"${{ github.actor }}\",\"repo\":\"${{ github.repository }}\"}"
 
   # ── CI: run tests before any build ──────────────────────────────────────────
   ci:
@@ -358,3 +358,24 @@ jobs:
             --create-namespace \
             --rollback-on-failure \
             --timeout 5m
+
+  # ── Notify: success or failure ────────────────────────────────────────────
+  notify-result:
+    name: Notify Discord (result)
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()           # deploy가 성공하든 실패하든 반드시 실행
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Publish result notification
+        run: |
+          STATUS=${{ needs.deploy.result == 'success' && 'success' || 'failure' }}
+          aws sns publish \
+            --region $AWS_REGION \
+            --topic-arn ${{ secrets.DISCORD_ALERT_SNS_ARN }} \
+            --message "{\"type\":\"deployment\",\"status\":\"$STATUS\",\"branch\":\"${{ github.ref_name }}\",\"commit\":\"${{ github.sha }}\",\"actor\":\"${{ github.actor }}\",\"repo\":\"${{ github.repository }}\"}"
