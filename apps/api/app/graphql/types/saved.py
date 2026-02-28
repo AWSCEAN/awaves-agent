@@ -33,7 +33,7 @@ class SavedItem:
     water_temperature: Optional[float] = None
     surfer_level: str
     surf_score: float
-    surf_grade: float
+    surf_grade: str
     flag_change: bool = False
     change_message: Optional[str] = None
     feedback_status: Optional[FeedbackStatus] = None
@@ -65,7 +65,7 @@ class SavedItem:
             water_temperature=item.get("waterTemperature"),
             surfer_level=item.get("surferLevel", ""),
             surf_score=item.get("surfScore", 0),
-            surf_grade=float(item.get("surfGrade", 0)),
+            surf_grade=item.get("surfGrade", ""),
             flag_change=item.get("flagChange", False),
             change_message=item.get("changeMessage"),
             feedback_status=fb_status,
@@ -105,7 +105,7 @@ class SaveItemInput:
     water_temperature: Optional[float] = None
     surfer_level: str
     surf_score: float
-    surf_grade: float
+    surf_grade: str
 
 
 @strawberry.input

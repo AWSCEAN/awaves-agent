@@ -205,17 +205,26 @@ def process_graphql_errors(
                 )
             )
         else:
+            # Log the full error for debugging (always)
+            _logger.error(
+                f"GraphQL unhandled error at path {error.path}: {type(original).__name__}: {original}",
+                exc_info=original if isinstance(original, Exception) else None,
+            )
+
             msg = (
                 f"{type(original).__name__}: {original}"
                 if settings.env in ("local", "dev", "development")
-                else "An unexpected error occurred"
+                else "An unexpected error occurred. Please check the logs or contact support."
             )
             processed.append(
                 GraphQLError(
                     message=msg,
                     nodes=error.nodes,
                     path=error.path,
-                    extensions={"code": "INTERNAL_ERROR"},
+                    extensions={
+                        "code": "INTERNAL_ERROR",
+                        "error_type": type(original).__name__,
+                    },
                 )
             )
 
