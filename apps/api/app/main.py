@@ -209,6 +209,24 @@ async def _seed_locations_if_empty() -> None:
         logger.warning("Failed to seed OpenSearch from DynamoDB locations table: %s", e)
 
 
+async def _warm_cache_background():
+    """Warm the surf spots cache in the background after startup.
+
+    Runs asynchronously after the app is ready to avoid blocking startup
+    and Kubernetes readiness probes. This prevents deployment timeouts
+    when scanning large DynamoDB tables.
+    """
+    # Wait a bit to ensure app is fully ready and serving traffic
+    await asyncio.sleep(5)
+    logger.info("Starting background cache warm-up...")
+    try:
+        await CacheService.invalidate_surf_spots()
+        await SurfDataRepository._get_all_spots_raw()
+        logger.info("Background cache warm-up completed successfully")
+    except Exception as e:
+        logger.error("Background cache warm-up failed: %s", e, exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager for startup and shutdown."""
@@ -221,9 +239,9 @@ async def lifespan(app: FastAPI):
     # Initialize OpenSearch index and auto-seed if empty
     await OpenSearchService.create_index_if_not_exists()
     await _seed_locations_if_empty()
-    # Clear stale surf spots cache and pre-warm with fresh data (includes Korean fields)
-    await CacheService.invalidate_surf_spots()
-    await SurfDataRepository._get_all_spots_raw()
+    # Warm cache in background (non-blocking) to avoid deployment timeouts
+    asyncio.create_task(_warm_cache_background())
+    logger.info("Application startup complete, cache warming in background")
     yield
     # Shutdown: Close database, cache, and OpenSearch connections
     await close_db()
