@@ -292,6 +292,91 @@ Authorization: Bearer {access_token}
 
 ---
 
+#### GET /surf/spots/all
+전체 서핑 스팟 목록 조회 (페이지네이션 없음, 맵 표시용)
+
+**Query Parameters**
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| date | string | ❌ | - | 날짜 필터 (YYYY-MM-DD 형식, 예: "2026-02-28") |
+| time | string | ❌ | - | 시간 슬롯 필터 (HH:MM 형식, 예: "03:00")<br/>**3시간 범위를 반환**: 선택한 시각부터 3시간 동안의 데이터<br/>• 예: `time="03:00"` → 03:00, 04:00, 05:00 시각의 데이터 반환<br/>• 표준 슬롯: 00:00, 03:00, 06:00, 09:00, 12:00, 15:00, 18:00, 21:00<br/>• 주의: `time="21:00"` → 21:00, 22:00, 23:00 (다음 날 00:00으로 넘어가지 않음)<br/>• 생략 시 해당 날짜의 모든 시각 데이터 반환 |
+
+**Response** `200 OK`
+```json
+[
+  {
+    "locationId": "38.0765#128.6234",
+    "surfTimestamp": "2026-02-28T03:00:00Z",
+    "geo": { "lat": 38.0765, "lng": 128.6234 },
+    "conditions": {
+      "waveHeight": 1.2,
+      "wavePeriod": 8.0,
+      "windSpeed": 12.0,
+      "waterTemperature": 22.0
+    },
+    "derivedMetrics": {
+      "BEGINNER": { "surfScore": 75.0, "surfGrade": "B" },
+      "INTERMEDIATE": { "surfScore": 65.0, "surfGrade": "C" },
+      "ADVANCED": { "surfScore": 55.0, "surfGrade": "D" }
+    },
+    "metadata": {
+      "modelVersion": "sagemaker-awaves-v1.2",
+      "dataSource": "open-meteo",
+      "predictionType": "FORECAST",
+      "createdAt": "2026-02-28T00:00:00Z"
+    }
+  }
+]
+```
+
+**Example**
+```bash
+# 특정 날짜의 모든 스팟
+curl "http://localhost:8001/surf/spots/all?date=2026-02-28"
+
+# 특정 날짜 + 시간 슬롯 (3시간 범위)
+curl "http://localhost:8001/surf/spots/all?date=2026-02-28&time=03:00"
+```
+
+---
+
+#### GET /surf/nearby
+좌표 기반 인근 서핑 스팟 조회
+
+**Query Parameters**
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| lat | float | ✅ | - | 위도 (예: 38.0765) |
+| lng | float | ✅ | - | 경도 (예: 128.6234) |
+| limit | int | ❌ | 25 | 최대 결과 수 |
+| date | string | ❌ | - | 날짜 필터 (YYYY-MM-DD 형식, 예: "2026-02-28") |
+| time | string | ❌ | - | 시간 슬롯 필터 (HH:MM 형식, 예: "03:00")<br/>**3시간 범위를 반환**: 선택한 시각부터 3시간 동안의 데이터<br/>• 예: `time="03:00"` → 03:00, 04:00, 05:00 시각의 데이터 반환<br/>• 표준 슬롯: 00:00, 03:00, 06:00, 09:00, 12:00, 15:00, 18:00, 21:00<br/>• 주의: `time="21:00"` → 21:00, 22:00, 23:00 (다음 날 00:00으로 넘어가지 않음)<br/>• 생략 시 해당 날짜의 모든 시각 데이터 반환 |
+
+**Response** `200 OK`
+```json
+[
+  {
+    "locationId": "38.0765#128.6234",
+    "surfTimestamp": "2026-02-28T03:00:00Z",
+    "geo": { "lat": 38.0765, "lng": 128.6234 },
+    "conditions": { ... },
+    "derivedMetrics": { ... },
+    "metadata": { ... }
+  }
+]
+```
+
+**Example**
+```bash
+# 좌표 기반 인근 스팟 조회
+curl "http://localhost:8001/surf/nearby?lat=38.0765&lng=128.6234&limit=25"
+
+# 특정 날짜 + 시간 슬롯 필터
+curl "http://localhost:8001/surf/nearby?lat=38.0765&lng=128.6234&date=2026-02-28&time=03:00"
+```
+
+---
+
 #### GET /surf/search (Deprecated)
 > ⚠️ 좌표 기반 부분 문자열 검색. `/search` 엔드포인트로 대체됨.
 
@@ -307,6 +392,10 @@ OpenSearch를 사용한 위치 키워드 검색
 |-----------|------|----------|---------|-------------|
 | q | string | ✅ | - | 검색 키워드 (도시명, 국가명, 장소명 등) |
 | size | int | ❌ | 50 | 최대 결과 수 (1-100) |
+| date | string | ❌ | - | 날짜 필터 (YYYY-MM-DD 형식, 예: "2026-02-28") |
+| time | string | ❌ | - | 시간 슬롯 필터 (HH:MM 형식, 예: "03:00")<br/>**3시간 범위를 반환**: 선택한 시각부터 3시간 동안의 데이터<br/>• 예: `time="03:00"` → 03:00, 04:00, 05:00 시각의 데이터 반환<br/>• 표준 슬롯: 00:00, 03:00, 06:00, 09:00, 12:00, 15:00, 18:00, 21:00<br/>• 주의: `time="21:00"` → 21:00, 22:00, 23:00 (다음 날 00:00으로 넘어가지 않음)<br/>• 생략 시 해당 날짜의 모든 시각 데이터 반환 |
+| surfer_level | string | ❌ | - | 서퍼 레벨 필터 (BEGINNER/INTERMEDIATE/ADVANCED) |
+| language | string | ❌ | ko | 응답 언어 (ko/en) |
 
 **검색 대상 필드**
 | Field | Weight | Type |

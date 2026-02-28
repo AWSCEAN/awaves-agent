@@ -276,13 +276,32 @@ class SurfDataRepository(BaseDynamoDBRepository):
             return []
 
         if time:
-            datetime_prefix = f"{date}T{time}"
-            time_matched = [
-                item for item in filtered
-                if item["surfTimestamp"]["S"].startswith(datetime_prefix)
-            ]
-            if time_matched:
-                filtered = time_matched
+            # Calculate 3-hour range from selected time slot
+            # Example: time="03:00" → hours [3, 4, 5]
+            #          time="21:00" → hours [21, 22, 23]
+            try:
+                start_hour = int(time.split(":")[0])
+
+                # Generate timestamp prefixes for 3-hour window
+                # Use "HH:" prefix to match any minute/second in that hour
+                time_prefixes = []
+                for offset in range(3):
+                    hour = start_hour + offset
+                    # Don't wrap past midnight (next day is different date partition)
+                    if hour <= 23:
+                        time_prefixes.append(f"{date}T{hour:02d}:")
+
+                # Filter items matching any hour in the 3-hour range
+                time_matched = [
+                    item for item in filtered
+                    if any(item["surfTimestamp"]["S"].startswith(prefix) for prefix in time_prefixes)
+                ]
+
+                if time_matched:
+                    filtered = time_matched
+            except (ValueError, IndexError):
+                # Invalid time format - fall back to no time filtering
+                pass
 
         # Pick one item per location: prefer closest to requested time
         location_map: dict[str, dict] = {}
