@@ -7,7 +7,9 @@ metadata:
     app: fastapi-api
     app.kubernetes.io/part-of: awaves
 spec:
+  {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
+  {{- end }}
   selector:
     matchLabels:
       app: fastapi-api

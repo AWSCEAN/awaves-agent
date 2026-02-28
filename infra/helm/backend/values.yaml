@@ -5,6 +5,12 @@ image:
 
 replicaCount: 2
 
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
 service:
   port: 80
   targetPort: 8001
@@ -16,11 +22,6 @@ resources:
   limits:
     cpu: "1000m"
     memory: "2Gi"
-
-hpa:
-  minReplicas: 2
-  maxReplicas: 10
-  cpuUtilization: 70
 
 ingress:
   host: api.awaves.net
