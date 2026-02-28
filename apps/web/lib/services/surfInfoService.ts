@@ -164,7 +164,7 @@ export function parseLocationId(locationId: string): { lat: number; lng: number 
   return { lat, lng };
 }
 
-export const TIME_SLOTS = ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00', '24:00'];
+export const TIME_SLOTS = ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00'];
 
 /**
  * Get the most recent 3-hour time slot rounded down from the current LOCAL time.
