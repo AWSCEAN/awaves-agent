@@ -5,6 +5,7 @@ import type { SurfGrade, SurfingLevel, SurfInfo, SurfInfoDerivedMetrics, LevelMe
 /**
  * Get the metrics for a specific surfer level from derivedMetrics.
  * If surferLevel is empty (All Levels), defaults to INTERMEDIATE.
+ * Converts numeric grade to letter grade for display.
  */
 export function getMetricsForLevel(
   derivedMetrics: SurfInfoDerivedMetrics | undefined,
@@ -13,7 +14,13 @@ export function getMetricsForLevel(
   const fallback: LevelMetrics = { surfScore: 0, surfGrade: 'D' as SurfGrade, surfGradeNumeric: 0.0 };
   if (!derivedMetrics) return fallback;
   const levelKey = surferLevelToKey(surferLevel);
-  return derivedMetrics[levelKey] ?? fallback;
+  const metrics = derivedMetrics[levelKey] ?? fallback;
+
+  // Convert numeric grade to letter grade for display
+  return {
+    ...metrics,
+    surfGrade: convertSurfGradeToLabel(metrics.surfGradeNumeric)
+  };
 }
 
 /**
@@ -34,7 +41,49 @@ export function generateSurfGrade(score: number): SurfGrade {
   if (score >= 80) return 'A';
   if (score >= 60) return 'B';
   if (score >= 40) return 'C';
-  return 'D';
+  if (score >= 20) return 'D';
+  return 'E';
+}
+
+/**
+ * Convert numeric surf grade (from backend) to letter grade label.
+ * Backend stores: 4.0 → A, 3.0 → B, 2.0 → C, 1.0 → D, 0.0 → E
+ * Handles fractional values by rounding (e.g., 3.5 → A, 2.5 → B)
+ * @param surfGradeNumeric - Numeric grade from backend (0.0-4.0)
+ * @returns SurfGrade letter (A/B/C/D/E)
+ */
+export function convertSurfGradeToLabel(surfGradeNumeric: number | undefined | null): SurfGrade {
+  // Handle edge cases
+  if (surfGradeNumeric == null || isNaN(surfGradeNumeric)) {
+    return 'E'; // Default to lowest grade
+  }
+
+  // Round to nearest integer for mapping
+  const rounded = Math.round(surfGradeNumeric);
+
+  // Map numeric grade to letter grade
+  // 4.0 (rounded 4) → A
+  // 3.0 (rounded 3) → B
+  // 2.0 (rounded 2) → C
+  // 1.0 (rounded 1) → D
+  // 0.0 (rounded 0) → E
+  // Out of range values: >4 → A, <0 → E
+  switch (rounded) {
+    case 4:
+      return 'A';
+    case 3:
+      return 'B';
+    case 2:
+      return 'C';
+    case 1:
+      return 'D';
+    case 0:
+      return 'E';
+    default:
+      // Handle out-of-range values
+      if (rounded > 4) return 'A';
+      return 'E';
+  }
 }
 
 export function generateSurfingLevel(waveHeight: number, windSpeed: number): SurfingLevel {
@@ -51,6 +100,7 @@ export function getGradeBgColor(grade: string): string {
     case 'B': return 'bg-yellow-100';
     case 'C': return 'bg-orange-100';
     case 'D': return 'bg-red-100';
+    case 'E': return 'bg-gray-200';
     default: return 'bg-gray-100';
   }
 }
@@ -61,6 +111,7 @@ export function getGradeTextColor(grade: string): string {
     case 'B': return 'text-yellow-700';
     case 'C': return 'text-orange-700';
     case 'D': return 'text-red-700';
+    case 'E': return 'text-gray-900';
     default: return 'text-gray-700';
   }
 }
@@ -71,6 +122,7 @@ export function getGradeBorderColor(grade: string): string {
     case 'B': return 'border-yellow-300';
     case 'C': return 'border-orange-300';
     case 'D': return 'border-red-300';
+    case 'E': return 'border-gray-400';
     default: return 'border-gray-300';
   }
 }

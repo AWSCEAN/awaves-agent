@@ -3,7 +3,7 @@
 // ============================================================
 
 // --- Enums / Literals ---
-export type SurfGrade = 'A' | 'B' | 'C' | 'D';
+export type SurfGrade = 'A' | 'B' | 'C' | 'D' | 'E';
 export type SurfingLevel = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
 export type SurferLevel = 'beginner' | 'intermediate' | 'advanced';
 
@@ -22,8 +22,8 @@ export interface SurfInfoConditions {
 
 export interface LevelMetrics {
   surfScore: number;          // 0-100
-  surfGrade: SurfGrade;       // A/B/C/D
-  surfGradeNumeric: number;   // raw float from backend (e.g. 3.0, 2.5)
+  surfGrade: SurfGrade;       // A/B/C/D/E
+  surfGradeNumeric: number;   // raw float from backend (e.g. 4.0, 3.0, 2.0, 1.0, 0.0)
 }
 
 export interface SurfInfoDerivedMetrics {
