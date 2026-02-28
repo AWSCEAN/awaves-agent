@@ -92,7 +92,7 @@ const translations = {
 
 export default function MyPage() {
   const router = useRouter();
-  const { user: authUser, logout, refreshAuth } = useAuth();
+  const { user: authUser, logout, updateUser } = useAuth();
   const { locale: lang, setLocale: setLang } = useLocale();
   const [userLevel, setSurferLevel] = useState<SurferLevel>('beginner');
   const [isSaving, setIsSaving] = useState(false);
@@ -111,9 +111,11 @@ export default function MyPage() {
     setSaveMessage(null);
     try {
       const response = await authService.updateUserLevel(userLevel);
-      if (response.success && response.data?.result === 'success') {
+      if (response.success && response.data?.result === 'success' && response.data.data) {
         setSaveMessage(lang === 'ko' ? '저장되었습니다!' : 'Saved successfully!');
-        await refreshAuth();
+        // Update local user state with the response data (no need to refetch)
+        // This prevents unnecessary token refresh that could fail in production
+        updateUser(response.data.data);
       } else {
         setSaveMessage(lang === 'ko' ? '저장에 실패했습니다' : 'Failed to save');
       }

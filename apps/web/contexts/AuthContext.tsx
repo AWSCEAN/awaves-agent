@@ -12,6 +12,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
+  updateUser: (user: UserV2) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,10 +45,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (result.success && result.data?.result === 'success' && result.data.data) {
         setUser(result.data.data);
       } else {
-        setUser(null);
+        // Don't log out on getCurrentUser failure - token might still be valid
+        // The 401 retry logic in apiRequest will handle actual auth failures
+        if (result.error !== 'Session expired. Please login again.') {
+          // Keep existing user state on non-auth errors
+          console.warn('Failed to refresh user data:', result.error);
+        } else {
+          setUser(null);
+        }
       }
     } catch {
-      setUser(null);
+      // Keep existing user state on network errors
+      console.warn('Failed to refresh user data: network error');
     } finally {
       setIsLoading(false);
     }
@@ -78,6 +87,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const updateUser = (updatedUser: UserV2) => {
+    setUser(updatedUser);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -87,6 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         refreshAuth,
+        updateUser,
       }}
     >
       {children}
