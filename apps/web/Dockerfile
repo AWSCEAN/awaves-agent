@@ -23,8 +23,10 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
 
-# Redirect sharp's libvips download away from flaky GitHub releases
-ENV npm_config_sharp_libvips_binary_host="https://npmmirror.com/mirrors/sharp-libvips"
+# sharp (transitive dep of @capacitor/assets) needs native compilation tools.
+# These are only needed during install and don't affect the final runner image.
+RUN apk add --no-cache python3 make g++
+
 RUN pnpm install --frozen-lockfile
 
 # Copy source after install to preserve the cache layer above
