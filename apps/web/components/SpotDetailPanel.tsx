@@ -501,15 +501,15 @@ export default function SpotDetailPanel({
           {/* Table View */}
           {forecastView === 'table' && (
           <div>
-            <table className="w-full text-xs">
+            <table className="w-full table-fixed text-[10px]">
               <thead>
                 <tr className="text-ocean-600 border-b border-ocean-200">
-                  <th className="py-0.5 px-1.5 text-left font-medium w-20"></th>
+                  <th className="py-0.5 px-0.5 text-left font-medium" style={{ width: '13%' }}></th>
                   {hours.map((hour, i) => (
-                    <th key={i} className={`py-0.5 px-1.5 text-center font-medium ${
+                    <th key={i} className={`py-0.5 px-0.5 text-center font-medium ${
                       hour === selectedLocalHour ? 'text-ocean-800 bg-ocean-50' : ''
                     }`}>
-                      {hour.toString().padStart(2, '0')}:00
+                      {hour.toString().padStart(2, '0')}
                     </th>
                   ))}
                 </tr>
@@ -517,44 +517,44 @@ export default function SpotDetailPanel({
               <tbody className="text-ocean-800">
                 {/* Wave Height Row */}
                 <tr className="border-b border-ocean-100">
-                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '파고' : 'Wave Height'} <span className="text-ocean-400 font-normal">(m)</span></td>
+                  <td className="py-0.5 px-0.5 font-medium text-ocean-600">{locale === 'ko' ? '파고' : 'Wave'}<span className="text-ocean-400 font-normal text-[8px]"> m</span></td>
                   {forecastData.waveHeights.map((v, idx) => (
-                    <td key={idx} className="py-1 px-1.5 text-center">{v}</td>
+                    <td key={idx} className={`py-0.5 px-0.5 text-center ${hours[idx] === selectedLocalHour ? 'bg-ocean-50' : ''}`}>{v}</td>
                   ))}
                 </tr>
                 {/* Wave Period Row */}
                 <tr className="border-b border-ocean-100">
-                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '파주기' : 'Wave Period'} <span className="text-ocean-400 font-normal">(s)</span></td>
+                  <td className="py-0.5 px-0.5 font-medium text-ocean-600">{locale === 'ko' ? '주기' : 'Period'}<span className="text-ocean-400 font-normal text-[8px]"> s</span></td>
                   {forecastData.wavePeriods.map((v, idx) => (
-                    <td key={idx} className="py-1 px-1.5 text-center">{v}</td>
+                    <td key={idx} className={`py-0.5 px-0.5 text-center ${hours[idx] === selectedLocalHour ? 'bg-ocean-50' : ''}`}>{v}</td>
                   ))}
                 </tr>
                 {/* Wind Speed Row */}
                 <tr className="border-b border-ocean-100">
-                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '풍속' : 'Wind Speed'} <span className="text-ocean-400 font-normal">(m/s)</span></td>
+                  <td className="py-0.5 px-0.5 font-medium text-ocean-600">{locale === 'ko' ? '풍속' : 'Wind'}<span className="text-ocean-400 font-normal text-[8px]"> m/s</span></td>
                   {forecastData.windSpeeds.map((v, idx) => (
-                    <td key={idx} className="py-1 px-1.5 text-center">{v}</td>
+                    <td key={idx} className={`py-0.5 px-0.5 text-center ${hours[idx] === selectedLocalHour ? 'bg-ocean-50' : ''}`}>{v}</td>
                   ))}
                 </tr>
                 {/* Water Temperature Row */}
                 <tr className="border-b border-ocean-100">
-                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '수온' : 'Water Temp'} <span className="text-ocean-400 font-normal">(°C)</span></td>
+                  <td className="py-0.5 px-0.5 font-medium text-ocean-600">{locale === 'ko' ? '수온' : 'Water'}<span className="text-ocean-400 font-normal text-[8px]"> °C</span></td>
                   {forecastData.waterTemps.map((v, idx) => (
-                    <td key={idx} className="py-1 px-1.5 text-center">{v}</td>
+                    <td key={idx} className={`py-0.5 px-0.5 text-center ${hours[idx] === selectedLocalHour ? 'bg-ocean-50' : ''}`}>{v}</td>
                   ))}
                 </tr>
                 {/* Air Temperature Row */}
                 <tr className="border-b border-ocean-100">
-                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '기온' : 'Air Temp'} <span className="text-ocean-400 font-normal">(°C)</span></td>
+                  <td className="py-0.5 px-0.5 font-medium text-ocean-600">{locale === 'ko' ? '기온' : 'Air'}<span className="text-ocean-400 font-normal text-[8px]"> °C</span></td>
                   {forecastData.airTemps.map((v, idx) => (
-                    <td key={idx} className="py-1 px-1.5 text-center">{v}</td>
+                    <td key={idx} className={`py-0.5 px-0.5 text-center ${hours[idx] === selectedLocalHour ? 'bg-ocean-50' : ''}`}>{v}</td>
                   ))}
                 </tr>
                 {/* Score Row with colored text */}
                 <tr>
-                  <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '점수' : 'Score'}</td>
+                  <td className="py-0.5 px-0.5 font-medium text-ocean-600">{locale === 'ko' ? '점수' : 'Score'}</td>
                   {forecastData.scores.map((score, idx) => (
-                    <td key={idx} className={`py-1 px-1.5 text-center font-bold ${getScoreColor(score)}`}>
+                    <td key={idx} className={`py-0.5 px-0.5 text-center font-bold ${getScoreColor(score)} ${hours[idx] === selectedLocalHour ? 'bg-ocean-50' : ''}`}>
                       {score}
                     </td>
                   ))}
