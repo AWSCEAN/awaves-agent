@@ -444,10 +444,11 @@ function MapPageContent() {
         });
       } else {
         // No current forecast available — construct from saved data.
-        // Still try to get enriched name/nameKo from allSpots (different timestamp
-        // entry for the same location may be present with the correct displayName).
+        // Try allSpots first (DynamoDB locations table), then searchResults
+        // (OpenSearch-enriched, which has Korean names when allSpots may not).
         const save = saves[0];
         const enrichedSpot = allSpots.find(s => s.locationId === save.locationId);
+        const searchResult = searchResults.find(s => s.locationId === save.locationId);
         const surfInfo: SurfInfo = {
           locationId: save.locationId,
           surfTimestamp: save.surfTimestamp,
@@ -464,8 +465,8 @@ function MapPageContent() {
             ADVANCED: { surfScore: save.surfScore, surfGrade: save.surfGrade, surfGradeNumeric: 0 },
           },
           metadata: { modelVersion: '', dataSource: '', predictionType: 'FORECAST', createdAt: '' },
-          name: enrichedSpot?.name || save.name || formatCoordFallback(save.locationId),
-          nameKo: enrichedSpot?.nameKo || save.nameKo,
+          name: enrichedSpot?.name || searchResult?.name || save.name || formatCoordFallback(save.locationId),
+          nameKo: searchResult?.nameKo || enrichedSpot?.nameKo || save.nameKo,
           region: save.region,
           country: save.country,
           address: save.address,
@@ -483,15 +484,18 @@ function MapPageContent() {
       setSelectedSpotDetail(null);
       setTimeSlotSelection({ locationId, coordinates, saves });
     }
-  }, [savesByLocation, allSpots]);
+  }, [savesByLocation, allSpots, searchResults]);
 
   const handleTimeSlotSelect = useCallback((save: SavedListItem) => {
     const [latStr, lngStr] = save.locationId.split('#');
     const lat = Number(latStr);
     const lng = Number(lngStr);
-    // Prefer enriched names from allSpots (locations-table-enriched) over the stale
-    // address stored in DynamoDB at save time (which may be a raw coordinate string).
+    // Prefer enriched names from allSpots (DynamoDB locations table).
+    // Also check searchResults which are OpenSearch-enriched and carry
+    // nameKo (display_name_ko) even when the DynamoDB locations table
+    // doesn't have the Korean name populated.
     const enrichedSpot = allSpots.find(s => s.locationId === save.locationId);
+    const searchResult = searchResults.find(s => s.locationId === save.locationId);
     const surfInfo: SurfInfo = {
       locationId: save.locationId,
       surfTimestamp: save.surfTimestamp,
@@ -508,8 +512,8 @@ function MapPageContent() {
         ADVANCED: { surfScore: save.surfScore, surfGrade: save.surfGrade, surfGradeNumeric: 0 },
       },
       metadata: { modelVersion: '', dataSource: '', predictionType: 'FORECAST', createdAt: '' },
-      name: enrichedSpot?.name || save.name || formatCoordFallback(save.locationId),
-      nameKo: enrichedSpot?.nameKo || save.nameKo,
+      name: enrichedSpot?.name || searchResult?.name || save.name || formatCoordFallback(save.locationId),
+      nameKo: searchResult?.nameKo || enrichedSpot?.nameKo || save.nameKo,
       region: save.region,
       country: save.country,
       address: save.address,
@@ -521,7 +525,7 @@ function MapPageContent() {
       coordinates: { latitude: lat, longitude: lng },
     });
     setTimeSlotSelection(null);
-  }, [allSpots]);
+  }, [allSpots, searchResults]);
 
   const getCurrentConditionsForLocation = useCallback((locationId: string): SurfInfo | null => {
     return allSpots.find(s => s.locationId === locationId) || null;
