@@ -10,6 +10,7 @@ is configured in no-op mode so the application still starts cleanly.
 """
 
 import logging
+from contextlib import asynccontextmanager, contextmanager
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -53,6 +54,29 @@ def init_tracing() -> None:
 def get_xray_recorder():
     """Return the global xray_recorder (or None if unavailable)."""
     return _xray_recorder
+
+
+@asynccontextmanager
+async def xray_segment(name: str):
+    """Async context manager that wraps code in an X-Ray segment.
+
+    Use this for background tasks or startup code that runs outside of
+    an HTTP request (where XRayMiddleware would normally create the segment).
+    If X-Ray is not initialised, this is a no-op.
+    """
+    recorder = get_xray_recorder()
+    if recorder is None:
+        yield
+        return
+
+    segment = recorder.begin_segment(name)
+    try:
+        yield segment
+    except Exception as exc:
+        segment.add_exception(exc, stack=True)
+        raise
+    finally:
+        recorder.end_segment()
 
 
 class XRayMiddleware(BaseHTTPMiddleware):

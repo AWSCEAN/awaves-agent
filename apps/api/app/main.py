@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.core.logging import setup_json_logging
-from app.core.tracing import init_tracing, XRayMiddleware
+from app.core.tracing import init_tracing, XRayMiddleware, xray_segment
 from app.core.middleware import TraceIdMiddleware
 from app.core.handlers import register_exception_handlers
 from app.middleware.metrics import CloudWatchMetricsMiddleware
@@ -220,8 +220,9 @@ async def _warm_cache_background():
     await asyncio.sleep(5)
     logger.info("Starting background cache warm-up...")
     try:
-        await CacheService.invalidate_surf_spots()
-        await SurfDataRepository._get_all_spots_raw()
+        async with xray_segment("background-cache-warmup"):
+            await CacheService.invalidate_surf_spots()
+            await SurfDataRepository._get_all_spots_raw()
         logger.info("Background cache warm-up completed successfully")
     except Exception as e:
         logger.error("Background cache warm-up failed: %s", e, exc_info=True)
@@ -232,13 +233,14 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager for startup and shutdown."""
     # Startup: Initialize database tables and DynamoDB
     await init_db()
-    await SavedListRepository.create_table_if_not_exists()
-    await SurfDataRepository.create_table_if_not_exists()
-    # Seed locations DynamoDB table with Korean address data from CSV
-    await _seed_locations_table_if_empty()
-    # Initialize OpenSearch index and auto-seed if empty
-    await OpenSearchService.create_index_if_not_exists()
-    await _seed_locations_if_empty()
+    async with xray_segment("startup-init"):
+        await SavedListRepository.create_table_if_not_exists()
+        await SurfDataRepository.create_table_if_not_exists()
+        # Seed locations DynamoDB table with Korean address data from CSV
+        await _seed_locations_table_if_empty()
+        # Initialize OpenSearch index and auto-seed if empty
+        await OpenSearchService.create_index_if_not_exists()
+        await _seed_locations_if_empty()
     # Warm cache in background (non-blocking) to avoid deployment timeouts
     asyncio.create_task(_warm_cache_background())
     logger.info("Application startup complete, cache warming in background")
