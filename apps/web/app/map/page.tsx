@@ -265,7 +265,7 @@ function MapPageContent() {
 
       if (query) {
         const [response] = await Promise.all([
-          surfService.searchSpots(query, { ...utcOptions, multi: true, language: locale === 'ko' ? 'ko' : undefined }),
+          surfService.searchSpots(query, { ...utcOptions, language: locale === 'ko' ? 'ko' : undefined }),
           allSpotsPromise.then(res => {
             if (res.success && res.data) setAllSpots(res.data);
           }),

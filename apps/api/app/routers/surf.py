@@ -63,10 +63,9 @@ async def search_spots(
     q: str = Query(..., min_length=1, description="Search query"),
     date: Optional[str] = Query(None, description="Filter by date (YYYY-MM-DD)"),
     time: Optional[str] = Query(None, description="Filter by time (HH:MM)"),
-    multi: bool = Query(False, description="Return all time slots per location (for left-panel timeline)"),
 ) -> list[SurfInfoResponse]:
     """Search surf spots by coordinate substring."""
-    results = await SurfDataRepository.search_spots(q, date, time, multi=multi)
+    results = await SurfDataRepository.search_spots(q, date, time)
     return [SurfInfoResponse(**s) for s in results]
 
 

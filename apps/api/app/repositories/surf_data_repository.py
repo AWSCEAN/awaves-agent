@@ -295,21 +295,16 @@ class SurfDataRepository(BaseDynamoDBRepository):
 
     @classmethod
     async def get_spots_for_date(
-        cls, date: Optional[str] = None, time: Optional[str] = None, multi: bool = False
+        cls, date: Optional[str] = None, time: Optional[str] = None
     ) -> list[dict]:
-        """Get spots filtered by date and optionally time.
-
-        When multi=False (default): returns one spot per location — used for map markers.
-        When multi=True: returns all items in the 3-hour window per location — used for
-        the left-panel timeline view so all 3 time slots are visible.
-        """
+        """Get one spot per location filtered by date and optionally time."""
         global _spots_for_date_cache, _spots_for_date_cache_time
 
         if not date:
             return await cls._get_all_spots_raw()
 
-        # Check result cache (keyed by date, time, and multi flag)
-        cache_key = f"{date}|{time or ''}|{'multi' if multi else 'single'}"
+        # Check result cache
+        cache_key = f"{date}|{time or ''}"
         if (
             _spots_for_date_cache
             and (_time.monotonic() - _spots_for_date_cache_time) < _CACHE_TTL
@@ -346,29 +341,26 @@ class SurfDataRepository(BaseDynamoDBRepository):
             except (ValueError, IndexError):
                 pass
 
-        if multi:
-            # Return all matching items — caller gets the full 3-hour window per location
-            spots = [cls._to_surf_info(item) for item in filtered]
-        else:
-            # Pick one item per location: prefer closest to requested time
-            location_map: dict[str, dict] = {}
-            for item in filtered:
-                loc_id = item["locationId"]["S"]
-                ts = item["surfTimestamp"]["S"]
-                if loc_id not in location_map:
-                    location_map[loc_id] = item
+        # Pick one item per location: prefer closest to requested time
+        location_map: dict[str, dict] = {}
+        for item in filtered:
+            loc_id = item["locationId"]["S"]
+            ts = item["surfTimestamp"]["S"]
+            if loc_id not in location_map:
+                location_map[loc_id] = item
+            else:
+                existing_ts = location_map[loc_id]["surfTimestamp"]["S"]
+                if time:
+                    ts_time = ts[11:16] if len(ts) > 15 else ts[11:]
+                    ex_time = existing_ts[11:16] if len(existing_ts) > 15 else existing_ts[11:]
+                    tg_time = time[:5]
+                    if abs(int(ts_time.replace(":", "")) - int(tg_time.replace(":", ""))) < abs(int(ex_time.replace(":", "")) - int(tg_time.replace(":", ""))):
+                        location_map[loc_id] = item
                 else:
-                    existing_ts = location_map[loc_id]["surfTimestamp"]["S"]
-                    if time:
-                        ts_time = ts[11:16] if len(ts) > 15 else ts[11:]
-                        ex_time = existing_ts[11:16] if len(existing_ts) > 15 else existing_ts[11:]
-                        tg_time = time[:5]
-                        if abs(int(ts_time.replace(":", "")) - int(tg_time.replace(":", ""))) < abs(int(ex_time.replace(":", "")) - int(tg_time.replace(":", ""))):
-                            location_map[loc_id] = item
-                    else:
-                        if ts > existing_ts:
-                            location_map[loc_id] = item
-            spots = [cls._to_surf_info(item) for item in location_map.values()]
+                    if ts > existing_ts:
+                        location_map[loc_id] = item
+
+        spots = [cls._to_surf_info(item) for item in location_map.values()]
 
         spots = await cls._enrich_with_korean(spots)
         spots.sort(
@@ -424,10 +416,10 @@ class SurfDataRepository(BaseDynamoDBRepository):
 
     @classmethod
     async def search_spots(
-        cls, query: str, date: Optional[str] = None, time: Optional[str] = None, multi: bool = False
+        cls, query: str, date: Optional[str] = None, time: Optional[str] = None
     ) -> list[dict]:
         """Search spots by coordinate substring in LocationId."""
-        spots = await cls.get_spots_for_date(date, time, multi=multi)
+        spots = await cls.get_spots_for_date(date, time)
         query_lower = query.lower()
         return [s for s in spots if query_lower in s["locationId"].lower()]
 
