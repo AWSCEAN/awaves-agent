@@ -131,7 +131,7 @@ async def _call_sagemaker_aws(
         "lat": lat,
         "lon": lng,
         "skill_level": surfer_level.upper(),
-        "current_date": surf_date,
+        "current_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "target_date": surf_date,
     }
 
