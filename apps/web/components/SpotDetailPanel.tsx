@@ -4,7 +4,7 @@ import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useLocale } from 'next-intl';
 import type { SurfInfo, SavedListItem } from '@/types';
 import { useSwipeDown } from '@/hooks/useSwipeDown';
-import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, getMetricsForLevel, surferLevelToKey } from '@/lib/services/surfInfoService';
+import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, getMetricsForLevel, surferLevelToKey, parseUTCTimestamp } from '@/lib/services/surfInfoService';
 import { surfService } from '@/lib/apiServices';
 
 interface SpotDetailPanelProps {
@@ -277,7 +277,8 @@ export default function SpotDetailPanel({
                 </svg>
                 <span className="text-sm font-semibold text-white">
                   {(() => {
-                    const date = new Date(surfInfo.surfTimestamp);
+                    const date = parseUTCTimestamp(surfInfo.surfTimestamp);
+                    if (!date) return '';
                     const year = date.getFullYear();
                     const month = (date.getMonth() + 1).toString().padStart(2, '0');
                     const day = date.getDate().toString().padStart(2, '0');
@@ -324,9 +325,10 @@ export default function SpotDetailPanel({
             )}
             {/* Saved Timeslot Buttons */}
             {onTimeslotSelect && [...savedTimeslots]
-              .sort((a, b) => new Date(a.surfTimestamp).getTime() - new Date(b.surfTimestamp).getTime())
+              .sort((a, b) => (parseUTCTimestamp(a.surfTimestamp)?.getTime() ?? 0) - (parseUTCTimestamp(b.surfTimestamp)?.getTime() ?? 0))
               .map((save) => {
-                const d = new Date(save.surfTimestamp);
+                const d = parseUTCTimestamp(save.surfTimestamp);
+                if (!d) return null;
                 const isActive = save.surfTimestamp === surfInfo.surfTimestamp;
                 const timeLabel = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
                 const dateLabel = locale === 'ko'

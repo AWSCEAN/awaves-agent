@@ -178,6 +178,24 @@ export function getCurrentTimeSlot(): string {
 }
 
 /**
+ * Parse a UTC surf timestamp string into a Date object.
+ * DynamoDB surfTimestamp is stored in UTC (e.g. "2026-02-28T15:00:00").
+ * Without a trailing "Z", `new Date()` treats it as local time — this
+ * helper ensures it is always parsed as UTC so that `.getHours()` etc.
+ * return the correct local-timezone values.
+ */
+export function parseUTCTimestamp(ts?: string): Date | null {
+  if (!ts) return null;
+
+  const hasTimezone =
+    ts.endsWith('Z') ||
+    ts.endsWith('+00:00') ||
+    /[+-]\d{2}:\d{2}$/.test(ts);
+
+  return new Date(hasTimezone ? ts : ts + 'Z');
+}
+
+/**
  * Convert a local date + time slot to UTC date + time for DynamoDB queries.
  * DynamoDB SurfTimestamp is stored in UTC, so we need to convert.
  * e.g. KST (UTC+9): 2026-02-13 03:00 → UTC: 2026-02-12 18:00

@@ -2,7 +2,7 @@
 
 import { useLocale } from 'next-intl';
 import type { PredictionResult } from '@/types';
-import { getGradeBgColor, getGradeTextColor, getGradeBorderColor } from '@/lib/services/surfInfoService';
+import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, parseUTCTimestamp } from '@/lib/services/surfInfoService';
 import { useSwipeDown } from '@/hooks/useSwipeDown';
 
 interface PredictionResultPanelProps {
@@ -45,7 +45,10 @@ export default function PredictionResultPanel({
 
   const displayName = locale === 'ko' && result.spotNameKo ? result.spotNameKo : result.spotName;
   const { surfScore, surfGrade, surfingLevel } = result.derivedMetrics;
-  const dateStr = result.surfTimestamp.split('T')[0];
+  const parsedDate = parseUTCTimestamp(result.surfTimestamp);
+  const dateStr = parsedDate
+    ? `${parsedDate.getFullYear()}-${(parsedDate.getMonth() + 1).toString().padStart(2, '0')}-${parsedDate.getDate().toString().padStart(2, '0')}`
+    : '';
 
   return (
     <div

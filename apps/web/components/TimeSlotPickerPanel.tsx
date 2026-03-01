@@ -1,7 +1,7 @@
 'use client';
 
 import type { SavedListItem, SurfInfo } from '@/types';
-import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, getMetricsForLevel } from '@/lib/services/surfInfoService';
+import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, getMetricsForLevel, parseUTCTimestamp } from '@/lib/services/surfInfoService';
 import { useSwipeDown } from '@/hooks/useSwipeDown';
 
 interface TimeSlotPickerPanelProps {
@@ -18,7 +18,8 @@ interface TimeSlotPickerPanelProps {
 }
 
 function formatTimestamp(ts: string, locale: string): { date: string; time: string } {
-  const d = new Date(ts);
+  const d = parseUTCTimestamp(ts);
+  if (!d) return { date: '', time: '' };
   const year = d.getFullYear();
   const month = d.getMonth() + 1;
   const day = d.getDate();
@@ -50,7 +51,7 @@ export default function TimeSlotPickerPanel({
   surferLevel = '',
 }: TimeSlotPickerPanelProps) {
   const sorted = [...saves].sort(
-    (a, b) => new Date(a.surfTimestamp).getTime() - new Date(b.surfTimestamp).getTime()
+    (a, b) => (parseUTCTimestamp(a.surfTimestamp)?.getTime() ?? 0) - (parseUTCTimestamp(b.surfTimestamp)?.getTime() ?? 0)
   );
 
   const displayName = sorted[0]?.name || locationId;

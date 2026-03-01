@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import type { SavedItemResponse, FeedbackStatus, Language } from '@/types';
+import { parseUTCTimestamp } from '@/lib/services/surfInfoService';
 
 interface SpotNameInfo {
   name: string;
@@ -137,7 +138,8 @@ export default function SavedItemCard({
 
   // Full timestamp for desktop
   const formatFullTimestamp = (ts: string) => {
-    const date = new Date(ts);
+    const date = parseUTCTimestamp(ts);
+    if (!date) return '';
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const day = date.getDate().toString().padStart(2, '0');
@@ -148,7 +150,8 @@ export default function SavedItemCard({
 
   // Compact timestamp for mobile
   const formatCompactTimestamp = (ts: string) => {
-    const d = new Date(ts);
+    const d = parseUTCTimestamp(ts);
+    if (!d) return '';
     const mm = (d.getMonth() + 1).toString().padStart(2, '0');
     const dd = d.getDate().toString().padStart(2, '0');
     const hh = d.getHours().toString().padStart(2, '0');
@@ -156,7 +159,8 @@ export default function SavedItemCard({
     return `${mm}/${dd} ${hh}:${min}`;
   };
 
-  const showFeedbackSection = !feedbackStatus && new Date(item.surf_timestamp) < new Date();
+  const parsedSurfTs = parseUTCTimestamp(item.surf_timestamp);
+  const showFeedbackSection = !feedbackStatus && !!parsedSurfTs && parsedSurfTs < new Date();
 
   return (
     <div className="card relative overflow-hidden break-inside-avoid">
