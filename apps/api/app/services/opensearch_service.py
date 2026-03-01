@@ -28,6 +28,7 @@ class OpenSearchService:
     INDEX_NAME = "locations"
     _client: Optional[AsyncOpenSearch] = None
     _available: bool = True
+    _nori_available: Optional[bool] = None
 
     @classmethod
     async def get_client(cls) -> Optional[AsyncOpenSearch]:
@@ -81,6 +82,40 @@ class OpenSearchService:
             cls._client = None
 
     @classmethod
+    async def _check_nori_available(cls, client: AsyncOpenSearch) -> bool:
+        """Check if the nori tokenizer plugin is installed."""
+        if cls._nori_available is not None:
+            return cls._nori_available
+        try:
+            plugins = await client.cat.plugins(format="json")
+            cls._nori_available = any(
+                p.get("component") == "analysis-nori" for p in plugins
+            )
+        except Exception:
+            cls._nori_available = False
+        if not cls._nori_available:
+            logger.warning(
+                "nori_tokenizer plugin not installed. "
+                "Korean fields will use standard analyzer."
+            )
+        return cls._nori_available
+
+    @classmethod
+    def _korean_analyzer_settings(cls, use_nori: bool) -> dict:
+        """Return analyzer config based on nori availability."""
+        if use_nori:
+            return {
+                "type": "custom",
+                "tokenizer": "nori_tokenizer",
+                "filter": ["lowercase", "nori_part_of_speech"],
+            }
+        return {
+            "type": "custom",
+            "tokenizer": "standard",
+            "filter": ["lowercase"],
+        }
+
+    @classmethod
     async def create_index_if_not_exists(cls) -> bool:
         """Create the locations index with proper mappings if it doesn't exist."""
         client = await cls.get_client()
@@ -91,23 +126,15 @@ class OpenSearchService:
             exists = await client.indices.exists(index=cls.INDEX_NAME)
             if exists:
                 logger.info("OpenSearch index '%s' already exists.", cls.INDEX_NAME)
-                # Try to add Korean fields to existing index (idempotent)
-                await cls._ensure_korean_mappings(client)
                 return True
+
+            use_nori = await cls._check_nori_available(client)
+            ko_analyzer = "korean_analyzer" if use_nori else "standard"
 
             mapping = {
                 "settings": {
                     "number_of_shards": 1,
                     "number_of_replicas": 0,
-                    "analysis": {
-                        "analyzer": {
-                            "korean_analyzer": {
-                                "type": "custom",
-                                "tokenizer": "nori_tokenizer",
-                                "filter": ["lowercase", "nori_part_of_speech"],
-                            }
-                        }
-                    },
                 },
                 "mappings": {
                     "properties": {
@@ -117,141 +144,48 @@ class OpenSearchService:
                         "state": {"type": "keyword"},
                         "country": {"type": "keyword"},
                         "location": {"type": "geo_point"},
-                        # Korean fields
                         "display_name_ko": {
                             "type": "text",
-                            "analyzer": "korean_analyzer",
+                            "analyzer": ko_analyzer,
                             "fields": {"keyword": {"type": "keyword"}},
                         },
                         "city_ko": {
                             "type": "text",
-                            "analyzer": "korean_analyzer",
+                            "analyzer": ko_analyzer,
                             "fields": {"keyword": {"type": "keyword"}},
                         },
                         "state_ko": {
                             "type": "text",
-                            "analyzer": "korean_analyzer",
+                            "analyzer": ko_analyzer,
                             "fields": {"keyword": {"type": "keyword"}},
                         },
                         "country_ko": {
                             "type": "text",
-                            "analyzer": "korean_analyzer",
+                            "analyzer": ko_analyzer,
                             "fields": {"keyword": {"type": "keyword"}},
                         },
                     }
                 },
             }
 
+            # Add korean_analyzer settings only if nori is available
+            if use_nori:
+                mapping["settings"]["analysis"] = {
+                    "analyzer": {
+                        "korean_analyzer": cls._korean_analyzer_settings(True)
+                    }
+                }
+
             await client.indices.create(index=cls.INDEX_NAME, body=mapping)
-            logger.info("OpenSearch index '%s' created with Korean analyzer.", cls.INDEX_NAME)
+            logger.info(
+                "OpenSearch index '%s' created (nori=%s).",
+                cls.INDEX_NAME, use_nori,
+            )
             return True
         except Exception as e:
             logger.error("Failed to create OpenSearch index: %s", e)
             return False
 
-    @classmethod
-    async def _ensure_korean_mappings(cls, client: AsyncOpenSearch) -> None:
-        """Add Korean field mappings to existing index, recreating if needed."""
-        try:
-            # Check current mappings for analyzer conflicts
-            current_mappings = await client.indices.get_mapping(index=cls.INDEX_NAME)
-            props = (
-                current_mappings.get(cls.INDEX_NAME, {})
-                .get("mappings", {})
-                .get("properties", {})
-            )
-
-            # If Korean fields exist with wrong analyzer, we must recreate
-            needs_recreate = False
-            for field in ("display_name_ko", "city_ko", "state_ko", "country_ko"):
-                field_mapping = props.get(field, {})
-                if field_mapping and field_mapping.get("analyzer") != "korean_analyzer":
-                    needs_recreate = True
-                    break
-
-            if needs_recreate:
-                logger.info(
-                    "Korean fields exist with wrong analyzer. "
-                    "Deleting index '%s' so it can be recreated with correct mappings.",
-                    cls.INDEX_NAME,
-                )
-                await client.indices.delete(index=cls.INDEX_NAME)
-                await cls.create_index_if_not_exists()
-                logger.info("Index recreated with Korean analyzer mappings.")
-                return
-
-            # Check if nori analyzer exists in settings
-            current_settings = await client.indices.get_settings(index=cls.INDEX_NAME)
-            index_settings = (
-                current_settings.get(cls.INDEX_NAME, {})
-                .get("settings", {})
-                .get("index", {})
-            )
-            analysis = index_settings.get("analysis", {})
-
-            if "korean_analyzer" not in analysis.get("analyzer", {}):
-                logger.info("Adding Korean analyzer to existing index...")
-                try:
-                    await client.indices.close(index=cls.INDEX_NAME)
-                    await client.indices.put_settings(
-                        index=cls.INDEX_NAME,
-                        body={
-                            "analysis": {
-                                "analyzer": {
-                                    "korean_analyzer": {
-                                        "type": "custom",
-                                        "tokenizer": "nori_tokenizer",
-                                        "filter": ["lowercase", "nori_part_of_speech"],
-                                    }
-                                }
-                            }
-                        },
-                    )
-                    await client.indices.open(index=cls.INDEX_NAME)
-                    logger.info("Korean analyzer added to existing index.")
-                except Exception as e:
-                    logger.warning("Could not add Korean analyzer: %s", e)
-                    try:
-                        await client.indices.open(index=cls.INDEX_NAME)
-                    except Exception:
-                        pass
-
-            # Add Korean field mappings if not yet present
-            ko_fields_missing = any(
-                field not in props
-                for field in ("display_name_ko", "city_ko", "state_ko", "country_ko")
-            )
-            if ko_fields_missing:
-                await client.indices.put_mapping(
-                    index=cls.INDEX_NAME,
-                    body={
-                        "properties": {
-                            "display_name_ko": {
-                                "type": "text",
-                                "analyzer": "korean_analyzer",
-                                "fields": {"keyword": {"type": "keyword"}},
-                            },
-                            "city_ko": {
-                                "type": "text",
-                                "analyzer": "korean_analyzer",
-                                "fields": {"keyword": {"type": "keyword"}},
-                            },
-                            "state_ko": {
-                                "type": "text",
-                                "analyzer": "korean_analyzer",
-                                "fields": {"keyword": {"type": "keyword"}},
-                            },
-                            "country_ko": {
-                                "type": "text",
-                                "analyzer": "korean_analyzer",
-                                "fields": {"keyword": {"type": "keyword"}},
-                            },
-                        }
-                    },
-                )
-                logger.info("Korean field mappings added to existing index.")
-        except Exception as e:
-            logger.warning("Could not ensure Korean mappings on existing index: %s", e)
 
     @classmethod
     async def index_location(cls, location_data: dict) -> bool:
