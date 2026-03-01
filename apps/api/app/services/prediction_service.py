@@ -128,12 +128,11 @@ async def _call_sagemaker_aws(
 ) -> dict | None:
     """Call AWS SageMaker endpoint via boto3 sagemaker-runtime."""
     payload = {
-        "location": location_id,
-        "current_date": surf_date,
-        "target_date": surf_date,
-        "level": surfer_level,
         "lat": lat,
         "lon": lng,
+        "skill_level": surfer_level.upper(),
+        "current_date": surf_date,
+        "target_date": surf_date,
     }
 
     session = aioboto3.Session(region_name=settings.aws_region or "us-east-1")
@@ -220,9 +219,15 @@ def _build_prediction(
     sagemaker_result: dict,
 ) -> dict:
     """Build prediction response from SageMaker inference result."""
-    # SageMaker returns surfGrade + surfScore
-    surf_score = sagemaker_result.get("surfScore", 0)
-    surf_grade = sagemaker_result.get("surfGrade", "D")
+    # SageMaker returns {"surf_score": 40.93}
+    surf_score = sagemaker_result.get("surf_score") or sagemaker_result.get("surfScore", 0)
+    surf_score = round(float(surf_score), 1)
+    surf_grade = (
+        "A" if surf_score >= 80
+        else "B" if surf_score >= 60
+        else "C" if surf_score >= 40
+        else "D"
+    )
 
     level_map = {
         "beginner": "BEGINNER",
