@@ -89,6 +89,7 @@ function MapPageContent() {
   const [visibleSpots, setVisibleSpots] = useState<SearchResult[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Map state
   const [showWindParticles, setShowWindParticles] = useState(false);
@@ -291,8 +292,10 @@ function MapPageContent() {
 
   const handleSearch = useCallback(async () => {
     setVisibleSpots([]);
+    setSearchResults([]);
     setShowResults(true);
     setHasSearched(true);
+    setIsSearching(true);
     setSelectedSpotDetail(null);
     // Close prediction panel if open
     setShowPrediction(false);
@@ -300,11 +303,15 @@ function MapPageContent() {
     // Update active search criteria only when search button is clicked
     setSearchDate(selectedDate);
     setSearchTime(selectedTime);
-    await fetchSpots(locationQuery || undefined, {
-      date: format(selectedDate, 'yyyy-MM-dd'),
-      time: selectedTime || undefined,
-      surferLevel: surferLevel || undefined,
-    });
+    try {
+      await fetchSpots(locationQuery || undefined, {
+        date: format(selectedDate, 'yyyy-MM-dd'),
+        time: selectedTime || undefined,
+        surferLevel: surferLevel || undefined,
+      });
+    } finally {
+      setIsSearching(false);
+    }
   }, [locationQuery, selectedDate, selectedTime, surferLevel, fetchSpots]);
 
   const handlePredictionSearch = useCallback(async () => {
@@ -529,6 +536,12 @@ function MapPageContent() {
 
   const handleSuggestByDistance = useCallback(async () => {
     if (!userLocation) return;
+    setSearchResults([]);
+    setVisibleSpots([]);
+    setShowResults(true);
+    setHasSearched(true);
+    setIsSearching(true);
+    setSelectedSpotDetail(null);
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const utcNearby = selectedTime
@@ -550,11 +563,9 @@ function MapPageContent() {
       }
     } catch (err) {
       console.error('Failed to fetch nearby spots:', err);
+    } finally {
+      setIsSearching(false);
     }
-    setVisibleSpots([]);
-    setShowResults(true);
-    setHasSearched(true);
-    setSelectedSpotDetail(null);
     // Update active search criteria
     setSearchDate(selectedDate);
     setSearchTime(selectedTime);
@@ -676,13 +687,23 @@ function MapPageContent() {
             {/* Search / Predict */}
             <button
               onClick={isPredictionMode ? handlePredictionSearch : handleSearch}
+              disabled={isSearching}
               className={`flex-1 px-3 py-1.5 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-1 ${
+                isSearching ? 'opacity-60 cursor-not-allowed' : ''
+              } ${
                 isPredictionMode ? 'bg-indigo-500' : 'bg-ocean-500'
               }`}
             >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+              {isSearching ? (
+                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : (
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              )}
               {isPredictionMode ? tSearch('predictButton') : tSearch('searchButton')}
             </button>
             {/* Nearby */}
@@ -789,18 +810,28 @@ function MapPageContent() {
             </select>
             <button
               onClick={isPredictionMode ? handlePredictionSearch : handleSearch}
+              disabled={isSearching}
               className={`px-4 py-2 text-white text-sm font-medium rounded-lg
                 transition-colors flex items-center gap-1 ${
+                  isSearching ? 'opacity-60 cursor-not-allowed' : ''
+                } ${
                   isPredictionMode ? 'bg-indigo-500 hover:bg-indigo-600' : 'bg-ocean-500 hover:bg-ocean-600'
                 }`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d={isPredictionMode
-                    ? "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                    : "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"}
-                />
-              </svg>
+              {isSearching ? (
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d={isPredictionMode
+                      ? "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                      : "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"}
+                  />
+                </svg>
+              )}
               {isPredictionMode ? tSearch('predictButton') : tSearch('searchButton')}
             </button>
             <button
@@ -934,6 +965,7 @@ function MapPageContent() {
             <SearchResultsList
               results={searchResults}
               isOpen={showResults && hasSearched}
+              isLoading={isSearching}
               onClose={() => {
                 setShowResults(false);
                 setVisibleSpots([]);

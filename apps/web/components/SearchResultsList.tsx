@@ -19,6 +19,7 @@ type SortMode = 'surfScore' | 'distance';
 interface SearchResultsListProps {
   results: SearchResult[];
   isOpen: boolean;
+  isLoading?: boolean;
   onClose: () => void;
   onSpotClick: (spot: SearchResult) => void;
   onSaveSpot: (spot: SearchResult) => void;
@@ -38,6 +39,7 @@ const ITEMS_PER_PAGE = 25;
 export default function SearchResultsList({
   results,
   isOpen,
+  isLoading = false,
   onClose,
   onSpotClick,
   onSaveSpot,
@@ -165,7 +167,7 @@ export default function SearchResultsList({
           <div>
             <h2 className="font-semibold text-ocean-800">{t('resultsTitle')}</h2>
             <p className="text-sm text-ocean-500">
-              {tCommon('results', { count: results.length })} · {getSortLabel(sortMode)}
+              {isLoading ? (locale === 'ko' ? '검색 중...' : 'Searching...') : <>{tCommon('results', { count: results.length })} · {getSortLabel(sortMode)}</>}
             </p>
             {selectedDate && (
               <p className="text-xs text-ocean-400 mt-1">
@@ -234,7 +236,22 @@ export default function SearchResultsList({
 
       {/* Results List */}
       <div className="flex-1 overflow-y-auto">
-        {results.length === 0 ? (
+        {isLoading ? (
+          <div className="p-2 space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="p-3 rounded-xl border border-sand-100 animate-pulse">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-4 bg-sand-200 rounded" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-sand-200 rounded w-3/4" />
+                    <div className="h-3 bg-sand-100 rounded w-1/2" />
+                  </div>
+                  <div className="w-12 h-8 bg-sand-200 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : results.length === 0 ? (
           <div className="p-8 text-center text-ocean-500">
             <div className="text-4xl mb-2">🔍</div>
             <p>{tCommon('noResults')}</p>
