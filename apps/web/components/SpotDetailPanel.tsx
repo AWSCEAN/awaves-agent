@@ -140,7 +140,19 @@ export default function SpotDetailPanel({
   const { waveHeight, wavePeriod, windSpeed, waterTemperature } = surfInfo.conditions;
 
   // Hourly forecast data (same multipliers as the table)
-  const hours = [6, 9, 12, 15, 18];
+  // UTC hour slots used for forecast generation
+  const utcHours = [6, 9, 12, 15, 18];
+  // Convert UTC hours to local timezone hours using the surfTimestamp date
+  const hours = useMemo(() => {
+    const baseDate = parseUTCTimestamp(surfInfo.surfTimestamp);
+    if (!baseDate) return utcHours;
+    const utcDateStr = baseDate.toISOString().split('T')[0]; // "YYYY-MM-DD"
+    return utcHours.map(h => {
+      const utcTs = `${utcDateStr}T${h.toString().padStart(2, '0')}:00:00Z`;
+      const localDate = parseUTCTimestamp(utcTs);
+      return localDate ? localDate.getHours() : h;
+    });
+  }, [surfInfo.surfTimestamp]);
   const waveMultipliers = [0.9, 0.95, 1.0, 1.05, 0.98];
   const windMultipliers = [0.9, 0.95, 1.0, 1.05, 0.98];
   const periodMultipliers = [0.9, 0.95, 1.0, 1.05, 0.98];
