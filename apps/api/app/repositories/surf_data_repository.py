@@ -1,5 +1,6 @@
 """Repository for surf_info DynamoDB table operations."""
 
+import asyncio
 import logging
 import math
 import time as _time
@@ -11,14 +12,10 @@ from app.services.cache import SurfSpotsCacheService as CacheService
 
 logger = logging.getLogger(__name__)
 
-# In-memory cache for full DynamoDB scan (avoids repeated full-table scans)
-_scan_cache: list[dict] = []
-_scan_cache_time: float = 0.0
-_SCAN_CACHE_TTL: float = 300.0  # 5 minutes
-
-# Pre-indexed date cache: date_str -> list of raw DDB items for that date
-_date_index: dict[str, list[dict]] = {}
-_date_index_time: float = 0.0
+# In-memory cache for latest-per-location results
+_latest_cache: list[dict] = []
+_latest_cache_time: float = 0.0
+_CACHE_TTL: float = 300.0  # 5 minutes
 
 # Result cache for get_spots_for_date: "date|time" -> processed spots list
 _spots_for_date_cache: dict[str, list[dict]] = {}
@@ -102,47 +99,81 @@ class SurfDataRepository(BaseDynamoDBRepository):
             return False
 
     @classmethod
-    async def _scan_all_items(cls) -> list[dict]:
-        """Scan all items from DynamoDB. Uses in-memory cache to avoid repeated scans."""
-        global _scan_cache, _scan_cache_time, _date_index, _date_index_time, _spots_for_date_cache, _spots_for_date_cache_time
-
-        if _scan_cache and (_time.monotonic() - _scan_cache_time) < _SCAN_CACHE_TTL:
-            return _scan_cache
-
+    async def _get_all_location_ids(cls) -> list[str]:
+        """Get all location IDs from the locations table (lightweight scan)."""
         try:
             async with await cls.get_client() as client:
-                all_items: list[dict] = []
-                params: dict = {"TableName": cls.TABLE_NAME}
-                with dynamodb_subsegment("DynamoDB_Scan"):
-                    while True:
-                        response = await client.scan(**params)
-                        all_items.extend(response.get("Items", []))
-                        if "LastEvaluatedKey" not in response:
-                            break
-                        params["ExclusiveStartKey"] = response["LastEvaluatedKey"]
-
-                _scan_cache = all_items
-                _scan_cache_time = _time.monotonic()
-
-                # Build date index for fast date-filtered lookups
-                new_index: dict[str, list[dict]] = {}
-                for item in all_items:
-                    ts = item["surfTimestamp"]["S"]
-                    date_key = ts[:10]  # "YYYY-MM-DD"
-                    if date_key not in new_index:
-                        new_index[date_key] = []
-                    new_index[date_key].append(item)
-                _date_index = new_index
-                _date_index_time = _scan_cache_time
-                # Clear processed result cache since underlying data changed
-                _spots_for_date_cache = {}
-                _spots_for_date_cache_time = 0.0
-
-                logger.info(f"DynamoDB scan cached: {len(all_items)} items, {len(new_index)} dates indexed")
-                return all_items
+                loc_ids: list[str] = []
+                params: dict = {
+                    "TableName": settings.dynamodb_locations_table,
+                    "ProjectionExpression": "locationId",
+                }
+                while True:
+                    response = await client.scan(**params)
+                    for item in response.get("Items", []):
+                        loc_ids.append(item["locationId"]["S"])
+                    if "LastEvaluatedKey" not in response:
+                        break
+                    params["ExclusiveStartKey"] = response["LastEvaluatedKey"]
+                return loc_ids
         except Exception as e:
-            logger.error(f"Failed to scan all items: {e}")
-            return _scan_cache if _scan_cache else []
+            logger.error(f"Failed to get location IDs: {e}")
+            return []
+
+    @classmethod
+    async def _query_latest_per_location(cls, location_ids: list[str]) -> list[dict]:
+        """Query latest surf entry for each location using parallel queries."""
+        semaphore = asyncio.Semaphore(20)  # limit concurrent DynamoDB connections
+
+        async def query_one(loc_id: str) -> Optional[dict]:
+            async with semaphore:
+                try:
+                    async with await cls.get_client() as client:
+                        resp = await client.query(
+                            TableName=cls.TABLE_NAME,
+                            KeyConditionExpression="locationId = :lid",
+                            ExpressionAttributeValues={":lid": {"S": loc_id}},
+                            ScanIndexForward=False,
+                            Limit=1,
+                        )
+                        items = resp.get("Items", [])
+                        return items[0] if items else None
+                except Exception as e:
+                    logger.warning(f"Failed to query latest for {loc_id}: {e}")
+                    return None
+
+        with dynamodb_subsegment("DynamoDB_QueryLatestPerLocation"):
+            results = await asyncio.gather(*[query_one(lid) for lid in location_ids])
+        return [r for r in results if r is not None]
+
+    @classmethod
+    async def _query_by_date(cls, location_ids: list[str], date: str) -> list[dict]:
+        """Query surf entries for a specific date across all locations."""
+        semaphore = asyncio.Semaphore(20)
+
+        async def query_one(loc_id: str) -> list[dict]:
+            async with semaphore:
+                try:
+                    async with await cls.get_client() as client:
+                        resp = await client.query(
+                            TableName=cls.TABLE_NAME,
+                            KeyConditionExpression="locationId = :lid AND begins_with(surfTimestamp, :d)",
+                            ExpressionAttributeValues={
+                                ":lid": {"S": loc_id},
+                                ":d": {"S": date},
+                            },
+                        )
+                        return resp.get("Items", [])
+                except Exception as e:
+                    logger.warning(f"Failed to query date {date} for {loc_id}: {e}")
+                    return []
+
+        with dynamodb_subsegment("DynamoDB_QueryByDate"):
+            results = await asyncio.gather(*[query_one(lid) for lid in location_ids])
+        items: list[dict] = []
+        for batch in results:
+            items.extend(batch)
+        return items
 
     @classmethod
     async def _enrich_with_korean(cls, spots: list[dict]) -> list[dict]:
@@ -225,23 +256,32 @@ class SurfDataRepository(BaseDynamoDBRepository):
     @classmethod
     async def _get_all_spots_raw(cls) -> list[dict]:
         """Get all unique locations with latest forecast. Uses Redis cache."""
+        global _latest_cache, _latest_cache_time
+
         cached = await CacheService.get_all_surf_spots()
         if cached is not None:
             return cached
 
-        all_items = await cls._scan_all_items()
-        location_map: dict[str, dict] = {}
-        for item in all_items:
-            loc_id = item["locationId"]["S"]
-            ts = item["surfTimestamp"]["S"]
-            if loc_id not in location_map or ts > location_map[loc_id]["surfTimestamp"]["S"]:
-                location_map[loc_id] = item
+        if _latest_cache and (_time.monotonic() - _latest_cache_time) < _CACHE_TTL:
+            return _latest_cache
 
-        spots = [cls._to_surf_info(item) for item in location_map.values()]
+        location_ids = await cls._get_all_location_ids()
+        if not location_ids:
+            logger.warning("No location IDs found, returning empty spots")
+            return []
+
+        logger.info(f"Querying latest forecast for {len(location_ids)} locations...")
+        latest_items = await cls._query_latest_per_location(location_ids)
+        logger.info(f"Got {len(latest_items)} latest forecasts")
+
+        spots = [cls._to_surf_info(item) for item in latest_items]
         spots = await cls._enrich_with_korean(spots)
         spots.sort(
             key=lambda s: s["derivedMetrics"].get("INTERMEDIATE", {}).get("surfScore", 0), reverse=True
         )
+
+        _latest_cache = spots
+        _latest_cache_time = _time.monotonic()
 
         await CacheService.store_all_surf_spots(spots)
 
@@ -257,41 +297,34 @@ class SurfDataRepository(BaseDynamoDBRepository):
         if not date:
             return await cls._get_all_spots_raw()
 
-        # Check result cache (invalidated when scan cache expires)
+        # Check result cache
         cache_key = f"{date}|{time or ''}"
         if (
-            _spots_for_date_cache_time >= _scan_cache_time
-            and _scan_cache_time > 0
+            _spots_for_date_cache
+            and (_time.monotonic() - _spots_for_date_cache_time) < _CACHE_TTL
             and cache_key in _spots_for_date_cache
         ):
             return _spots_for_date_cache[cache_key]
 
-        # Ensure scan cache and date index are built
-        await cls._scan_all_items()
+        location_ids = await cls._get_all_location_ids()
+        if not location_ids:
+            return []
 
-        # Use pre-indexed date lookup (O(1)) instead of scanning all items
-        filtered = _date_index.get(date, [])
+        # Query only items for the requested date (not full table)
+        filtered = await cls._query_by_date(location_ids, date)
 
         if not filtered:
             return []
 
         if time:
-            # Calculate 3-hour range from selected time slot
-            # Example: time="03:00" → hours [3, 4, 5]
-            #          time="21:00" → hours [21, 22, 23]
             try:
                 start_hour = int(time.split(":")[0])
-
-                # Generate timestamp prefixes for 3-hour window
-                # Use "HH:" prefix to match any minute/second in that hour
                 time_prefixes = []
                 for offset in range(3):
                     hour = start_hour + offset
-                    # Don't wrap past midnight (next day is different date partition)
                     if hour <= 23:
                         time_prefixes.append(f"{date}T{hour:02d}:")
 
-                # Filter items matching any hour in the 3-hour range
                 time_matched = [
                     item for item in filtered
                     if any(item["surfTimestamp"]["S"].startswith(prefix) for prefix in time_prefixes)
@@ -300,7 +333,6 @@ class SurfDataRepository(BaseDynamoDBRepository):
                 if time_matched:
                     filtered = time_matched
             except (ValueError, IndexError):
-                # Invalid time format - fall back to no time filtering
                 pass
 
         # Pick one item per location: prefer closest to requested time
@@ -313,10 +345,9 @@ class SurfDataRepository(BaseDynamoDBRepository):
             else:
                 existing_ts = location_map[loc_id]["surfTimestamp"]["S"]
                 if time:
-                    target = f"{date}T{time}"
                     ts_time = ts[11:16] if len(ts) > 15 else ts[11:]
                     ex_time = existing_ts[11:16] if len(existing_ts) > 15 else existing_ts[11:]
-                    tg_time = target[11:16] if len(target) > 15 else target[11:]
+                    tg_time = time[:5]
                     if abs(int(ts_time.replace(":", "")) - int(tg_time.replace(":", ""))) < abs(int(ex_time.replace(":", "")) - int(tg_time.replace(":", ""))):
                         location_map[loc_id] = item
                 else:
