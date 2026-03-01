@@ -72,6 +72,26 @@ spec:
             periodSeconds: 15
             timeoutSeconds: 5
             failureThreshold: 6
+
+        # X-Ray daemon sidecar — receives UDP segments from FastAPI SDK
+        # on 127.0.0.1:2000 and forwards them to AWS X-Ray API using IRSA creds.
+        - name: xray-daemon
+          image: public.ecr.aws/xray/aws-xray-daemon:3.x
+          args: ["--bind", "0.0.0.0:2000"]
+          ports:
+            - containerPort: 2000
+              protocol: UDP
+              name: xray-ingest
+          resources:
+            requests:
+              cpu: "32m"
+              memory: "24Mi"
+            limits:
+              cpu: "256m"
+              memory: "64Mi"
+          env:
+            - name: AWS_REGION
+              value: "us-east-1"
       imagePullSecrets:
         {{- range .Values.imagePullSecrets }}
         - name: {{ .name }}
