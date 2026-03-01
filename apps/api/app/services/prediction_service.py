@@ -129,7 +129,7 @@ async def _call_sagemaker_aws(
     """Call AWS SageMaker endpoint via boto3 sagemaker-runtime."""
     payload = {
         "location": location_id,
-        "current_date": surf_date,
+        "target_date": surf_date,
         "level": surfer_level,
         "lat": lat,
         "lon": lng,
