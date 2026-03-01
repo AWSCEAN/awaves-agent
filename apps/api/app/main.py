@@ -29,6 +29,9 @@ from app.repositories.surf_data_repository import SurfDataRepository
 # Initialise JSON structured logging before any logger is used
 setup_json_logging()
 
+# Initialise X-Ray tracing (patches boto3, httpx, etc.)
+init_tracing()
+
 logger = logging.getLogger(__name__)
 
 # Path to Korean translations CSV
@@ -228,9 +231,6 @@ async def _warm_cache_background():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager for startup and shutdown."""
-    # Initialise X-Ray tracing inside the running event loop so that
-    # AsyncContext captures uvicorn's loop (not a stale module-level one).
-    init_tracing()
     # Startup: Initialize database tables and DynamoDB
     await init_db()
     async with xray_segment("startup-init"):

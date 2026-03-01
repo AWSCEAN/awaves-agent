@@ -1,15 +1,19 @@
 """AWS X-Ray tracing integration.
 
 Initialises the X-Ray recorder with patch_all() so that boto3, httpx,
-and other supported libraries are automatically instrumented.  A pure
-ASGI middleware wraps every incoming request in an X-Ray segment named
+and other supported libraries are automatically instrumented.  An ASGI
+middleware wraps every incoming request in an X-Ray segment named
 "FastAPI".
 
-The recorder is configured with ``AsyncContext`` (backed by
-``contextvars``) so that the active segment propagates correctly across
-``await`` boundaries.  We use a raw ASGI middleware instead of
-Starlette's ``BaseHTTPMiddleware`` because the latter runs downstream
-handlers in a separate task, which breaks context propagation.
+The default thread-local context is used (not AsyncContext) because
+AsyncContext's ``set_task_factory`` conflicts with anyio's task
+creation used internally by Starlette / FastAPI.  Patched libraries
+that run outside an HTTP request (e.g. startup, background tasks)
+should be wrapped with ``xray_segment()`` to provide a parent segment.
+
+Subsegment lookups that happen outside a segment (e.g. sync boto3 in a
+thread-pool executor) are silenced by lowering the SDK context logger
+to CRITICAL.
 
 In local/dev environments where no X-Ray daemon is running, tracing
 is configured in no-op mode so the application still starts cleanly.
@@ -18,7 +22,9 @@ is configured in no-op mode so the application still starts cleanly.
 import logging
 from contextlib import asynccontextmanager
 
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 
 from app.config import settings
 
@@ -40,17 +46,22 @@ def init_tracing() -> None:
 
     try:
         from aws_xray_sdk.core import xray_recorder, patch_all
-        from aws_xray_sdk.core.async_context import AsyncContext
 
         xray_recorder.configure(
             service="awaves-api",
             daemon_address="127.0.0.1:2000",
             context_missing="LOG_ERROR",
-            context=AsyncContext(),
         )
         patch_all()
         _xray_recorder = xray_recorder
-        logger.info("X-Ray tracing initialised (service=awaves-api, context=AsyncContext)")
+
+        # Silence the noisy "cannot find the current segment" messages
+        # that fire when patched libraries (e.g. sync boto3 in a thread
+        # executor) run outside a request segment.  Genuine tracing
+        # issues are still visible via the middleware and xray_segment.
+        logging.getLogger("aws_xray_sdk.core.context").setLevel(logging.CRITICAL)
+
+        logger.info("X-Ray tracing initialised (service=awaves-api)")
     except ImportError:
         logger.warning("aws-xray-sdk not installed - X-Ray tracing disabled")
     except Exception as exc:
@@ -85,55 +96,27 @@ async def xray_segment(name: str):
         recorder.end_segment()
 
 
-class XRayMiddleware:
-    """Pure ASGI middleware that wraps each HTTP request in an X-Ray segment."""
+class XRayMiddleware(BaseHTTPMiddleware):
+    """Wrap each HTTP request in an X-Ray segment named 'FastAPI'."""
 
-    def __init__(self, app: ASGIApp) -> None:
-        self.app = app
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
-
+    async def dispatch(self, request: Request, call_next) -> Response:
         recorder = get_xray_recorder()
         if recorder is None:
-            await self.app(scope, receive, send)
-            return
+            return await call_next(request)
 
         segment = recorder.begin_segment("FastAPI")
         try:
-            # Build request URL from scope
-            scheme = scope.get("scheme", "http")
-            host = next(
-                (v.decode() for k, v in scope.get("headers", []) if k == b"host"),
-                scope.get("server", ("localhost",))[0],
-            )
-            path = scope.get("path", "/")
-            segment.put_http_meta("url", f"{scheme}://{host}{path}")
-            segment.put_http_meta("method", scope.get("method", ""))
+            segment.put_http_meta("url", str(request.url))
+            segment.put_http_meta("method", request.method)
 
             # Annotate with frontend trace ID for end-to-end correlation
-            fe_trace_id = next(
-                (v.decode() for k, v in scope.get("headers", [])
-                 if k == b"x-amzn-trace-id"),
-                None,
-            )
+            fe_trace_id = request.headers.get("X-Amzn-Trace-Id")
             if fe_trace_id:
                 segment.put_annotation("frontend_trace_id", fe_trace_id)
 
-            status_code = 500  # default in case send is never called
-
-            original_send = send
-
-            async def send_with_status(message):
-                nonlocal status_code
-                if message["type"] == "http.response.start":
-                    status_code = message["status"]
-                await original_send(message)
-
-            await self.app(scope, receive, send_with_status)
-            segment.put_http_meta("status", status_code)
+            response: Response = await call_next(request)
+            segment.put_http_meta("status", response.status_code)
+            return response
         except Exception as exc:
             segment.add_exception(exc, stack=True)
             raise
