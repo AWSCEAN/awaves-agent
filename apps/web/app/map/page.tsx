@@ -430,6 +430,8 @@ function MapPageContent() {
   };
 
   const handleMultiSaveMarkerClick = useCallback((locationId: string, coordinates: { lat: number; lng: number }) => {
+    // Fly to the saved marker's exact coordinate first, regardless of branch below
+    setMapCenter({ lat: coordinates.lat, lng: coordinates.lng });
     const saves = savesByLocation.get(locationId) || [];
     if (saves.length === 1) {
       // Single save: prefer current forecast, fall back to saved data
