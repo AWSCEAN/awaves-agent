@@ -77,7 +77,7 @@ async def _invoke_and_cache(
     location_id: str, surf_timestamp: str, level: str
 ) -> None:
     """Invoke Lambda (or return mock in local env) and cache the result."""
-    if settings.env in ("local", "dev", "development"):
+    if settings.env == "local":
         await _mock_and_cache(location_id, surf_timestamp, level)
     else:
         await _invoke_lambda_and_cache(location_id, surf_timestamp, level)

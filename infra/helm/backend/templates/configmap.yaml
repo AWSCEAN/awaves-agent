@@ -26,3 +26,4 @@ data:
   CORS_ORIGINS: "https://awaves.net,https://www.awaves.net,https://web.awaves.net,https://mobile.awaves.net"
   INFERENCE_MODE: "sagemaker"
   SAGEMAKER_ENDPOINT_NAME: "awaves-dev-surf-index"
+  LLM_SUMMARY_LAMBDA_NAME: "awaves-dev-bedrock-summary"
