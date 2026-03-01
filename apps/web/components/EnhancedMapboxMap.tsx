@@ -636,6 +636,31 @@ export default function EnhancedMapboxMap({
       return;
     }
 
+    // 1b. Check saved spots within 1km — handles spots that are saved but not in
+    // the current surf forecast data (e.g. filtered out by date/time selection)
+    if (onMultiSaveMarkerClick) {
+      let savedClosestDist = Infinity;
+      let savedClosestId: string | null = null;
+      let savedClosestCoords: { lat: number; lng: number } | null = null;
+      for (const savedSpot of savedSpots) {
+        if (!savedSpot.locationId?.includes('#')) continue;
+        const [sLatStr, sLngStr] = savedSpot.locationId.split('#');
+        const sLat = parseFloat(sLatStr);
+        const sLng = parseFloat(sLngStr);
+        if (isNaN(sLat) || isNaN(sLng)) continue;
+        const R = 6371;
+        const dLat = (sLat - lngLat.lat) * Math.PI / 180;
+        const dLng = (sLng - lngLat.lng) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(lngLat.lat * Math.PI / 180) * Math.cos(sLat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+        const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        if (dist < savedClosestDist) { savedClosestDist = dist; savedClosestId = savedSpot.locationId; savedClosestCoords = { lat: sLat, lng: sLng }; }
+      }
+      if (savedClosestId && savedClosestDist <= 1 && savedClosestCoords) {
+        onMultiSaveMarkerClick(savedClosestId, savedClosestCoords);
+        return;
+      }
+    }
+
     // 2. Find the best spot within 100km (highest surfScore, alphabetical tiebreaker)
     let bestNearby: { spot: SurfInfo; distance: number } | null = null;
 
