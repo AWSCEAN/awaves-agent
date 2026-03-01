@@ -139,34 +139,47 @@ export default function SpotDetailPanel({
   const { surfScore, surfGrade } = getMetricsForLevel(surfInfo.derivedMetrics, effectiveLevel);
   const { waveHeight, wavePeriod, windSpeed, waterTemperature } = surfInfo.conditions;
 
-  // Hourly forecast data (same multipliers as the table)
-  // UTC hour slots used for forecast generation
-  const utcHours = [6, 9, 12, 15, 18];
-  // Convert UTC hours to local timezone hours using the surfTimestamp date
-  const hours = useMemo(() => {
-    const baseDate = parseUTCTimestamp(surfInfo.surfTimestamp);
-    if (!baseDate) return utcHours;
-    const utcDateStr = baseDate.toISOString().split('T')[0]; // "YYYY-MM-DD"
-    return utcHours.map(h => {
-      const utcTs = `${utcDateStr}T${h.toString().padStart(2, '0')}:00:00Z`;
-      const localDate = parseUTCTimestamp(utcTs);
-      return localDate ? localDate.getHours() : h;
-    });
-  }, [surfInfo.surfTimestamp]);
-  const waveMultipliers = [0.9, 0.95, 1.0, 1.05, 0.98];
-  const windMultipliers = [0.9, 0.95, 1.0, 1.05, 0.98];
-  const periodMultipliers = [0.9, 0.95, 1.0, 1.05, 0.98];
-  const scoreMultipliers = [0.85, 0.92, 1.0, 0.95, 0.88];
-  const airTempMultipliers = [0.95, 1.0, 1.1, 1.15, 1.05];
+  // All 8 local time slots for forecast display
+  const hours = [0, 3, 6, 9, 12, 15, 18, 21];
 
-  const forecastData = useMemo(() => ({
-    waveHeights: waveMultipliers.map(v => +(waveHeight * v).toFixed(1)),
-    wavePeriods: periodMultipliers.map(v => +(wavePeriod * v).toFixed(1)),
-    windSpeeds: windMultipliers.map(v => +(windSpeed * v).toFixed(1)),
-    waterTemps: [waterTemperature, waterTemperature, waterTemperature, waterTemperature, waterTemperature].map(v => +v.toFixed(1)),
-    airTemps: airTempMultipliers.map(v => +((waterTemperature + 5) * v).toFixed(1)),
-    scores: scoreMultipliers.map(v => Math.round(surfScore * v)),
-  }), [waveHeight, wavePeriod, windSpeed, waterTemperature, surfScore]);
+  // Determine the local hour of the selected surfTimestamp to position multiplier=1.0
+  const selectedLocalHour = useMemo(() => {
+    const date = parseUTCTimestamp(surfInfo.surfTimestamp);
+    if (!date) return 12;
+    // Round down to nearest 3-hour slot
+    return Math.floor(date.getHours() / 3) * 3;
+  }, [surfInfo.surfTimestamp]);
+
+  // Build multipliers centered on the selected time slot
+  // The selected slot gets 1.0; adjacent slots taper off symmetrically
+  const buildMultipliers = useCallback((baseMultipliers: number[]) => {
+    // baseMultipliers: [nearest, 1-step, 2-step, 3-step, 4-step] from center
+    const selectedIdx = hours.indexOf(selectedLocalHour);
+    return hours.map((_, i) => {
+      const dist = Math.min(
+        Math.abs(i - selectedIdx),
+        hours.length - Math.abs(i - selectedIdx), // wrap-around distance
+      );
+      return baseMultipliers[Math.min(dist, baseMultipliers.length - 1)];
+    });
+  }, [selectedLocalHour]);
+
+  const forecastData = useMemo(() => {
+    const waveMult   = buildMultipliers([1.0, 0.98, 0.95, 0.90, 0.85]);
+    const periodMult = buildMultipliers([1.0, 0.98, 0.95, 0.90, 0.85]);
+    const windMult   = buildMultipliers([1.0, 1.02, 1.05, 1.08, 1.10]);
+    const scoreMult  = buildMultipliers([1.0, 0.95, 0.92, 0.88, 0.85]);
+    const airMult    = buildMultipliers([1.05, 1.0, 0.95, 0.92, 0.90]);
+
+    return {
+      waveHeights: waveMult.map(v => +(waveHeight * v).toFixed(1)),
+      wavePeriods: periodMult.map(v => +(wavePeriod * v).toFixed(1)),
+      windSpeeds:  windMult.map(v => +(windSpeed * v).toFixed(1)),
+      waterTemps:  hours.map(() => +waterTemperature.toFixed(1)),
+      airTemps:    airMult.map(v => +((waterTemperature + 5) * v).toFixed(1)),
+      scores:      scoreMult.map(v => Math.round(surfScore * v)),
+    };
+  }, [waveHeight, wavePeriod, windSpeed, waterTemperature, surfScore, buildMultipliers]);
 
   const getScoreLabel = (score: number): string => {
     if (score >= 70) return locale === 'ko' ? '좋음' : 'Good';
@@ -493,7 +506,9 @@ export default function SpotDetailPanel({
                 <tr className="text-ocean-600 border-b border-ocean-200">
                   <th className="py-0.5 px-1.5 text-left font-medium w-20"></th>
                   {hours.map((hour, i) => (
-                    <th key={i} className="py-0.5 px-1.5 text-center font-medium">
+                    <th key={i} className={`py-0.5 px-1.5 text-center font-medium ${
+                      hour === selectedLocalHour ? 'text-ocean-800 bg-ocean-50' : ''
+                    }`}>
                       {hour.toString().padStart(2, '0')}:00
                     </th>
                   ))}
@@ -503,49 +518,46 @@ export default function SpotDetailPanel({
                 {/* Wave Height Row */}
                 <tr className="border-b border-ocean-100">
                   <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '파고' : 'Wave Height'} <span className="text-ocean-400 font-normal">(m)</span></td>
-                  {[0.9, 0.95, 1.0, 1.05, 0.98].map((v, idx) => (
-                    <td key={idx} className="py-1 px-1.5 text-center">{(waveHeight * v).toFixed(1)}</td>
+                  {forecastData.waveHeights.map((v, idx) => (
+                    <td key={idx} className="py-1 px-1.5 text-center">{v}</td>
                   ))}
                 </tr>
                 {/* Wave Period Row */}
                 <tr className="border-b border-ocean-100">
                   <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '파주기' : 'Wave Period'} <span className="text-ocean-400 font-normal">(s)</span></td>
-                  {[0.9, 0.95, 1.0, 1.05, 0.98].map((v, idx) => (
-                    <td key={idx} className="py-1 px-1.5 text-center">{(wavePeriod * v).toFixed(1)}</td>
+                  {forecastData.wavePeriods.map((v, idx) => (
+                    <td key={idx} className="py-1 px-1.5 text-center">{v}</td>
                   ))}
                 </tr>
                 {/* Wind Speed Row */}
                 <tr className="border-b border-ocean-100">
                   <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '풍속' : 'Wind Speed'} <span className="text-ocean-400 font-normal">(m/s)</span></td>
-                  {[0.9, 0.95, 1.0, 1.05, 0.98].map((v, idx) => (
-                    <td key={idx} className="py-1 px-1.5 text-center">{(windSpeed * v).toFixed(1)}</td>
+                  {forecastData.windSpeeds.map((v, idx) => (
+                    <td key={idx} className="py-1 px-1.5 text-center">{v}</td>
                   ))}
                 </tr>
                 {/* Water Temperature Row */}
                 <tr className="border-b border-ocean-100">
                   <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '수온' : 'Water Temp'} <span className="text-ocean-400 font-normal">(°C)</span></td>
-                  {[0, 0, 0, 0, 0].map((_, idx) => (
-                    <td key={idx} className="py-1 px-1.5 text-center">{waterTemperature.toFixed(1)}</td>
+                  {forecastData.waterTemps.map((v, idx) => (
+                    <td key={idx} className="py-1 px-1.5 text-center">{v}</td>
                   ))}
                 </tr>
                 {/* Air Temperature Row */}
                 <tr className="border-b border-ocean-100">
                   <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '기온' : 'Air Temp'} <span className="text-ocean-400 font-normal">(°C)</span></td>
-                  {[0.95, 1.0, 1.1, 1.15, 1.05].map((v, idx) => (
-                    <td key={idx} className="py-1 px-1.5 text-center">{((waterTemperature + 5) * v).toFixed(1)}</td>
+                  {forecastData.airTemps.map((v, idx) => (
+                    <td key={idx} className="py-1 px-1.5 text-center">{v}</td>
                   ))}
                 </tr>
                 {/* Score Row with colored text */}
                 <tr>
                   <td className="py-1 px-1.5 font-medium text-ocean-600 whitespace-nowrap">{locale === 'ko' ? '점수' : 'Score'}</td>
-                  {[0.85, 0.92, 1.0, 0.95, 0.88].map((v, idx) => {
-                    const score = Math.round(surfScore * v);
-                    return (
-                      <td key={idx} className={`py-1 px-1.5 text-center font-bold ${getScoreColor(score)}`}>
-                        {score}
-                      </td>
-                    );
-                  })}
+                  {forecastData.scores.map((score, idx) => (
+                    <td key={idx} className={`py-1 px-1.5 text-center font-bold ${getScoreColor(score)}`}>
+                      {score}
+                    </td>
+                  ))}
                 </tr>
               </tbody>
             </table>
