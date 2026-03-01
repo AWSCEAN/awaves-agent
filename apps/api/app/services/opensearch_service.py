@@ -83,7 +83,12 @@ class OpenSearchService:
 
     @classmethod
     async def _check_nori_available(cls, client: AsyncOpenSearch) -> bool:
-        """Check if the nori tokenizer plugin is installed."""
+        """Check if the nori tokenizer plugin is installed.
+
+        First tries cat.plugins (works for self-hosted OpenSearch), then
+        falls back to the analyze API (works for Amazon OpenSearch Service
+        where nori is installed as an associated package).
+        """
         if cls._nori_available is not None:
             return cls._nori_available
         try:
@@ -93,6 +98,17 @@ class OpenSearchService:
             )
         except Exception:
             cls._nori_available = False
+
+        # Fallback: try the analyze API (catches Amazon OpenSearch Service packages)
+        if not cls._nori_available:
+            try:
+                await client.indices.analyze(
+                    body={"tokenizer": "nori_tokenizer", "text": "테스트"}
+                )
+                cls._nori_available = True
+            except Exception:
+                cls._nori_available = False
+
         if not cls._nori_available:
             logger.warning(
                 "nori_tokenizer plugin not installed. "
