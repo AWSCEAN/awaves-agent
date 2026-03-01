@@ -17,13 +17,13 @@ class InferenceCacheService(BaseCacheService):
     INFERENCE_PREFIX = "awaves:surf:inference"
 
     @classmethod
-    def _inference_key(cls, location_id: str, surf_timestamp: str) -> str:
+    def _inference_key(cls, location_id: str, surf_timestamp: str, surfing_level: str) -> str:
         """Generate cache key for inference prediction."""
-        return f"{cls.INFERENCE_PREFIX}:{location_id}:{surf_timestamp}"
+        return f"{cls.INFERENCE_PREFIX}:{location_id}:{surf_timestamp}:{surfing_level.upper()}"
 
     @classmethod
     async def get_inference_prediction(
-        cls, location_id: str, surf_timestamp: str
+        cls, location_id: str, surf_timestamp: str, surfing_level: str
     ) -> Optional[dict]:
         """Get cached inference prediction."""
         client = await cls.get_client()
@@ -32,7 +32,7 @@ class InferenceCacheService(BaseCacheService):
 
         try:
             with _redis_subsegment("Redis_Get"):
-                value = await client.get(cls._inference_key(location_id, surf_timestamp))
+                value = await client.get(cls._inference_key(location_id, surf_timestamp, surfing_level))
             if value:
                 emit_cache_hit("inference")
                 return json.loads(value)
@@ -44,7 +44,7 @@ class InferenceCacheService(BaseCacheService):
 
     @classmethod
     async def store_inference_prediction(
-        cls, location_id: str, surf_timestamp: str, data: dict
+        cls, location_id: str, surf_timestamp: str, surfing_level: str, data: dict
     ) -> None:
         """Store inference prediction in cache."""
         client = await cls.get_client()
@@ -53,7 +53,7 @@ class InferenceCacheService(BaseCacheService):
 
         try:
             await client.setex(
-                cls._inference_key(location_id, surf_timestamp),
+                cls._inference_key(location_id, surf_timestamp, surfing_level),
                 settings.redis_ttl_seconds,
                 json.dumps(data),
             )
