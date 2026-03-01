@@ -1,6 +1,7 @@
 """Search service combining OpenSearch, Redis cache, and DynamoDB."""
 
 import logging
+import time as _time
 from typing import Optional
 
 from app.middleware.metrics import emit_external_api_failure
@@ -74,10 +75,14 @@ class SearchService:
         4. Filter by surfer_level if specified.
         5. Return aggregated results enriched with location metadata.
         """
+        t_total = _time.monotonic()
+
         # Step 1: Search OpenSearch (location keyword search only)
+        t0 = _time.monotonic()
         os_results = await OpenSearchService.search_locations(
             query, size=size, language=language
         )
+        logger.info("[search] OpenSearch took %.0fms, %d hits", (_time.monotonic() - t0) * 1000, len(os_results or []))
         if not os_results:
             # OpenSearch unavailable or returned nothing — fall back to DynamoDB text search
             emit_external_api_failure("OpenSearch")
@@ -87,7 +92,9 @@ class SearchService:
 
         # Step 2: Batch-fetch all spots for the date/time (uses in-memory cache)
         # This is a single call instead of N individual DynamoDB queries
+        t0 = _time.monotonic()
         all_spots = await SurfDataRepository.get_spots_for_date(date, time)
+        logger.info("[search] get_spots_for_date took %.0fms, %d spots", (_time.monotonic() - t0) * 1000, len(all_spots))
         spots_by_id: dict[str, dict] = {s["locationId"]: s for s in all_spots}
 
         # Step 3: Match OpenSearch results with surf data
@@ -179,4 +186,5 @@ class SearchService:
                     "bestSeason": [],
                 })
 
+        logger.info("[search] total search took %.0fms, %d results", (_time.monotonic() - t_total) * 1000, len(results))
         return results

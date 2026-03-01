@@ -21,6 +21,11 @@ _CACHE_TTL: float = 300.0  # 5 minutes
 _spots_for_date_cache: dict[str, list[dict]] = {}
 _spots_for_date_cache_time: float = 0.0
 
+# In-memory cache for location IDs (avoids repeated Scan)
+_location_ids_cache: list[str] = []
+_location_ids_cache_time: float = 0.0
+_LOCATION_IDS_CACHE_TTL: float = 600.0  # 10 minutes
+
 
 def _haversine(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     """Calculate distance between two coordinates in km."""
@@ -100,7 +105,16 @@ class SurfDataRepository(BaseDynamoDBRepository):
 
     @classmethod
     async def _get_all_location_ids(cls) -> list[str]:
-        """Get all location IDs from the locations table (lightweight scan)."""
+        """Get all location IDs from the locations table (lightweight scan).
+
+        Results are cached in-memory for 10 minutes to avoid repeated scans.
+        """
+        global _location_ids_cache, _location_ids_cache_time
+
+        if _location_ids_cache and (_time.monotonic() - _location_ids_cache_time) < _LOCATION_IDS_CACHE_TTL:
+            return _location_ids_cache
+
+        t0 = _time.monotonic()
         try:
             async with await cls.get_client() as client:
                 loc_ids: list[str] = []
@@ -115,6 +129,9 @@ class SurfDataRepository(BaseDynamoDBRepository):
                     if "LastEvaluatedKey" not in response:
                         break
                     params["ExclusiveStartKey"] = response["LastEvaluatedKey"]
+                logger.info("[perf] _get_all_location_ids scan took %.0fms, %d IDs", (_time.monotonic() - t0) * 1000, len(loc_ids))
+                _location_ids_cache = loc_ids
+                _location_ids_cache_time = _time.monotonic()
                 return loc_ids
         except Exception as e:
             logger.error(f"Failed to get location IDs: {e}")
@@ -122,13 +139,18 @@ class SurfDataRepository(BaseDynamoDBRepository):
 
     @classmethod
     async def _query_latest_per_location(cls, location_ids: list[str]) -> list[dict]:
-        """Query latest surf entry for each location using parallel queries."""
-        semaphore = asyncio.Semaphore(20)  # limit concurrent DynamoDB connections
+        """Query latest surf entry for each location using parallel queries.
 
-        async def query_one(loc_id: str) -> Optional[dict]:
-            async with semaphore:
-                try:
-                    async with await cls.get_client() as client:
+        Uses a single shared DDB client to avoid per-query connection overhead.
+        """
+        semaphore = asyncio.Semaphore(50)
+        t0 = _time.monotonic()
+
+        async with await cls.get_client() as client:
+
+            async def query_one(loc_id: str) -> Optional[dict]:
+                async with semaphore:
+                    try:
                         resp = await client.query(
                             TableName=cls.TABLE_NAME,
                             KeyConditionExpression="locationId = :lid",
@@ -138,23 +160,30 @@ class SurfDataRepository(BaseDynamoDBRepository):
                         )
                         items = resp.get("Items", [])
                         return items[0] if items else None
-                except Exception as e:
-                    logger.warning(f"Failed to query latest for {loc_id}: {e}")
-                    return None
+                    except Exception as e:
+                        logger.warning(f"Failed to query latest for {loc_id}: {e}")
+                        return None
 
-        with dynamodb_subsegment("DynamoDB_QueryLatestPerLocation"):
-            results = await asyncio.gather(*[query_one(lid) for lid in location_ids])
+            with dynamodb_subsegment("DynamoDB_QueryLatestPerLocation"):
+                results = await asyncio.gather(*[query_one(lid) for lid in location_ids])
+
+        logger.info("[perf] _query_latest_per_location took %.0fms for %d locations", (_time.monotonic() - t0) * 1000, len(location_ids))
         return [r for r in results if r is not None]
 
     @classmethod
     async def _query_by_date(cls, location_ids: list[str], date: str) -> list[dict]:
-        """Query surf entries for a specific date across all locations."""
-        semaphore = asyncio.Semaphore(20)
+        """Query surf entries for a specific date across all locations.
 
-        async def query_one(loc_id: str) -> list[dict]:
-            async with semaphore:
-                try:
-                    async with await cls.get_client() as client:
+        Uses a single shared DDB client to avoid per-query connection overhead.
+        """
+        semaphore = asyncio.Semaphore(50)
+        t0 = _time.monotonic()
+
+        async with await cls.get_client() as client:
+
+            async def query_one(loc_id: str) -> list[dict]:
+                async with semaphore:
+                    try:
                         resp = await client.query(
                             TableName=cls.TABLE_NAME,
                             KeyConditionExpression="locationId = :lid AND begins_with(surfTimestamp, :d)",
@@ -164,15 +193,17 @@ class SurfDataRepository(BaseDynamoDBRepository):
                             },
                         )
                         return resp.get("Items", [])
-                except Exception as e:
-                    logger.warning(f"Failed to query date {date} for {loc_id}: {e}")
-                    return []
+                    except Exception as e:
+                        logger.warning(f"Failed to query date {date} for {loc_id}: {e}")
+                        return []
 
-        with dynamodb_subsegment("DynamoDB_QueryByDate"):
-            results = await asyncio.gather(*[query_one(lid) for lid in location_ids])
+            with dynamodb_subsegment("DynamoDB_QueryByDate"):
+                results = await asyncio.gather(*[query_one(lid) for lid in location_ids])
+
         items: list[dict] = []
         for batch in results:
             items.extend(batch)
+        logger.info("[perf] _query_by_date took %.0fms for %d locations", (_time.monotonic() - t0) * 1000, len(location_ids))
         return items
 
     @classmethod
@@ -186,14 +217,15 @@ class SurfDataRepository(BaseDynamoDBRepository):
         if not spots:
             return spots
 
+        t0 = _time.monotonic()
         try:
             loc_ids = [s["locationId"] for s in spots]
             # BatchGetItem: max 100 keys per request
             loc_map: dict[str, dict] = {}
-            for i in range(0, len(loc_ids), 100):
-                batch_ids = loc_ids[i:i + 100]
-                keys = [{"locationId": {"S": lid}} for lid in batch_ids]
-                async with await cls.get_client() as client:
+            async with await cls.get_client() as client:
+                for i in range(0, len(loc_ids), 100):
+                    batch_ids = loc_ids[i:i + 100]
+                    keys = [{"locationId": {"S": lid}} for lid in batch_ids]
                     resp = await client.batch_get_item(
                         RequestItems={
                             settings.dynamodb_locations_table: {
@@ -201,32 +233,32 @@ class SurfDataRepository(BaseDynamoDBRepository):
                             }
                         }
                     )
-                for item in resp.get("Responses", {}).get(settings.dynamodb_locations_table, []):
-                    lid = item["locationId"]["S"]
+                    for item in resp.get("Responses", {}).get(settings.dynamodb_locations_table, []):
+                        lid = item["locationId"]["S"]
 
-                    def _get(field: str, *fallbacks: str) -> str | None:
-                        """Read a DDB string attr, trying camelCase then fallback names."""
-                        val = item.get(field, {}).get("S", "") or ""
-                        if not val:
-                            for fb in fallbacks:
-                                val = item.get(fb, {}).get("S", "") or ""
-                                if val:
-                                    break
-                        return val or None
+                        def _get(field: str, *fallbacks: str, _item: dict = item) -> str | None:
+                            """Read a DDB string attr, trying camelCase then fallback names."""
+                            val = _item.get(field, {}).get("S", "") or ""
+                            if not val:
+                                for fb in fallbacks:
+                                    val = _item.get(fb, {}).get("S", "") or ""
+                                    if val:
+                                        break
+                            return val or None
 
-                    loc_map[lid] = {
-                        # English fields (camelCase → snake_case fallback)
-                        "display_name": _get("displayName", "display_name"),
-                        "city": _get("city"),
-                        "region": _get("state"),
-                        "country": _get("country"),
-                        # Korean fields (Ko → Kr → snake_case fallback)
-                        "nameKo": _get("displayNameKo", "displayNameKr", "display_name_ko"),
-                        "cityKo": _get("cityKo", "cityKr", "city_ko"),
-                        "regionKo": _get("stateKo", "stateKr", "state_ko"),
-                        "countryKo": _get("countryKo", "countryKr", "country_ko"),
-                        "addressKo": _get("displayNameKo", "displayNameKr", "display_name_ko"),
-                    }
+                        loc_map[lid] = {
+                            # English fields (camelCase → snake_case fallback)
+                            "display_name": _get("displayName", "display_name"),
+                            "city": _get("city"),
+                            "region": _get("state"),
+                            "country": _get("country"),
+                            # Korean fields (Ko → Kr → snake_case fallback)
+                            "nameKo": _get("displayNameKo", "displayNameKr", "display_name_ko"),
+                            "cityKo": _get("cityKo", "cityKr", "city_ko"),
+                            "regionKo": _get("stateKo", "stateKr", "state_ko"),
+                            "countryKo": _get("countryKo", "countryKr", "country_ko"),
+                            "addressKo": _get("displayNameKo", "displayNameKr", "display_name_ko"),
+                        }
 
             enriched_count = 0
             for spot in spots:
@@ -251,8 +283,8 @@ class SurfDataRepository(BaseDynamoDBRepository):
                     if loc.get(key):
                         spot[key] = loc[key]
             logger.info(
-                "Enrichment complete: %d/%d spots received displayName from locations table",
-                enriched_count, len(spots),
+                "[perf] _enrich_with_korean took %.0fms: %d/%d spots enriched",
+                (_time.monotonic() - t0) * 1000, enriched_count, len(spots),
             )
         except Exception as e:
             logger.warning(f"Failed to enrich spots with location data: {e}", exc_info=True)
@@ -303,14 +335,29 @@ class SurfDataRepository(BaseDynamoDBRepository):
         if not date:
             return await cls._get_all_spots_raw()
 
-        # Check result cache
+        t_total = _time.monotonic()
+
+        # Check in-memory result cache
         cache_key = f"{date}|{time or ''}"
         if (
             _spots_for_date_cache
             and (_time.monotonic() - _spots_for_date_cache_time) < _CACHE_TTL
             and cache_key in _spots_for_date_cache
         ):
+            logger.info("[perf] get_spots_for_date cache HIT (in-memory) for %s", cache_key)
             return _spots_for_date_cache[cache_key]
+
+        # Check Redis cache
+        redis_key = f"awaves:surf:date:{cache_key}"
+        try:
+            cached = await CacheService.get_by_key(redis_key)
+            if cached is not None:
+                logger.info("[perf] get_spots_for_date cache HIT (Redis) for %s", cache_key)
+                _spots_for_date_cache[cache_key] = cached
+                _spots_for_date_cache_time = _time.monotonic()
+                return cached
+        except Exception:
+            pass
 
         location_ids = await cls._get_all_location_ids()
         if not location_ids:
@@ -370,6 +417,13 @@ class SurfDataRepository(BaseDynamoDBRepository):
         _spots_for_date_cache[cache_key] = spots
         _spots_for_date_cache_time = _time.monotonic()
 
+        # Store in Redis for cross-request caching
+        try:
+            await CacheService.store_by_key(redis_key, spots)
+        except Exception:
+            pass
+
+        logger.info("[perf] get_spots_for_date total %.0fms for %s (%d spots)", (_time.monotonic() - t_total) * 1000, cache_key, len(spots))
         return spots
 
     @classmethod

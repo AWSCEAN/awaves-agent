@@ -52,6 +52,31 @@ class SurfSpotsCacheService(BaseCacheService):
             logger.warning(f"Failed to store surf spots in cache: {e}")
 
     @classmethod
+    async def get_by_key(cls, key: str) -> Optional[list[dict]]:
+        """Get cached data by arbitrary key."""
+        client = await cls.get_client()
+        if not client:
+            return None
+        try:
+            value = await client.get(key)
+            if value:
+                return json.loads(value)
+        except Exception as e:
+            logger.warning(f"Failed to get cache key {key}: {e}")
+        return None
+
+    @classmethod
+    async def store_by_key(cls, key: str, data: list[dict], ttl: Optional[int] = None) -> None:
+        """Store data under arbitrary key with TTL."""
+        client = await cls.get_client()
+        if not client:
+            return
+        try:
+            await client.setex(key, ttl or settings.cache_ttl_surf_spots, json.dumps(data))
+        except Exception as e:
+            logger.warning(f"Failed to store cache key {key}: {e}")
+
+    @classmethod
     async def invalidate_surf_spots(cls) -> None:
         """Invalidate surf spots cache."""
         client = await cls.get_client()
