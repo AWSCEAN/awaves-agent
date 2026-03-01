@@ -273,9 +273,11 @@ app.add_middleware(
 )
 
 # Observability middleware (last added = outermost = executes first)
+# TraceIdMiddleware must be outermost so trace_id_var is set before
+# XRayMiddleware and CloudWatchMetricsMiddleware emit any logs.
+app.add_middleware(TraceIdMiddleware)
 app.add_middleware(XRayMiddleware)
 app.add_middleware(CloudWatchMetricsMiddleware)
-app.add_middleware(TraceIdMiddleware)
 
 # Include routers
 # Include routers

@@ -50,7 +50,7 @@ class ErrorResponse(BaseModel):
 def _get_trace_id(request: Request) -> Optional[str]:
     trace_id = getattr(request.state, "trace_id", None)
     # Restore ContextVar if it was reset during middleware unwinding,
-    # so the TraceIdLogFilter includes request_id in log entries.
+    # so the TraceIdLogFilter includes trace_id in log entries.
     if trace_id and trace_id_var.get(None) is None:
         trace_id_var.set(trace_id)
     return trace_id
@@ -75,7 +75,7 @@ async def _handle_app_exception(
         exc.error_code,
         exc.status_code,
         exc.message,
-        extra={"request_id": trace_id, "error_code": exc.error_code},
+        extra={"trace_id": trace_id, "request_id": trace_id, "error_code": exc.error_code},
         exc_info=exc if exc.status_code >= 500 else None,
     )
 
@@ -103,7 +103,7 @@ async def _handle_validation_error(
         messages.append(f"{loc}: {err.get('msg', 'invalid')}")
     summary = "; ".join(messages)
 
-    logger.warning("ValidationError: %s", summary, extra={"request_id": trace_id})
+    logger.warning("ValidationError: %s", summary, extra={"trace_id": trace_id, "request_id": trace_id})
 
     body = ErrorResponse(
         error=ErrorBody(
@@ -138,7 +138,7 @@ async def _handle_http_exception(
         "HTTPException %d: %s",
         exc.status_code,
         exc.detail,
-        extra={"request_id": trace_id},
+        extra={"trace_id": trace_id, "request_id": trace_id},
     )
 
     body = ErrorResponse(
@@ -161,7 +161,7 @@ async def _handle_unhandled_exception(
         "Unhandled exception: %s: %s",
         type(exc).__name__,
         str(exc),
-        extra={"request_id": trace_id},
+        extra={"trace_id": trace_id, "request_id": trace_id},
         exc_info=True,
     )
 

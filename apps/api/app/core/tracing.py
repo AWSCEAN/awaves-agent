@@ -27,6 +27,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from app.config import settings
+from app.core.logging import trace_id_var
 
 logger = logging.getLogger(__name__)
 
@@ -109,10 +110,12 @@ class XRayMiddleware(BaseHTTPMiddleware):
             segment.put_http_meta("url", str(request.url))
             segment.put_http_meta("method", request.method)
 
-            # Annotate with frontend trace ID for end-to-end correlation
-            fe_trace_id = request.headers.get("X-Amzn-Trace-Id")
-            if fe_trace_id:
-                segment.put_annotation("frontend_trace_id", fe_trace_id)
+            # Annotate with app-level trace_id (set by TraceIdMiddleware,
+            # which runs before this middleware) so X-Ray traces are
+            # searchable by the same ID that appears in CloudWatch Logs.
+            app_trace_id = trace_id_var.get()
+            if app_trace_id:
+                segment.put_annotation("trace_id", app_trace_id)
 
             response: Response = await call_next(request)
             segment.put_http_meta("status", response.status_code)
