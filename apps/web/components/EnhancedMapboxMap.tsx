@@ -618,14 +618,21 @@ export default function EnhancedMapboxMap({
       noInfoPopupRef.current = null;
     }
 
-    // 1. Check if clicked coordinate matches an existing spot (exact LocationId match)
+    // 1. Find the closest spot within 1km of the clicked coordinate
     // Use allSpots for detection so 100km works regardless of search state
     const currentSpots = allSpotsRef.current.length > 0 ? allSpotsRef.current : spotsRef.current;
-    const clickedLocationId = `${lngLat.lat.toFixed(4)}#${lngLat.lng.toFixed(4)}`;
-    const exactMatch = currentSpots.find(s => s.locationId === clickedLocationId);
-
-    if (exactMatch) {
-      showSurfInfoAtCoords(lngLat.lng, lngLat.lat, exactMatch, currentSelectedDate);
+    let closestMatch: SurfInfo | null = null;
+    let closestDist = Infinity;
+    for (const spot of currentSpots) {
+      const R = 6371;
+      const dLat = (spot.geo.lat - lngLat.lat) * Math.PI / 180;
+      const dLng = (spot.geo.lng - lngLat.lng) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(lngLat.lat * Math.PI / 180) * Math.cos(spot.geo.lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+      const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      if (dist < closestDist) { closestDist = dist; closestMatch = spot; }
+    }
+    if (closestMatch && closestDist <= 1) {
+      showSurfInfoAtCoords(lngLat.lng, lngLat.lat, closestMatch, currentSelectedDate);
       return;
     }
 

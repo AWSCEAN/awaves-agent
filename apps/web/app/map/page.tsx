@@ -26,6 +26,12 @@ import SurfLoadingScreen from '@/components/SurfLoadingScreen';
 import { useAuth } from '@/contexts/AuthContext';
 
 
+function formatCoordFallback(locationId: string): string {
+  const [lat, lng] = locationId.split('#');
+  if (!lat || !lng) return locationId;
+  return `${parseFloat(lat).toFixed(4)}°, ${parseFloat(lng).toFixed(4)}°`;
+}
+
 const EnhancedMapboxMap = dynamic(
   () => import('@/components/EnhancedMapboxMap'),
   {
@@ -148,7 +154,7 @@ function MapPageContent() {
       surfingLevel: (item.surfer_level?.toUpperCase() || 'BEGINNER') as SurfingLevel,
       surfScore: item.surf_score,
       surfGrade: convertSurfGradeToLabel(item.surf_grade),
-      name: item.address || item.location_id,
+      name: item.address || formatCoordFallback(item.location_id),
       nameKo: undefined,
     })),
     [savedItems]
@@ -204,7 +210,7 @@ function MapPageContent() {
               ADVANCED: { surfScore: matchingSaved.surfScore, surfGrade: matchingSaved.surfGrade, surfGradeNumeric: 0 },
             },
             metadata: { modelVersion: '', dataSource: '', predictionType: 'FORECAST', createdAt: '' },
-            name: matchingSaved.name || matchingSaved.locationId,
+            name: matchingSaved.name || formatCoordFallback(matchingSaved.locationId),
             nameKo: matchingSaved.nameKo,
             region: matchingSaved.region,
             country: matchingSaved.country,
@@ -453,7 +459,7 @@ function MapPageContent() {
             ADVANCED: { surfScore: save.surfScore, surfGrade: save.surfGrade, surfGradeNumeric: 0 },
           },
           metadata: { modelVersion: '', dataSource: '', predictionType: 'FORECAST', createdAt: '' },
-          name: save.name || save.locationId,
+          name: save.name || formatCoordFallback(save.locationId),
           nameKo: save.nameKo,
           region: save.region,
           country: save.country,
