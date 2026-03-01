@@ -9,13 +9,16 @@ Flow:
 """
 
 import hashlib
+import json
 import logging
 import random
 import time as _time
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
+import aioboto3
 import httpx
+from botocore.config import Config as BotoConfig
 
 from app.config import settings
 from app.middleware.metrics import emit_ml_inference_latency, emit_external_api_failure
@@ -104,11 +107,74 @@ async def _call_sagemaker(
     lat: float,
     lng: float,
 ) -> dict | None:
-    """Call SageMaker local endpoint and return inference result.
+    """Call SageMaker endpoint and return inference result.
+
+    Uses AWS SageMaker Runtime when sagemaker_endpoint_name is configured,
+    otherwise falls back to local HTTP endpoint (for local dev).
 
     Returns dict with surfGrade, surfScore, etc. or None on failure.
     """
+    if settings.sagemaker_endpoint_name and settings.env != "local":
+        return await _call_sagemaker_aws(location_id, surf_date, surfer_level, lat, lng)
+    return await _call_sagemaker_local(location_id, surf_date, surfer_level, lat, lng)
+
+
+async def _call_sagemaker_aws(
+    location_id: str,
+    surf_date: str,
+    surfer_level: str,
+    lat: float,
+    lng: float,
+) -> dict | None:
+    """Call AWS SageMaker endpoint via boto3 sagemaker-runtime."""
+    payload = {
+        "location": location_id,
+        "date": surf_date,
+        "level": surfer_level,
+        "lat": lat,
+        "lng": lng,
+    }
+
+    session = aioboto3.Session(region_name=settings.aws_region or "us-east-1")
+    config = BotoConfig(
+        retries={"max_attempts": 2, "mode": "adaptive"},
+        connect_timeout=5,
+        read_timeout=30,
+    )
+
+    start = _time.perf_counter()
+    try:
+        with _sagemaker_subsegment():
+            async with session.client("sagemaker-runtime", config=config) as client:
+                response = await client.invoke_endpoint(
+                    EndpointName=settings.sagemaker_endpoint_name,
+                    ContentType="application/json",
+                    Body=json.dumps(payload),
+                )
+                body = await response["Body"].read()
+                result = json.loads(body.decode("utf-8"))
+                latency_ms = (_time.perf_counter() - start) * 1000
+                emit_ml_inference_latency(latency_ms)
+                return result
+    except Exception as e:
+        logger.warning("SageMaker AWS endpoint call failed: %s", e)
+        emit_external_api_failure("SageMaker")
+        return None
+
+
+async def _call_sagemaker_local(
+    location_id: str,
+    surf_date: str,
+    surfer_level: str,
+    lat: float,
+    lng: float,
+) -> dict | None:
+    """Call SageMaker local Docker container endpoint via HTTP."""
     endpoint = settings.sagemaker_local_endpoint
+    if not endpoint:
+        logger.warning("No SageMaker endpoint configured (local or AWS)")
+        return None
+
     payload = {
         "location": location_id,
         "date": surf_date,
