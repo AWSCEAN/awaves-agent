@@ -492,8 +492,8 @@ export default function SpotDetailPanel({
               <thead>
                 <tr className="text-ocean-600 border-b border-ocean-200">
                   <th className="py-0.5 px-1.5 text-left font-medium w-20"></th>
-                  {[6, 9, 12, 15, 18].map((hour) => (
-                    <th key={hour} className="py-0.5 px-1.5 text-center font-medium">
+                  {hours.map((hour, i) => (
+                    <th key={i} className="py-0.5 px-1.5 text-center font-medium">
                       {hour.toString().padStart(2, '0')}:00
                     </th>
                   ))}
