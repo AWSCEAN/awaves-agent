@@ -220,12 +220,12 @@ class SurfDataRepository(BaseDynamoDBRepository):
                         "city": _get("city"),
                         "region": _get("state"),
                         "country": _get("country"),
-                        # Korean fields (camelCase → snake_case fallback)
-                        "nameKo": _get("displayNameKo", "display_name_ko"),
-                        "cityKo": _get("cityKo", "city_ko"),
-                        "regionKo": _get("stateKo", "state_ko"),
-                        "countryKo": _get("countryKo", "country_ko"),
-                        "addressKo": _get("displayNameKo", "display_name_ko"),
+                        # Korean fields (Ko → Kr → snake_case fallback)
+                        "nameKo": _get("displayNameKo", "displayNameKr", "display_name_ko"),
+                        "cityKo": _get("cityKo", "cityKr", "city_ko"),
+                        "regionKo": _get("stateKo", "stateKr", "state_ko"),
+                        "countryKo": _get("countryKo", "countryKr", "country_ko"),
+                        "addressKo": _get("displayNameKo", "displayNameKr", "display_name_ko"),
                     }
 
             for spot in spots:

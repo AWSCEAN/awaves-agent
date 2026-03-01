@@ -196,10 +196,10 @@ async def _seed_locations_if_empty() -> None:
                 "city": item.get("city", {}).get("S", ""),
                 "state": item.get("state", {}).get("S", ""),
                 "country": item.get("country", {}).get("S", ""),
-                "display_name_ko": item.get("displayNameKo", {}).get("S", ""),
-                "city_ko": item.get("cityKo", {}).get("S", ""),
-                "state_ko": item.get("stateKo", {}).get("S", ""),
-                "country_ko": item.get("countryKo", {}).get("S", ""),
+                "display_name_ko": item.get("displayNameKo", {}).get("S", "") or item.get("displayNameKr", {}).get("S", ""),
+                "city_ko": item.get("cityKo", {}).get("S", "") or item.get("cityKr", {}).get("S", ""),
+                "state_ko": item.get("stateKo", {}).get("S", "") or item.get("stateKr", {}).get("S", ""),
+                "country_ko": item.get("countryKo", {}).get("S", "") or item.get("countryKr", {}).get("S", ""),
             })
 
         indexed = await OpenSearchService.bulk_index_locations(locations)
