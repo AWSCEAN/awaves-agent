@@ -295,6 +295,9 @@ class OpenSearchService:
 
         try:
             if language == "ko":
+                # Ensure nori availability is known before building the query
+                if cls._nori_available is None:
+                    await cls._check_nori_available(client)
                 body = cls._build_korean_query(query, size)
             else:
                 body = cls._build_english_query(query, size)
@@ -370,42 +373,42 @@ class OpenSearchService:
 
     @classmethod
     def _build_korean_query(cls, query: str, size: int) -> dict:
-        """Build Korean search query using nori analyzer."""
+        """Build Korean search query using nori analyzer if available."""
+        ko_phrase: dict = {
+            "query": query,
+            "fields": [
+                "display_name_ko^5",
+                "city_ko^3",
+                "state_ko^2",
+                "country_ko",
+            ],
+            "type": "phrase",
+            "boost": 3,
+        }
+        ko_cross: dict = {
+            "query": query,
+            "fields": [
+                "display_name_ko^3",
+                "city_ko^2",
+                "state_ko",
+                "country_ko",
+            ],
+            "type": "cross_fields",
+            "operator": "and",
+        }
+
+        # Only reference korean_analyzer when nori plugin is installed
+        if cls._nori_available:
+            ko_phrase["analyzer"] = "korean_analyzer"
+            ko_cross["analyzer"] = "korean_analyzer"
+
         return {
             "size": size,
             "query": {
                 "bool": {
                     "should": [
-                        # Exact phrase match on Korean fields
-                        {
-                            "multi_match": {
-                                "query": query,
-                                "fields": [
-                                    "display_name_ko^5",
-                                    "city_ko^3",
-                                    "state_ko^2",
-                                    "country_ko",
-                                ],
-                                "type": "phrase",
-                                "boost": 3,
-                                "analyzer": "korean_analyzer",
-                            }
-                        },
-                        # Cross-field match on Korean fields
-                        {
-                            "multi_match": {
-                                "query": query,
-                                "fields": [
-                                    "display_name_ko^3",
-                                    "city_ko^2",
-                                    "state_ko",
-                                    "country_ko",
-                                ],
-                                "type": "cross_fields",
-                                "operator": "and",
-                                "analyzer": "korean_analyzer",
-                            }
-                        },
+                        {"multi_match": ko_phrase},
+                        {"multi_match": ko_cross},
                         # Also search English fields for mixed queries
                         {
                             "multi_match": {

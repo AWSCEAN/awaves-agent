@@ -19,7 +19,7 @@ from app.core.middleware import TraceIdMiddleware
 from app.core.handlers import register_exception_handlers
 from app.middleware.metrics import CloudWatchMetricsMiddleware
 from app.db.session import close_db, init_db
-from app.routers import auth, feedback, register, saved, search, surf
+from app.routers import admin, auth, feedback, register, saved, search, surf
 from app.graphql.schema import graphql_app
 from app.services.cache import CacheService
 from app.repositories.saved_list_repository import SavedListRepository
@@ -284,6 +284,7 @@ app.include_router(saved.router, prefix="/saved", tags=["Saved Spots"])
 app.include_router(feedback.router, prefix="/feedback", tags=["Feedback"])
 app.include_router(search.router, prefix="/search", tags=["Location Search"])
 app.include_router(graphql_app, prefix="/graphql", tags=["GraphQL"])
+app.include_router(admin.router, prefix="/admin", tags=["Admin"])
 
 
 @app.get("/")
