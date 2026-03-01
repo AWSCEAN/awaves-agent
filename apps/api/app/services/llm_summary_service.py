@@ -126,19 +126,25 @@ async def _invoke_lambda_and_cache(
             response_payload = await response["Payload"].read()
             result = json.loads(response_payload.decode("utf-8"))
 
-        # Lambda returns {"statusCode": 200, "body": "{\"locationId\":..., \"advice\":{\"ko\":..., \"en\":...}}"}
+        # Lambda may return either:
+        #   1. {"statusCode": 200, "body": "{\"advice\":{...}}"}  (API Gateway format)
+        #   2. {"advice": {"ko": "...", "en": "..."}, ...}         (direct invocation)
+        advice = None
         if result.get("statusCode") == 200:
             body = result.get("body")
             if isinstance(body, str):
                 body = json.loads(body)
-            advice = body.get("advice")
-            if advice:
-                cache_data = {"status": "success", "advice": advice}
-                await LlmCacheService.store_llm_summary(
-                    location_id, surf_timestamp, level, cache_data
-                )
-                logger.info("LLM summary cached for %s/%s/%s", location_id, surf_timestamp, level)
-                return
+            advice = body.get("advice") if body else None
+        elif "advice" in result:
+            advice = result["advice"]
+
+        if advice:
+            cache_data = {"status": "success", "advice": advice}
+            await LlmCacheService.store_llm_summary(
+                location_id, surf_timestamp, level, cache_data
+            )
+            logger.info("LLM summary cached for %s/%s/%s", location_id, surf_timestamp, level)
+            return
 
         # Non-200 or missing advice
         logger.warning("Lambda returned unexpected result: %s", result)
