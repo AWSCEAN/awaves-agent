@@ -25,5 +25,5 @@ data:
   DYNAMODB_LOCATIONS_TABLE: "awaves-dev-locations"
   CORS_ORIGINS: "https://awaves.net,https://www.awaves.net,https://web.awaves.net,https://mobile.awaves.net"
   INFERENCE_MODE: "sagemaker"
-  SAGEMAKER_ENDPOINT_NAME: "awaves-dev-surf-index"
+  SAGEMAKER_ENDPOINT_NAME: "awaves-dev-weekly"
   LLM_SUMMARY_LAMBDA_NAME: "awaves-dev-bedrock-summary"
