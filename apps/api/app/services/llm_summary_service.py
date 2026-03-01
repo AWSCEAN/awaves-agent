@@ -111,9 +111,9 @@ async def _invoke_lambda_and_cache(
 
     try:
         payload = {
-            "locationId": location_id,
-            "surfTimestamp": surf_timestamp,
-            "surfingLevel": level,
+            "location_id": location_id,
+            "surf_timestamp": surf_timestamp,
+            "surfing_level": level,
         }
 
         async with session.client("lambda", config=config) as client:
