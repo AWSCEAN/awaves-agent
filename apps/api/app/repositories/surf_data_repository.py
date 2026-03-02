@@ -219,9 +219,7 @@ class SurfDataRepository(BaseDynamoDBRepository):
 
         t0 = _time.monotonic()
         try:
-            # Deduplicate: date-range queries return multiple time slots per location,
-            # and DynamoDB BatchGetItem raises ValidationException for duplicate keys.
-            loc_ids = list(dict.fromkeys(s["locationId"] for s in spots))
+            loc_ids = [s["locationId"] for s in spots]
             # BatchGetItem: max 100 keys per request
             loc_map: dict[str, dict] = {}
             async with await cls.get_client() as client:
@@ -591,14 +589,10 @@ class SurfDataRepository(BaseDynamoDBRepository):
         name = display_name if display_name else f"{lat}, {lng}"
 
         # Korean address fields (from location nested object if present)
-        # Check both displayNameKo and displayNameKr (legacy field name)
-        display_name_ko = (
-            location.get("displayNameKo", {}).get("S", "")
-            or location.get("displayNameKr", {}).get("S", "")
-        )
-        city_ko = location.get("cityKo", {}).get("S", "") or location.get("cityKr", {}).get("S", "")
-        state_ko = location.get("stateKo", {}).get("S", "") or location.get("stateKr", {}).get("S", "")
-        country_ko = location.get("countryKo", {}).get("S", "") or location.get("countryKr", {}).get("S", "")
+        display_name_ko = location.get("displayNameKo", {}).get("S", "")
+        city_ko = location.get("cityKo", {}).get("S", "")
+        state_ko = location.get("stateKo", {}).get("S", "")
+        country_ko = location.get("countryKo", {}).get("S", "")
 
         return {
             "locationId": loc_id,
