@@ -326,10 +326,22 @@ class SurfDataRepository(BaseDynamoDBRepository):
         return spots
 
     @classmethod
-    async def get_spots_for_date(
-        cls, date: Optional[str] = None, time: Optional[str] = None
+    async def get_spots_for_date_range(
+        cls, date: Optional[str] = None, from_time: Optional[str] = None, to_time: Optional[str] = None
     ) -> list[dict]:
-        """Get one spot per location filtered by date and optionally time."""
+        """Get surf spots filtered by date and time range.
+
+        - When from_time and to_time are None: Returns all time slots for the date
+        - When from_time and to_time are specified: Returns all slots in range [from_time, to_time]
+
+        Args:
+            date: Date in YYYY-MM-DD format
+            from_time: Start time in HH:00 format (inclusive)
+            to_time: End time in HH:00 format (inclusive)
+
+        Returns:
+            List of surf spots matching the criteria, sorted by timestamp
+        """
         global _spots_for_date_cache, _spots_for_date_cache_time
 
         if not date:
@@ -338,21 +350,21 @@ class SurfDataRepository(BaseDynamoDBRepository):
         t_total = _time.monotonic()
 
         # Check in-memory result cache
-        cache_key = f"{date}|{time or ''}"
+        cache_key = f"{date}|{from_time or ''}|{to_time or ''}"
         if (
             _spots_for_date_cache
             and (_time.monotonic() - _spots_for_date_cache_time) < _CACHE_TTL
             and cache_key in _spots_for_date_cache
         ):
-            logger.info("[perf] get_spots_for_date cache HIT (in-memory) for %s", cache_key)
+            logger.info("[perf] get_spots_for_date_range cache HIT (in-memory) for %s", cache_key)
             return _spots_for_date_cache[cache_key]
 
         # Check Redis cache
-        redis_key = f"awaves:surf:date:{cache_key}"
+        redis_key = f"awaves:surf:daterange:{cache_key}"
         try:
             cached = await CacheService.get_by_key(redis_key)
             if cached is not None:
-                logger.info("[perf] get_spots_for_date cache HIT (Redis) for %s", cache_key)
+                logger.info("[perf] get_spots_for_date_range cache HIT (Redis) for %s", cache_key)
                 _spots_for_date_cache[cache_key] = cached
                 _spots_for_date_cache_time = _time.monotonic()
                 return cached
@@ -369,50 +381,47 @@ class SurfDataRepository(BaseDynamoDBRepository):
         if not filtered:
             return []
 
-        if time:
+        # Debug: Log what hours are present in the raw query results
+        if from_time or to_time:
+            raw_hours = set()
+            for item in filtered:
+                ts = item["surfTimestamp"]["S"]
+                if len(ts) >= 13:
+                    raw_hours.add(int(ts[11:13]))
+            logger.info(f"[time-filter] Raw DynamoDB query returned {len(filtered)} items with hours: {sorted(raw_hours)}")
+
+        # Apply time range filter if both from_time and to_time are provided
+        if from_time and to_time:
             try:
-                start_hour = int(time.split(":")[0])
-                time_prefixes = []
-                for offset in range(3):
-                    hour = start_hour + offset
-                    if hour <= 23:
-                        time_prefixes.append(f"{date}T{hour:02d}:")
+                from_hour = int(from_time.split(":")[0])
+                to_hour = int(to_time.split(":")[0])
 
-                time_matched = [
-                    item for item in filtered
-                    if any(item["surfTimestamp"]["S"].startswith(prefix) for prefix in time_prefixes)
-                ]
+                logger.info(f"[time-filter] Applying time filter: from_hour={from_hour}, to_hour={to_hour}, items_before={len(filtered)}")
 
-                if time_matched:
-                    filtered = time_matched
-            except (ValueError, IndexError):
-                pass
+                # Filter timestamps within the range [from_hour, to_hour]
+                time_matched = []
+                hours_found = set()
+                for item in filtered:
+                    ts = item["surfTimestamp"]["S"]
+                    # Extract hour from timestamp (format: YYYY-MM-DDTHH:MM:SS)
+                    if len(ts) >= 13:
+                        ts_hour = int(ts[11:13])
+                        if from_hour <= ts_hour <= to_hour:
+                            time_matched.append(item)
+                            hours_found.add(ts_hour)
 
-        # Pick one item per location: prefer closest to requested time
-        location_map: dict[str, dict] = {}
-        for item in filtered:
-            loc_id = item["locationId"]["S"]
-            ts = item["surfTimestamp"]["S"]
-            if loc_id not in location_map:
-                location_map[loc_id] = item
-            else:
-                existing_ts = location_map[loc_id]["surfTimestamp"]["S"]
-                if time:
-                    ts_time = ts[11:16] if len(ts) > 15 else ts[11:]
-                    ex_time = existing_ts[11:16] if len(existing_ts) > 15 else existing_ts[11:]
-                    tg_time = time[:5]
-                    if abs(int(ts_time.replace(":", "")) - int(tg_time.replace(":", ""))) < abs(int(ex_time.replace(":", "")) - int(tg_time.replace(":", ""))):
-                        location_map[loc_id] = item
-                else:
-                    if ts > existing_ts:
-                        location_map[loc_id] = item
+                logger.info(f"[time-filter] After filtering: items_after={len(time_matched)}, hours_found={sorted(hours_found)}")
+                filtered = time_matched
+            except (ValueError, IndexError) as e:
+                logger.warning(f"Failed to parse time range {from_time}-{to_time}: {e}")
 
-        spots = [cls._to_surf_info(item) for item in location_map.values()]
+        # Return all matching time slots (no deduplication by location)
+        spots = [cls._to_surf_info(item) for item in filtered]
 
         spots = await cls._enrich_with_korean(spots)
-        spots.sort(
-            key=lambda s: s["derivedMetrics"].get("INTERMEDIATE", {}).get("surfScore", 0), reverse=True
-        )
+
+        # Sort by timestamp ascending (for time range display)
+        spots.sort(key=lambda s: s["surfTimestamp"])
 
         _spots_for_date_cache[cache_key] = spots
         _spots_for_date_cache_time = _time.monotonic()
@@ -423,7 +432,7 @@ class SurfDataRepository(BaseDynamoDBRepository):
         except Exception:
             pass
 
-        logger.info("[perf] get_spots_for_date total %.0fms for %s (%d spots)", (_time.monotonic() - t_total) * 1000, cache_key, len(spots))
+        logger.info("[perf] get_spots_for_date_range total %.0fms for %s (%d spots)", (_time.monotonic() - t_total) * 1000, cache_key, len(spots))
         return spots
 
     @classmethod
@@ -473,7 +482,7 @@ class SurfDataRepository(BaseDynamoDBRepository):
         cls, query: str, date: Optional[str] = None, time: Optional[str] = None
     ) -> list[dict]:
         """Search spots by coordinate substring in LocationId."""
-        spots = await cls.get_spots_for_date(date, time)
+        spots = await cls.get_spots_for_date_range(date, time, time)
         query_lower = query.lower()
         return [s for s in spots if query_lower in s["locationId"].lower()]
 
@@ -483,7 +492,7 @@ class SurfDataRepository(BaseDynamoDBRepository):
         date: Optional[str] = None, time: Optional[str] = None,
     ) -> list[dict]:
         """Get spots sorted by distance from given coordinates."""
-        spots = await cls.get_spots_for_date(date, time)
+        spots = await cls.get_spots_for_date_range(date, time, time)
 
         spots_with_distance = []
         for spot in spots:

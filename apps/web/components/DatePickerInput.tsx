@@ -52,7 +52,7 @@ export default function DatePickerInput({ value, onChange, className = '' }: Dat
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-3 py-2 text-sm border border-sand-200 rounded-lg
+        className="w-full px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm border border-sand-200 rounded-lg
           focus:outline-none focus:ring-2 focus:ring-ocean-500/50 focus:border-ocean-500
           bg-white text-ocean-800 text-left"
       >

@@ -167,14 +167,54 @@ export function parseLocationId(locationId: string): { lat: number; lng: number 
 export const TIME_SLOTS = ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00'];
 
 /**
+ * All hourly time options for time range selector (00:00 to 23:00).
+ */
+export const TIME_HOURS = [
+  '00:00', '01:00', '02:00', '03:00', '04:00', '05:00',
+  '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
+  '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+  '18:00', '19:00', '20:00', '21:00', '22:00', '23:00',
+];
+
+/**
  * Get the most recent 3-hour time slot rounded down from the current LOCAL time.
  * e.g. local 11:00 → '09:00', local 15:30 → '15:00', local 02:00 → '00:00'
+ * @deprecated Use getDefaultFromTime() for new time range selector
  */
 export function getCurrentTimeSlot(): string {
   const now = new Date();
   const hours = now.getHours();
   const roundedHour = Math.floor(hours / 3) * 3;
   return `${roundedHour.toString().padStart(2, '0')}:00`;
+}
+
+/**
+ * Get the default "From" time - rounded UP to the next hour.
+ * Used for time range selector default value.
+ *
+ * Examples:
+ * - 03:00 → 03:00 (exactly on the hour)
+ * - 03:01 → 04:00 (round up to next hour)
+ * - 03:35 → 04:00 (round up to next hour)
+ * - 23:20 → 23:00 (max is 23:00, not 24:00)
+ */
+export function getDefaultFromTime(): string {
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+
+  // If we're at XX:00 exactly, use current hour
+  // Otherwise, round up to next hour (max 23)
+  const fromHour = currentMinute === 0 ? currentHour : Math.min(currentHour + 1, 23);
+
+  return `${fromHour.toString().padStart(2, '0')}:00`;
+}
+
+/**
+ * Get the default "To" time - always 23:00 (end of day).
+ */
+export function getDefaultToTime(): string {
+  return '23:00';
 }
 
 /**

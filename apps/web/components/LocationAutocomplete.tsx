@@ -141,7 +141,7 @@ export default function LocationAutocomplete({
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => value.length >= 1 && options.length > 0 && setIsOpen(true)}
         placeholder={hasError && errorPlaceholder ? errorPlaceholder : (placeholder || t('locationPlaceholder'))}
-        className={`w-full px-3 py-2 text-sm border rounded-lg truncate
+        className={`w-full px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm border rounded-lg truncate
           focus:outline-none focus:ring-2 bg-white text-ocean-800 ${
             hasError
               ? 'border-red-400 focus:ring-red-500/50 focus:border-red-500 placeholder:text-red-400'

@@ -15,11 +15,12 @@ import SpotDetailPanel from '@/components/SpotDetailPanel';
 import TimeSlotPickerPanel from '@/components/TimeSlotPickerPanel';
 import PredictionResultPanel from '@/components/PredictionResultPanel';
 import DatePickerInput from '@/components/DatePickerInput';
+import TimeRangeSelector from '@/components/TimeRangeSelector';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useLocale as useAppLocale } from '@/components/LocaleProvider';
 import type { SurfInfo, SavedListItem, SurferLevel, SurfingLevel, SurfGrade, PredictionResult } from '@/types';
 import type { OverlayMode, SpotSelectionData } from '@/components/EnhancedMapboxMap';
-import { TIME_SLOTS, getCurrentTimeSlot, localToUTC, getMetricsForLevel, surferLevelToKey, convertSurfGradeToLabel } from '@/lib/services/surfInfoService';
+import { TIME_HOURS, getDefaultFromTime, getDefaultToTime, localToUTC, getMetricsForLevel, surferLevelToKey, convertSurfGradeToLabel } from '@/lib/services/surfInfoService';
 import { surfService } from '@/lib/apiServices';
 import { useSavedItems } from '@/hooks/useSavedItems';
 import SurfLoadingScreen from '@/components/SurfLoadingScreen';
@@ -54,7 +55,8 @@ function MapPageContent() {
   // Search state - input values (what user is selecting)
   const [locationQuery, setLocationQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedTime, setSelectedTime] = useState<string>('');
+  const [selectedFromTime, setSelectedFromTime] = useState<string>(getDefaultFromTime());
+  const [selectedToTime, setSelectedToTime] = useState<string>(getDefaultToTime());
   const [surferLevel, setSurferLevel] = useState<SurferLevel | ''>('');
 
   // Initialize surferLevel from user's saved level
@@ -66,7 +68,8 @@ function MapPageContent() {
 
   // Search state - active values (what was last searched, only update on search button click)
   const [searchDate, setSearchDate] = useState<Date>(new Date());
-  const [searchTime, setSearchTime] = useState<string>('');
+  const [searchFromTime, setSearchFromTime] = useState<string>(getDefaultFromTime());
+  const [searchToTime, setSearchToTime] = useState<string>(getDefaultToTime());
 
   // User location state - persist permission across navigations
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(() => {
@@ -118,14 +121,16 @@ function MapPageContent() {
   // Saved items from GraphQL (BE DynamoDB)
   const { items: savedItems, saveItem, deleteItem, refetch } = useSavedItems();
 
-  // Fetch all spots on mount for default map markers (today's date, current time slot)
+  // Fetch all spots on mount for default map markers (today's date, default time range)
   useEffect(() => {
     const loadAllSpots = async () => {
       try {
         const todayStr = format(new Date(), 'yyyy-MM-dd');
-        const timeSlot = getCurrentTimeSlot();
-        const utc = localToUTC(todayStr, timeSlot);
-        const response = await surfService.getAllSpots(utc.date, utc.time);
+        const fromTime = getDefaultFromTime();
+        const toTime = getDefaultToTime();
+        const utcFrom = localToUTC(todayStr, fromTime);
+        const utcTo = localToUTC(todayStr, toTime);
+        const response = await surfService.getAllSpots(utcFrom.date, utcFrom.time, utcTo.time);
         if (response.success && response.data) {
           setAllSpots(response.data);
         }
@@ -242,6 +247,13 @@ function MapPageContent() {
     return { daysFromToday: days, isPredictionMode: days > 9 };
   }, [selectedDate]);
 
+  // Validate time range (From must be <= To)
+  const isTimeRangeValid = useMemo(() => {
+    const fromHour = parseInt(selectedFromTime.split(':')[0]);
+    const toHour = parseInt(selectedToTime.split(':')[0]);
+    return fromHour <= toHour;
+  }, [selectedFromTime, selectedToTime]);
+
   const handleOverlayToggle = (mode: OverlayMode) => {
     setOverlayMode((prev) => (prev === mode ? 'none' : mode));
   };
@@ -249,20 +261,26 @@ function MapPageContent() {
   
   const fetchSpots = useCallback(async (
     query?: string,
-    options?: { date?: string; time?: string; surferLevel?: string }
+    options?: { date?: string; fromTime?: string; toTime?: string; surferLevel?: string }
   ) => {
     try {
-      // Convert local date+time to UTC for DynamoDB queries
-      // When "All Times" is selected (no time), use noon as reference for consistent UTC conversion
-      const utc = (options?.date && options?.time)
-        ? localToUTC(options.date, options.time)
-        : options?.date
-          ? localToUTC(options.date, '12:00')
-          : { date: undefined, time: undefined };
-      const utcOptions = { ...options, date: utc.date, time: utc.time };
+      // Convert local date+time range to UTC for DynamoDB queries
+      const utcFrom = (options?.date && options?.fromTime)
+        ? localToUTC(options.date, options.fromTime)
+        : { date: options?.date, time: undefined };
+      const utcTo = (options?.date && options?.toTime)
+        ? localToUTC(options.date, options.toTime)
+        : { date: options?.date, time: undefined };
 
-      // Always fetch all spots for the selected date so map markers stay in sync
-      const allSpotsPromise = surfService.getAllSpots(utc.date, utc.time);
+      const utcOptions = {
+        ...options,
+        date: utcFrom.date,
+        fromTime: utcFrom.time,
+        toTime: utcTo.time,
+      };
+
+      // Always fetch all spots for the selected date/time range so map markers stay in sync
+      const allSpotsPromise = surfService.getAllSpots(utcFrom.date, utcFrom.time, utcTo.time);
 
       if (query) {
         const [response] = await Promise.all([
@@ -275,7 +293,7 @@ function MapPageContent() {
           setSearchResults(response.data as SearchResult[]);
         }
       } else {
-        // No query: use allSpots filtered by date/time, then apply surferLevel client-side
+        // No query: use allSpots filtered by date/time range, then apply surferLevel client-side
         const response = await allSpotsPromise;
         if (response.success && response.data) {
           setAllSpots(response.data);
@@ -302,17 +320,19 @@ function MapPageContent() {
     setPredictionResult(null);
     // Update active search criteria only when search button is clicked
     setSearchDate(selectedDate);
-    setSearchTime(selectedTime);
+    setSearchFromTime(selectedFromTime);
+    setSearchToTime(selectedToTime);
     try {
       await fetchSpots(locationQuery || undefined, {
         date: format(selectedDate, 'yyyy-MM-dd'),
-        time: selectedTime || undefined,
+        fromTime: selectedFromTime,
+        toTime: selectedToTime,
         surferLevel: surferLevel || undefined,
       });
     } finally {
       setIsSearching(false);
     }
-  }, [locationQuery, selectedDate, selectedTime, surferLevel, fetchSpots]);
+  }, [locationQuery, selectedDate, selectedFromTime, selectedToTime, surferLevel, fetchSpots]);
 
   const handlePredictionSearch = useCallback(async () => {
     const errors: { location?: boolean; level?: boolean } = {};
@@ -359,7 +379,8 @@ function MapPageContent() {
           localStorage.setItem('userLocation', JSON.stringify(loc));
           fetchSpots(locationQuery || undefined, {
             date: format(selectedDate, 'yyyy-MM-dd'),
-            time: selectedTime || undefined,
+            fromTime: selectedFromTime,
+            toTime: selectedToTime,
             surferLevel: surferLevel || undefined,
           });
         },
@@ -503,7 +524,7 @@ function MapPageContent() {
     // Prefer enriched names from allSpots (locations-table-enriched) over the stale
     // address stored in DynamoDB at save time (which may be a raw coordinate string).
     const enrichedSpot = allSpots.find(s => s.locationId === save.locationId);
-    const surfInfo: SurfInfo = {
+    const surfInfo: SurfInfo & { displayLevel?: string } = {
       locationId: save.locationId,
       surfTimestamp: save.surfTimestamp,
       geo: { lat, lng },
@@ -526,6 +547,8 @@ function MapPageContent() {
       address: save.address,
       waveType: '',
       bestSeason: [],
+      // CRITICAL: Set displayLevel to match the saved item's level for correct active state
+      displayLevel: save.surfingLevel,
     };
     setSelectedSpotDetail({
       surfInfo,
@@ -548,15 +571,19 @@ function MapPageContent() {
     setSelectedSpotDetail(null);
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const utcNearby = selectedTime
-        ? localToUTC(dateStr, selectedTime)
-        : localToUTC(dateStr, '12:00');
+      const utcFromNearby = selectedFromTime
+        ? localToUTC(dateStr, selectedFromTime)
+        : localToUTC(dateStr, getDefaultFromTime());
+      const utcToNearby = selectedToTime
+        ? localToUTC(dateStr, selectedToTime)
+        : localToUTC(dateStr, getDefaultToTime());
       const response = await surfService.getNearbySpots(
         userLocation.lat,
         userLocation.lng,
         100,
-        utcNearby.date,
-        utcNearby.time,
+        utcFromNearby.date,
+        utcFromNearby.time,
+        utcToNearby.time,
       );
       if (response.success && response.data) {
         let nearby = (response.data as SearchResult[]).filter(
@@ -572,8 +599,9 @@ function MapPageContent() {
     }
     // Update active search criteria
     setSearchDate(selectedDate);
-    setSearchTime(selectedTime);
-  }, [userLocation, selectedDate, selectedTime, surferLevel]);
+    setSearchFromTime(selectedFromTime);
+    setSearchToTime(selectedToTime);
+  }, [userLocation, selectedDate, selectedFromTime, selectedToTime, surferLevel]);
 
   const toggleLocale = () => {
     setLocale(locale === 'ko' ? 'en' : 'ko');
@@ -622,9 +650,9 @@ function MapPageContent() {
     <ProtectedRoute>
     <div className="flex flex-col pb-14 md:pb-0" style={{ height: '100dvh' }}>
       {/* Header with Search Bar */}
-      <header className="glass z-50 px-3 py-2">
+      <header className="glass z-50 px-3 py-1.5">
         {/* ── MOBILE header: always-visible search + filters (KakaoMap style) ── */}
-        <div className="md:hidden flex flex-col gap-1.5">
+        <div className="md:hidden flex flex-col gap-1">
           {/* Row 1: Logo + Location search bar */}
           <div className="flex items-center gap-2">
             <LogoOverlay />
@@ -645,26 +673,22 @@ function MapPageContent() {
             />
           </div>
 
-          {/* Row 2: Date (larger) | Time | Level */}
-          <div className="flex gap-1.5">
-            {/* Date takes 2× weight so it has room for yyyy-MM-dd without clipping */}
+          {/* Row 2: Date | Time Range (From ~ To) | Level */}
+          <div className="flex gap-1">
+            {/* Balanced width distribution: Date, From, To, Level */}
             <DatePickerInput
               value={selectedDate}
               onChange={setSelectedDate}
-              className="flex-[2] min-w-0"
+              className="flex-[1.5] min-w-0"
             />
             {!isPredictionMode && (
-              <select
-                value={selectedTime}
-                onChange={(e) => setSelectedTime(e.target.value)}
-                className="flex-1 min-w-0 px-1.5 py-2 text-xs border border-sand-200 rounded-lg bg-white text-ocean-800
-                  focus:outline-none focus:ring-2 focus:ring-ocean-500/50"
-              >
-                <option value="">{tSearch('allTimes')}</option>
-                {TIME_SLOTS.map((time) => (
-                  <option key={time} value={time}>{time}</option>
-                ))}
-              </select>
+              <TimeRangeSelector
+                fromTime={selectedFromTime}
+                toTime={selectedToTime}
+                onFromChange={setSelectedFromTime}
+                onToChange={setSelectedToTime}
+                className="flex-[1.6]"
+              />
             )}
             <select
               value={surferLevel}
@@ -672,7 +696,7 @@ function MapPageContent() {
                 setSurferLevel(e.target.value as SurferLevel | '');
                 setPredictionErrors((prev) => ({ ...prev, level: false }));
               }}
-              className={`flex-1 min-w-0 px-1.5 py-2 text-xs border rounded-lg bg-white
+              className={`flex-[1.3] min-w-0 px-1.5 py-1.5 text-xs border rounded-lg bg-white
                 focus:outline-none focus:ring-2 ${
                   predictionErrors.level
                     ? 'border-red-400 text-red-400 focus:ring-red-500/50'
@@ -686,14 +710,21 @@ function MapPageContent() {
             </select>
           </div>
 
+          {/* Time Range Validation Error */}
+          {!isTimeRangeValid && !isPredictionMode && (
+            <div className="text-xs text-red-500 px-1.5">
+              Start time must be before or equal to end time
+            </div>
+          )}
+
           {/* Row 3: Action chips */}
-          <div className="flex gap-1.5">
+          <div className="flex gap-1">
             {/* Search / Predict */}
             <button
               onClick={isPredictionMode ? handlePredictionSearch : handleSearch}
-              disabled={isSearching}
-              className={`flex-1 px-3 py-1.5 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-1 ${
-                isSearching ? 'opacity-60 cursor-not-allowed' : ''
+              disabled={isSearching || (!isPredictionMode && !isTimeRangeValid)}
+              className={`flex-1 px-2 md:px-3 py-1 md:py-1.5 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-1 ${
+                (isSearching || (!isPredictionMode && !isTimeRangeValid)) ? 'opacity-60 cursor-not-allowed' : ''
               } ${
                 isPredictionMode ? 'bg-indigo-500' : 'bg-ocean-500'
               }`}
@@ -715,7 +746,7 @@ function MapPageContent() {
               onClick={handleSuggestByDistance}
               disabled={!userLocation}
               title={!userLocation ? (locale === 'ko' ? '위치 권한 필요' : 'Location required') : (locale === 'ko' ? '주변 스팟' : 'Nearby')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${
+              className={`px-2 md:px-3 py-1 md:py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${
                 userLocation ? 'bg-blue-500 text-white' : 'bg-blue-200 text-blue-400 cursor-not-allowed'
               }`}
             >
@@ -729,7 +760,7 @@ function MapPageContent() {
             <button
               onClick={() => handleOverlayToggle('surf')}
               title={t('surfScore')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${
+              className={`px-2 md:px-3 py-1 md:py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${
                 overlayMode === 'surf' ? 'bg-green-500 text-white' : 'bg-sand-100 text-ocean-700'
               }`}
             >
@@ -742,7 +773,7 @@ function MapPageContent() {
             <button
               onClick={() => setShowWindParticles(!showWindParticles)}
               title={t('windParticles')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${
+              className={`px-2 md:px-3 py-1 md:py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1 ${
                 showWindParticles ? 'bg-ocean-500 text-white' : 'bg-sand-100 text-ocean-700'
               }`}
             >
@@ -781,18 +812,12 @@ function MapPageContent() {
               className="w-40"
             />
             {!isPredictionMode && (
-              <select
-                value={selectedTime}
-                onChange={(e) => setSelectedTime(e.target.value)}
-                className="px-3 py-2 text-sm border border-sand-200 rounded-lg
-                  focus:outline-none focus:ring-2 focus:ring-ocean-500/50 focus:border-ocean-500
-                  bg-white text-ocean-800 w-28"
-              >
-                <option value="">{tSearch('allTimes')}</option>
-                {TIME_SLOTS.map((time) => (
-                  <option key={time} value={time}>{time}</option>
-                ))}
-              </select>
+              <TimeRangeSelector
+                fromTime={selectedFromTime}
+                toTime={selectedToTime}
+                onFromChange={setSelectedFromTime}
+                onToChange={setSelectedToTime}
+              />
             )}
             <select
               value={surferLevel}
@@ -979,12 +1004,14 @@ function MapPageContent() {
               onRemoveSpot={handleRemoveSpot}
               savedSpotIds={savedSpotIds}
               selectedDate={searchDate}
-              selectedTime={searchTime}
+              selectedFromTime={searchFromTime}
+              selectedToTime={searchToTime}
               onSuggestByDistance={handleSuggestByDistance}
               userLocation={userLocation}
               onVisibleItemsChange={setVisibleSpots}
               showLocationPrompt={showLocationPrompt}
               surferLevel={surferLevel}
+              selectedSpotDetail={selectedSpotDetail}
             />
           )
         )}
@@ -1103,8 +1130,10 @@ function MapPageContent() {
             onClose={() => setTimeSlotSelection(null)}
             onSelectTimeSlot={handleTimeSlotSelect}
             onSelectCurrent={(surfInfo) => {
+              // Set displayLevel to current surferLevel for correct active state
+              const enhancedSurfInfo = { ...surfInfo, displayLevel: surferLevel };
               setSelectedSpotDetail({
-                surfInfo,
+                surfInfo: enhancedSurfInfo,
                 coordinates: { latitude: timeSlotSelection.coordinates.lat, longitude: timeSlotSelection.coordinates.lng },
               });
               setTimeSlotSelection(null);
@@ -1164,8 +1193,10 @@ function MapPageContent() {
             currentConditions={getCurrentConditionsForLocation(selectedSpotDetail.surfInfo.locationId)}
             onTimeslotSelect={handleTimeSlotSelect}
             onCurrentSelect={(surfInfo) => {
+              // Set displayLevel to current surferLevel for correct active state
+              const enhancedSurfInfo = { ...surfInfo, displayLevel: surferLevel };
               setSelectedSpotDetail({
-                surfInfo,
+                surfInfo: enhancedSurfInfo,
                 coordinates: selectedSpotDetail.coordinates,
               });
             }}

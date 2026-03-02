@@ -20,16 +20,17 @@ class SearchService:
         query: str,
         size: int = 50,
         date: Optional[str] = None,
-        time: Optional[str] = None,
+        from_time: Optional[str] = None,
+        to_time: Optional[str] = None,
         surfer_level: Optional[str] = None,
     ) -> list[dict]:
         """Text-search fallback used when OpenSearch is unavailable.
 
-        Loads all DynamoDB spots for the requested date/time and filters
+        Loads all DynamoDB spots for the requested date/time range and filters
         them by matching the query string against name, address, region,
         country and their Korean equivalents.
         """
-        spots = await SurfDataRepository.get_spots_for_date(date, time)
+        spots = await SurfDataRepository.get_spots_for_date_range(date, from_time, to_time)
         query_lower = query.lower()
         results: list[dict] = []
         for spot in spots:
@@ -61,7 +62,8 @@ class SearchService:
         query: str,
         size: int = 50,
         date: Optional[str] = None,
-        time: Optional[str] = None,
+        from_time: Optional[str] = None,
+        to_time: Optional[str] = None,
         surfer_level: Optional[str] = None,
         language: Optional[str] = None,
     ) -> list[dict]:
@@ -71,7 +73,7 @@ class SearchService:
         1. Query OpenSearch for matching locations (keyword search only).
         2. If OpenSearch is unavailable or returns nothing, fall back to
            DynamoDB text search against in-memory cached spot data.
-        3. Batch-fetch surf data for the date/time from in-memory cache.
+        3. Batch-fetch surf data for the date/time range from in-memory cache.
         4. Filter by surfer_level if specified.
         5. Return aggregated results enriched with location metadata.
         """
@@ -87,14 +89,14 @@ class SearchService:
             # OpenSearch unavailable or returned nothing — fall back to DynamoDB text search
             emit_external_api_failure("OpenSearch")
             return await cls._text_search_fallback(
-                query, size=size, date=date, time=time, surfer_level=surfer_level
+                query, size=size, date=date, from_time=from_time, to_time=to_time, surfer_level=surfer_level
             )
 
-        # Step 2: Batch-fetch all spots for the date/time (uses in-memory cache)
+        # Step 2: Batch-fetch all spots for the date/time range (uses in-memory cache)
         # This is a single call instead of N individual DynamoDB queries
         t0 = _time.monotonic()
-        all_spots = await SurfDataRepository.get_spots_for_date(date, time)
-        logger.info("[search] get_spots_for_date took %.0fms, %d spots", (_time.monotonic() - t0) * 1000, len(all_spots))
+        all_spots = await SurfDataRepository.get_spots_for_date_range(date, from_time, to_time)
+        logger.info("[search] get_spots_for_date_range took %.0fms, %d spots", (_time.monotonic() - t0) * 1000, len(all_spots))
         spots_by_id: dict[str, dict] = {s["locationId"]: s for s in all_spots}
 
         # Step 3: Match OpenSearch results with surf data

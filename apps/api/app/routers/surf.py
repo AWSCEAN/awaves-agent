@@ -31,12 +31,12 @@ async def get_spots(
     min_wave_height: Optional[float] = Query(None, description="Minimum wave height"),
     max_wave_height: Optional[float] = Query(None, description="Maximum wave height"),
     date: Optional[str] = Query(None, description="Filter by date (YYYY-MM-DD)"),
-    time: Optional[str] = Query(None, description="Filter by time (HH:MM)"),
+    time: Optional[str] = Query(None, description="Filter by time (HH:MM) - legacy parameter"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
 ) -> PaginatedSurfInfoResponse:
     """Get paginated list of surf spots from DynamoDB."""
-    all_spots = await SurfDataRepository.get_spots_for_date(date, time)
+    all_spots = await SurfDataRepository.get_spots_for_date_range(date, time, time)
 
     if min_wave_height is not None:
         all_spots = [s for s in all_spots if s["conditions"]["waveHeight"] >= min_wave_height]
@@ -87,10 +87,22 @@ async def get_nearby_spots(
 @router.get("/spots/all")
 async def get_all_spots_unpaginated(
     date: Optional[str] = Query(None, description="Filter by date (YYYY-MM-DD)"),
-    time: Optional[str] = Query(None, description="Filter by time (HH:MM)"),
+    from_time: Optional[str] = Query(None, alias="from", regex=r"^([01]\d|2[0-3]):00$", description="Start time (HH:00)"),
+    to_time: Optional[str] = Query(None, alias="to", regex=r"^([01]\d|2[0-3]):00$", description="End time (HH:00)"),
 ) -> list[SurfInfoResponse]:
-    """Get ALL surf spots (unpaginated) for map marker display."""
-    spots = await SurfDataRepository.get_spots_for_date(date, time)
+    """Get ALL surf spots (unpaginated) for map marker display.
+
+    Supports time range filtering with from/to parameters.
+    Both from and to should be provided together (or both omitted).
+    """
+    # Validate time range
+    if from_time and to_time:
+        from_hour = int(from_time.split(":")[0])
+        to_hour = int(to_time.split(":")[0])
+        if from_hour > to_hour:
+            raise NotFoundException(message="Start time must be before or equal to end time")
+
+    spots = await SurfDataRepository.get_spots_for_date_range(date, from_time, to_time)
     return [SurfInfoResponse(**s) for s in spots]
 
 

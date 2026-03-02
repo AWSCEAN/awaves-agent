@@ -26,12 +26,14 @@ interface SearchResultsListProps {
   onRemoveSpot?: (locationId: string, surfTimestamp?: string, surfingLevel?: string) => void;
   savedSpotIds: Set<string>;
   selectedDate?: Date;
-  selectedTime?: string;
+  selectedFromTime?: string;
+  selectedToTime?: string;
   onSuggestByDistance?: () => void;
   userLocation?: { lat: number; lng: number } | null;
   onVisibleItemsChange?: (items: SearchResult[]) => void;
   showLocationPrompt?: boolean;
   surferLevel?: string;
+  selectedSpotDetail?: { surfInfo: SurfInfo } | null;
 }
 
 const ITEMS_PER_PAGE = 25;
@@ -46,12 +48,14 @@ export default function SearchResultsList({
   onRemoveSpot,
   savedSpotIds,
   selectedDate,
-  selectedTime,
+  selectedFromTime,
+  selectedToTime,
   onSuggestByDistance,
   userLocation,
   onVisibleItemsChange,
   showLocationPrompt = false,
   surferLevel = '',
+  selectedSpotDetail = null,
 }: SearchResultsListProps) {
   const t = useTranslations('search');
   const tCommon = useTranslations('common');
@@ -172,7 +176,7 @@ export default function SearchResultsList({
             {selectedDate && (
               <p className="text-xs text-ocean-400 mt-1">
                 {format(selectedDate, 'PPP', { locale: dateLocale })}
-                {selectedTime && ` · ${selectedTime}`}
+                {selectedFromTime && selectedToTime && ` · ${selectedFromTime} ~ ${selectedToTime}`}
               </p>
             )}
           </div>
@@ -264,10 +268,20 @@ export default function SearchResultsList({
               const isSaved = savedSpotIds.has(savedKey);
               const displayName = locale === 'ko' && spot.nameKo ? spot.nameKo : spot.name;
 
+              // Determine if this item is currently selected
+              const isSelected = selectedSpotDetail &&
+                selectedSpotDetail.surfInfo.locationId === spot.locationId &&
+                selectedSpotDetail.surfInfo.surfTimestamp === spot.surfTimestamp &&
+                ((selectedSpotDetail.surfInfo as any).displayLevel || '').toUpperCase() === (spot.displayLevel || '').toUpperCase();
+
               return (
                 <li
                   key={compositeKey}
-                  className="p-3 bg-white rounded-xl border border-sand-200 hover:border-ocean-300 hover:shadow-md cursor-pointer transition-all"
+                  className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                    isSelected
+                      ? 'bg-ocean-50 border-ocean-500 shadow-lg ring-2 ring-ocean-500/50'
+                      : 'bg-white border-sand-200 hover:border-ocean-300 hover:shadow-md'
+                  }`}
                   onClick={() => onSpotClick(spot)}
                 >
                   <div className="flex items-start justify-between gap-3">

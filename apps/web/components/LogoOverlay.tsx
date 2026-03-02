@@ -22,7 +22,7 @@ export default function LogoOverlay() {
         alt="awaves Logo"
         width={36}
         height={36}
-        className="h-8 w-auto md:h-9"
+        className="h-7 w-auto md:h-9"
       />
     </Link>
   );

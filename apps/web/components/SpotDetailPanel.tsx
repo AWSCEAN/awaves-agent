@@ -365,9 +365,11 @@ export default function SpotDetailPanel({
               .map((save) => {
                 const d = parseUTCTimestamp(save.surfTimestamp);
                 if (!d) return null;
-                const currentLevel = (effectiveLevel || surferLevel || 'INTERMEDIATE').toUpperCase();
-                const isActive = save.surfTimestamp === surfInfo.surfTimestamp
-                  && save.surfingLevel.toUpperCase() === currentLevel;
+                // Use composite key comparison: locationId + timestamp + level
+                // This ensures the correct button is highlighted based on the actually selected item
+                const saveCompositeKey = `${save.locationId}#${save.surfTimestamp}#${save.surfingLevel.toUpperCase()}`;
+                const currentCompositeKey = `${surfInfo.locationId}#${surfInfo.surfTimestamp}#${(effectiveLevel || surferLevel || '').toUpperCase()}`;
+                const isActive = saveCompositeKey === currentCompositeKey;
                 const timeLabel = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
                 const dateLabel = locale === 'ko'
                   ? `${d.getMonth() + 1}/${d.getDate()}`

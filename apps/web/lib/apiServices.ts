@@ -307,11 +307,12 @@ export const surfService = {
 
   async searchSpots(
     query: string,
-    options?: { date?: string; time?: string; surferLevel?: string; language?: string }
+    options?: { date?: string; fromTime?: string; toTime?: string; surferLevel?: string; language?: string }
   ): Promise<ApiResponse<SurfInfo[]>> {
     const params = new URLSearchParams({ q: query });
     if (options?.date) params.set('date', options.date);
-    if (options?.time) params.set('time', options.time);
+    if (options?.fromTime) params.set('from', options.fromTime);
+    if (options?.toTime) params.set('to', options.toTime);
     if (options?.surferLevel) params.set('surfer_level', options.surferLevel);
     if (options?.language) params.set('language', options.language);
     return apiRequest<SurfInfo[]>(`/search?${params.toString()}`);
@@ -321,17 +322,19 @@ export const surfService = {
     return apiRequest<SurfInfo[]>(`/surf/recommendations?user_id=${userId}`);
   },
 
-  async getNearbySpots(lat: number, lng: number, limit: number = 25, date?: string, time?: string): Promise<ApiResponse<SurfInfo[]>> {
+  async getNearbySpots(lat: number, lng: number, limit: number = 25, date?: string, fromTime?: string, toTime?: string): Promise<ApiResponse<SurfInfo[]>> {
     const params = new URLSearchParams({ lat: lat.toString(), lng: lng.toString(), limit: limit.toString() });
     if (date) params.set('date', date);
-    if (time) params.set('time', time);
+    if (fromTime) params.set('from', fromTime);
+    if (toTime) params.set('to', toTime);
     return apiRequest<SurfInfo[]>(`/surf/nearby?${params.toString()}`);
   },
 
-  async getAllSpots(date?: string, time?: string): Promise<ApiResponse<SurfInfo[]>> {
+  async getAllSpots(date?: string, fromTime?: string, toTime?: string): Promise<ApiResponse<SurfInfo[]>> {
     const params = new URLSearchParams();
     if (date) params.set('date', date);
-    if (time) params.set('time', time);
+    if (fromTime) params.set('from', fromTime);
+    if (toTime) params.set('to', toTime);
     const qs = params.toString();
     return apiRequest<SurfInfo[]>(`/surf/spots/all${qs ? `?${qs}` : ''}`);
   },
