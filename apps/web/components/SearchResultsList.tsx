@@ -3,7 +3,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { ko, enUS } from 'date-fns/locale';
-import { useTranslations, useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
+import { useLocale } from '@/components/LocaleProvider';
 import type { SurfInfo, SurfingLevel } from '@/types';
 import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, getMetricsForLevel, surferLevelToKey, isCoordString } from '@/lib/services/surfInfoService';
 import { useSwipeDown } from '@/hooks/useSwipeDown';
@@ -59,7 +60,7 @@ export default function SearchResultsList({
 }: SearchResultsListProps) {
   const t = useTranslations('search');
   const tCommon = useTranslations('common');
-  const locale = useLocale();
+  const { locale } = useLocale();
   const dateLocale = locale === 'ko' ? ko : enUS;
 
   const [currentPage, setCurrentPage] = useState(1);

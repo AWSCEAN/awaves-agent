@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { useLocale } from 'next-intl';
+import { useLocale } from '@/components/LocaleProvider';
 import type { SurfInfo, SavedListItem } from '@/types';
 import { useSwipeDown } from '@/hooks/useSwipeDown';
 import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, getMetricsForLevel, surferLevelToKey, parseUTCTimestamp, isCoordString } from '@/lib/services/surfInfoService';
@@ -61,7 +61,7 @@ export default function SpotDetailPanel({
   surferLevel = '',
   llmFetchKey,
 }: SpotDetailPanelProps) {
-  const locale = useLocale();
+  const { locale } = useLocale();
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [copied, setCopied] = useState(false);
   const [forecastView, setForecastView] = useState<'table' | 'chart'>('chart');
