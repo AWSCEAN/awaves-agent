@@ -180,6 +180,15 @@ class OpenSearchService:
                             "analyzer": ko_analyzer,
                             "fields": {"keyword": {"type": "keyword"}},
                         },
+                        # Completion suggester field for fast autocomplete
+                        "suggest": {
+                            "type": "completion",
+                            "analyzer": "standard",
+                            "search_analyzer": "standard",
+                            "preserve_separators": True,
+                            "preserve_position_increments": True,
+                            "max_input_length": 50,
+                        },
                     }
                 },
             }
@@ -248,6 +257,38 @@ class OpenSearchService:
 
         actions = []
         for loc in locations:
+            # Build completion suggester input array
+            # Include all searchable text for autocomplete (both English and Korean)
+            suggest_inputs = []
+
+            # Add all non-empty text fields
+            for field in ["display_name", "city", "state", "country",
+                         "display_name_ko", "city_ko", "state_ko", "country_ko"]:
+                value = loc.get(field, "").strip()
+                if value:
+                    suggest_inputs.append(value)
+
+            # Add tokenized words from display names for partial matching
+            display_name = loc.get("display_name", "").strip()
+            if display_name:
+                # Split on common separators and add individual words
+                words = [w.strip() for w in display_name.replace(',', ' ').split() if w.strip()]
+                suggest_inputs.extend(words)
+
+            display_name_ko = loc.get("display_name_ko", "").strip()
+            if display_name_ko:
+                # Korean text tokenization
+                words = [w.strip() for w in display_name_ko.replace(',', ' ').split() if w.strip()]
+                suggest_inputs.extend(words)
+
+            # Remove duplicates while preserving order
+            seen = set()
+            unique_inputs = []
+            for item in suggest_inputs:
+                if item.lower() not in seen:
+                    seen.add(item.lower())
+                    unique_inputs.append(item)
+
             actions.append({"index": {"_index": cls.INDEX_NAME, "_id": loc["locationId"]}})
             actions.append({
                 "locationId": loc["locationId"],
@@ -264,6 +305,11 @@ class OpenSearchService:
                 "city_ko": loc.get("city_ko", ""),
                 "state_ko": loc.get("state_ko", ""),
                 "country_ko": loc.get("country_ko", ""),
+                # Completion suggester field
+                "suggest": {
+                    "input": unique_inputs if unique_inputs else [""],
+                    "weight": 1,
+                },
             })
 
         if not actions:
@@ -302,6 +348,63 @@ class OpenSearchService:
             logger.error("Bulk index failed: %s", e, exc_info=True)
             emit_external_api_failure("OpenSearch")
             return 0
+
+    @classmethod
+    async def suggest_locations(cls, query: str, size: int = 10) -> list[dict]:
+        """Get autocomplete suggestions using OpenSearch completion suggester.
+
+        Args:
+            query: Partial text to autocomplete.
+            size: Max number of suggestions.
+
+        Returns:
+            List of location dicts with locationId and metadata, ordered by relevance.
+        """
+        client = await cls.get_client()
+        if not client:
+            return []
+
+        try:
+            body = {
+                "suggest": {
+                    "location-suggest": {
+                        "prefix": query,
+                        "completion": {
+                            "field": "suggest",
+                            "size": size,
+                            "skip_duplicates": True,
+                        }
+                    }
+                }
+            }
+
+            response = await client.search(index=cls.INDEX_NAME, body=body)
+            suggestions = response.get("suggest", {}).get("location-suggest", [])
+
+            results = []
+            if suggestions:
+                for suggestion in suggestions[0].get("options", []):
+                    source = suggestion.get("_source", {})
+                    results.append({
+                        "locationId": source.get("locationId"),
+                        "display_name": source.get("display_name", ""),
+                        "city": source.get("city", ""),
+                        "state": source.get("state", ""),
+                        "country": source.get("country", ""),
+                        "display_name_ko": source.get("display_name_ko", ""),
+                        "city_ko": source.get("city_ko", ""),
+                        "state_ko": source.get("state_ko", ""),
+                        "country_ko": source.get("country_ko", ""),
+                        "lat": source.get("location", {}).get("lat"),
+                        "lon": source.get("location", {}).get("lon"),
+                        "score": suggestion.get("_score", 0),
+                    })
+
+            return results
+        except Exception as e:
+            logger.error("OpenSearch suggest failed: %s", e)
+            emit_external_api_failure("OpenSearch")
+            return []
 
     @classmethod
     async def search_locations(
