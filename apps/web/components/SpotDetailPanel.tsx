@@ -20,6 +20,7 @@ interface SpotDetailPanelProps {
   onTimeslotSelect?: (save: SavedListItem) => void;
   onCurrentSelect?: (surfInfo: SurfInfo) => void;
   surferLevel?: string;
+  llmFetchKey?: number;
 }
 
 function getScoreColor(score: number): string {
@@ -58,6 +59,7 @@ export default function SpotDetailPanel({
   onTimeslotSelect,
   onCurrentSelect,
   surferLevel = '',
+  llmFetchKey,
 }: SpotDetailPanelProps) {
   const locale = useLocale();
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
@@ -124,7 +126,8 @@ export default function SpotDetailPanel({
       stopped = true;
       if (timerId) clearTimeout(timerId);
     };
-  }, [surfInfo.locationId, surfInfo.surfTimestamp, surferLevel]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [surfInfo.locationId, surfInfo.surfTimestamp, surferLevel, (surfInfo as unknown as { displayLevel?: string }).displayLevel, llmFetchKey]);
 
   const handleResizeStart = useCallback((e: React.PointerEvent) => {
     dragStartY.current = e.clientY;

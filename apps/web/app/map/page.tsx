@@ -58,6 +58,7 @@ function MapPageContent() {
   const [selectedFromTime, setSelectedFromTime] = useState<string>(getDefaultFromTime());
   const [selectedToTime, setSelectedToTime] = useState<string>(getDefaultToTime());
   const [surferLevel, setSurferLevel] = useState<SurferLevel | ''>('');
+  const [llmFetchKey, setLlmFetchKey] = useState(0);
 
   // Initialize surferLevel from user's saved level
   useEffect(() => {
@@ -450,6 +451,7 @@ function MapPageContent() {
       surfInfo: spot,
       coordinates: { latitude: spot.geo.lat, longitude: spot.geo.lng },
     });
+    setLlmFetchKey((k) => k + 1);
   };
 
   const handleMapSpotSelect = (data: SpotSelectionData) => {
@@ -1204,6 +1206,7 @@ function MapPageContent() {
               });
             }}
             surferLevel={surferLevel}
+            llmFetchKey={llmFetchKey}
           />
         )}
       </div>
