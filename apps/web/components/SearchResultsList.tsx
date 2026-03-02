@@ -23,7 +23,7 @@ interface SearchResultsListProps {
   onClose: () => void;
   onSpotClick: (spot: SearchResult) => void;
   onSaveSpot: (spot: SearchResult) => void;
-  onRemoveSpot?: (locationId: string, surfTimestamp?: string) => void;
+  onRemoveSpot?: (locationId: string, surfTimestamp?: string, surfingLevel?: string) => void;
   savedSpotIds: Set<string>;
   selectedDate?: Date;
   selectedTime?: string;
@@ -60,7 +60,7 @@ export default function SearchResultsList({
 
   const [currentPage, setCurrentPage] = useState(1);
   const [sortMode, setSortMode] = useState<SortMode>('surfScore');
-  const [confirmDelete, setConfirmDelete] = useState<{ id: string; surfTimestamp: string; name: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; surfTimestamp: string; surfingLevel: string; name: string } | null>(null);
   const swipe = useSwipeDown(onClose);
 
   // Reset to page 1 when results change
@@ -260,7 +260,7 @@ export default function SearchResultsList({
           <ul className="p-2 space-y-2">
             {paginatedResults.map((spot, index) => {
               const compositeKey = `${spot.locationId}#${spot.surfTimestamp}#${spot.displayLevel || ''}`;
-              const savedKey = `${spot.locationId}#${spot.surfTimestamp}`;
+              const savedKey = `${spot.locationId}#${spot.surfTimestamp}#${(spot.displayLevel || '').toUpperCase()}`;
               const isSaved = savedSpotIds.has(savedKey);
               const displayName = locale === 'ko' && spot.nameKo ? spot.nameKo : spot.name;
 
@@ -321,7 +321,7 @@ export default function SearchResultsList({
                       onClick={(e) => {
                         e.stopPropagation();
                         if (isSaved && onRemoveSpot) {
-                          setConfirmDelete({ id: spot.locationId, surfTimestamp: spot.surfTimestamp, name: displayName });
+                          setConfirmDelete({ id: spot.locationId, surfTimestamp: spot.surfTimestamp, surfingLevel: spot.displayLevel || '', name: displayName });
                         } else if (!isSaved) {
                           onSaveSpot(spot);
                         }
@@ -403,7 +403,7 @@ export default function SearchResultsList({
               <button
                 onClick={() => {
                   if (onRemoveSpot) {
-                    onRemoveSpot(confirmDelete.id, confirmDelete.surfTimestamp);
+                    onRemoveSpot(confirmDelete.id, confirmDelete.surfTimestamp, confirmDelete.surfingLevel);
                   }
                   setConfirmDelete(null);
                 }}

@@ -70,19 +70,19 @@ class SavedListRepository(BaseDynamoDBRepository):
             return False
 
     @classmethod
-    def _parse_location_surf_key(cls, location_surf_key: Optional[str], location_id: Optional[str], surf_timestamp: Optional[str]) -> tuple[str, str]:
-        """Parse location_surf_key or use separate location_id and surf_timestamp."""
+    def _parse_location_surf_key(cls, location_surf_key: Optional[str], location_id: Optional[str], surf_timestamp: Optional[str]) -> str:
+        """Parse location_surf_key or construct from separate parts.
+
+        Returns the full sortKey in format: {locationId}#{surfTimestamp}#{surferLevel}
+        """
         if location_surf_key:
-            parts = location_surf_key.split("#", 2)
-            if len(parts) >= 3:
-                loc_id = f"{parts[0]}#{parts[1]}"
-                ts = parts[2]
-                return loc_id, ts
-            elif len(parts) == 2:
-                return parts[0], parts[1]
+            # Already in full format, return as-is
+            return location_surf_key
         if location_id and surf_timestamp:
-            return location_id, surf_timestamp
-        raise ValueError("Either location_surf_key or both location_id and surf_timestamp must be provided")
+            # Partial key provided - caller must handle separately
+            # This branch is used by get_saved_item/delete_item which now require the full key
+            raise ValueError("location_surf_key must be provided with surfer level included")
+        raise ValueError("location_surf_key must be provided")
 
     @classmethod
     async def save_item(
@@ -104,7 +104,7 @@ class SavedListRepository(BaseDynamoDBRepository):
         water_temperature: Optional[float] = None,
     ) -> Optional[dict]:
         """Save a new item to saved_list table."""
-        sort_key = f"{location_id}#{surf_timestamp}"
+        sort_key = f"{location_id}#{surf_timestamp}#{surfer_level.upper()}"
 
         item = {
             "userId": {"S": user_id},
@@ -176,8 +176,7 @@ class SavedListRepository(BaseDynamoDBRepository):
         location_surf_key: Optional[str] = None,
     ) -> Optional[dict]:
         """Get a specific saved item."""
-        loc_id, ts = cls._parse_location_surf_key(location_surf_key, location_id, surf_timestamp)
-        sort_key = f"{loc_id}#{ts}"
+        sort_key = cls._parse_location_surf_key(location_surf_key, location_id, surf_timestamp)
 
         try:
             async with await cls.get_client() as client:
@@ -204,8 +203,7 @@ class SavedListRepository(BaseDynamoDBRepository):
         location_surf_key: Optional[str] = None,
     ) -> bool:
         """Delete a saved item."""
-        loc_id, ts = cls._parse_location_surf_key(location_surf_key, location_id, surf_timestamp)
-        sort_key = f"{loc_id}#{ts}"
+        sort_key = cls._parse_location_surf_key(location_surf_key, location_id, surf_timestamp)
 
         try:
             async with await cls.get_client() as client:
@@ -231,8 +229,7 @@ class SavedListRepository(BaseDynamoDBRepository):
         location_surf_key: Optional[str] = None,
     ) -> bool:
         """Acknowledge a change notification (set flagChange to false)."""
-        loc_id, ts = cls._parse_location_surf_key(location_surf_key, location_id, surf_timestamp)
-        sort_key = f"{loc_id}#{ts}"
+        sort_key = cls._parse_location_surf_key(location_surf_key, location_id, surf_timestamp)
 
         try:
             async with await cls.get_client() as client:

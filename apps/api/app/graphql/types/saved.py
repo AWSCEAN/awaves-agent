@@ -61,7 +61,8 @@ class SavedItem:
         """
         location_id = item.get("locationId", "")
         surf_timestamp = item.get("surfTimestamp", "")
-        location_surf_key = item.get("sortKey", f"{location_id}#{surf_timestamp}")
+        surfer_level = item.get("surferLevel", "").upper()
+        location_surf_key = item.get("sortKey", f"{location_id}#{surf_timestamp}#{surfer_level}")
 
         fb_status = None
         if feedback_status:

@@ -36,7 +36,7 @@ class SavedItemResponse(BaseModel):
     """Saved item response."""
 
     user_id: str
-    location_surf_key: str = Field(..., description="Composite key: {locationId}#{surfTimestamp}")
+    location_surf_key: str = Field(..., description="Composite key: {locationId}#{surfTimestamp}#{surferLevel}")
     location_id: str
     surf_timestamp: str
     saved_at: str
@@ -78,7 +78,8 @@ class SavedItemResponse(BaseModel):
         """Create response from DynamoDB item."""
         location_id = item.get("locationId", "")
         surf_timestamp = item.get("surfTimestamp", "")
-        location_surf_key = item.get("sortKey", f"{location_id}#{surf_timestamp}")
+        surfer_level = item.get("surferLevel", "").upper()
+        location_surf_key = item.get("sortKey", f"{location_id}#{surf_timestamp}#{surfer_level}")
 
         return cls(
             user_id=item.get("userId", ""),
@@ -113,7 +114,7 @@ class SavedListResponse(BaseModel):
 class DeleteSavedItemRequest(BaseModel):
     """Request to delete a saved item."""
 
-    location_surf_key: Optional[str] = Field(default=None, description="Composite key: {locationId}#{surfTimestamp}")
+    location_surf_key: Optional[str] = Field(default=None, description="Composite key: {locationId}#{surfTimestamp}#{surferLevel}")
     location_id: Optional[str] = Field(default=None)
     surf_timestamp: Optional[str] = Field(default=None)
 
@@ -121,6 +122,6 @@ class DeleteSavedItemRequest(BaseModel):
 class AcknowledgeChangeRequest(BaseModel):
     """Request to acknowledge a change notification."""
 
-    location_surf_key: Optional[str] = Field(default=None, description="Composite key: {locationId}#{surfTimestamp}")
+    location_surf_key: Optional[str] = Field(default=None, description="Composite key: {locationId}#{surfTimestamp}#{surferLevel}")
     location_id: Optional[str] = Field(default=None)
     surf_timestamp: Optional[str] = Field(default=None)

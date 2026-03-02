@@ -28,6 +28,17 @@ function getScoreColor(score: number): string {
   return 'text-red-600';
 }
 
+function getShortLevelLabel(level: string, locale: 'en' | 'ko'): string {
+  const upper = level.toUpperCase();
+  if (locale === 'ko') {
+    if (upper === 'BEGINNER') return '초급';
+    if (upper === 'INTERMEDIATE') return '중급';
+    if (upper === 'ADVANCED') return '고급';
+  }
+  // English: use first letter
+  return upper.charAt(0);  // B, I, A
+}
+
 function getScoreBgColor(score: number): string {
   if (score >= 70) return 'bg-green-50 border-green-200';
   if (score >= 40) return 'bg-yellow-50 border-yellow-200';
@@ -354,11 +365,14 @@ export default function SpotDetailPanel({
               .map((save) => {
                 const d = parseUTCTimestamp(save.surfTimestamp);
                 if (!d) return null;
-                const isActive = save.surfTimestamp === surfInfo.surfTimestamp;
+                const currentLevel = (effectiveLevel || surferLevel || 'INTERMEDIATE').toUpperCase();
+                const isActive = save.surfTimestamp === surfInfo.surfTimestamp
+                  && save.surfingLevel.toUpperCase() === currentLevel;
                 const timeLabel = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
                 const dateLabel = locale === 'ko'
                   ? `${d.getMonth() + 1}/${d.getDate()}`
                   : `${d.getMonth() + 1}/${d.getDate()}`;
+                const levelLabel = getShortLevelLabel(save.surfingLevel, locale as 'en' | 'ko');
                 return (
                   <button
                     key={save.locationSurfKey}
@@ -372,6 +386,7 @@ export default function SpotDetailPanel({
                     <svg className={`w-3 h-3 flex-shrink-0 ${isActive ? 'text-red-300' : 'text-red-400'}`} fill="currentColor" viewBox="0 0 24 24">
                       <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                     </svg>
+                    <span className="font-bold">{levelLabel}</span>
                     <span>{dateLabel}</span>
                     <span>{timeLabel}</span>
                   </button>

@@ -38,6 +38,19 @@ function formatTimestamp(ts: string, locale: string): { date: string; time: stri
   };
 }
 
+function getLevelLabel(level: string, locale: string): string {
+  const upper = level.toUpperCase();
+  if (locale === 'ko') {
+    if (upper === 'BEGINNER') return '초급';
+    if (upper === 'INTERMEDIATE') return '중급';
+    if (upper === 'ADVANCED') return '고급';
+  }
+  if (upper === 'BEGINNER') return 'Beginner';
+  if (upper === 'INTERMEDIATE') return 'Intermediate';
+  if (upper === 'ADVANCED') return 'Advanced';
+  return level;
+}
+
 export default function TimeSlotPickerPanel({
   locationId,
   coordinates,
@@ -142,6 +155,7 @@ export default function TimeSlotPickerPanel({
         {sorted.map((save) => {
           const { date, time } = formatTimestamp(save.surfTimestamp, locale);
           const grade = save.surfGrade || 'D';
+          const levelLabel = getLevelLabel(save.surfingLevel, locale);
 
           return (
             <button
@@ -161,6 +175,9 @@ export default function TimeSlotPickerPanel({
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-ocean-800">{date}</span>
                     <span className="text-sm text-ocean-500">{time}</span>
+                    <span className="text-xs font-medium px-1.5 py-0.5 bg-ocean-100 text-ocean-700 rounded">
+                      {levelLabel}
+                    </span>
                   </div>
                   <div className="flex items-center gap-3 mt-1.5">
                     <span className="text-xs text-ocean-500">

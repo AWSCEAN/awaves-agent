@@ -405,10 +405,14 @@ function MapPageContent() {
     }
   };
 
-  const handleRemoveSpot = async (locationId: string, surfTimestamp?: string) => {
-    const saved = surfTimestamp
-      ? savedSpots.find((s) => s.locationId === locationId && s.surfTimestamp === surfTimestamp)
-      : savedSpots.find((s) => s.locationId === locationId);
+  const handleRemoveSpot = async (locationId: string, surfTimestamp?: string, surfingLevel?: string) => {
+    const level = surfingLevel?.toUpperCase();
+    const saved = savedSpots.find((s) => {
+      if (s.locationId !== locationId) return false;
+      if (surfTimestamp && s.surfTimestamp !== surfTimestamp) return false;
+      if (level && s.surfingLevel !== level) return false;
+      return true;
+    });
     if (saved) {
       await deleteItem(saved.locationSurfKey);
     }
@@ -589,10 +593,10 @@ function MapPageContent() {
     return () => mq.removeEventListener('change', handler);
   }, []);
 
-  // Memoize savedSpotIds using LocationId#SurfTimestamp composite key
-  // This allows saving the same spot at different times
+  // Memoize savedSpotIds using LocationId#SurfTimestamp#SurfingLevel composite key
+  // This allows saving the same spot at different times and different skill levels
   const savedSpotIds = useMemo(() =>
-    new Set(savedSpots.map((s) => `${s.locationId}#${s.surfTimestamp}`)),
+    new Set(savedSpots.map((s) => `${s.locationId}#${s.surfTimestamp}#${s.surfingLevel || ''}`)),
     [savedSpots]
   );
 
@@ -1119,6 +1123,7 @@ function MapPageContent() {
             isSaved={savedSpots.some(
               (s) => s.locationId === selectedSpotDetail.surfInfo.locationId
                 && s.surfTimestamp === selectedSpotDetail.surfInfo.surfTimestamp
+                && s.surfingLevel === (((selectedSpotDetail.surfInfo as unknown as { displayLevel?: string }).displayLevel) || surferLevel).toUpperCase()
             )}
             onClose={() => setSelectedSpotDetail(null)}
             onSave={async () => {
@@ -1147,9 +1152,11 @@ function MapPageContent() {
               }
             }}
             onRemove={() => {
+              const effLevel = ((selectedSpotDetail.surfInfo as unknown as { displayLevel?: string }).displayLevel) || surferLevel;
               handleRemoveSpot(
                 selectedSpotDetail.surfInfo.locationId,
                 selectedSpotDetail.surfInfo.surfTimestamp,
+                effLevel,
               );
             }}
             showLocationPrompt={showLocationPrompt}
