@@ -557,7 +557,9 @@ class SurfDataRepository(BaseDynamoDBRepository):
         for level in ("BEGINNER", "INTERMEDIATE", "ADVANCED"):
             level_data = derived.get(level, {}).get("M", {})
             if level_data:
-                raw_grade = level_data.get("surfGrade", {}).get("S", "0")
+                # surfGrade may be stored as String {"S": "3.0"} or Number {"N": "3.0"}
+                grade_attr = level_data.get("surfGrade", {})
+                raw_grade = grade_attr.get("S") or grade_attr.get("N") or "0"
                 try:
                     grade_numeric = float(raw_grade)
                 except (ValueError, TypeError):

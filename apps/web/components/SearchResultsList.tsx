@@ -6,7 +6,7 @@ import { ko, enUS } from 'date-fns/locale';
 import { useTranslations } from 'next-intl';
 import { useLocale } from '@/components/LocaleProvider';
 import type { SurfInfo, SurfingLevel } from '@/types';
-import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, getMetricsForLevel, surferLevelToKey, isCoordString } from '@/lib/services/surfInfoService';
+import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, getMetricsForLevel, surferLevelToKey, isCoordString, getSurfScoreColors } from '@/lib/services/surfInfoService';
 import { useSwipeDown } from '@/hooks/useSwipeDown';
 
 export interface SearchResult extends SurfInfo {
@@ -119,12 +119,6 @@ export default function SearchResultsList({
   useEffect(() => {
     onVisibleItemsChange?.(paginatedResults);
   }, [currentPage, sortedResults, onVisibleItemsChange]);
-
-  const getSurfScoreColor = (score: number): string => {
-    if (score >= 70) return 'bg-green-500';
-    if (score >= 40) return 'bg-yellow-500';
-    return 'bg-red-500';
-  };
 
   const getLevelLabel = (spot: SearchResult): string => {
     const level = spot.displayLevel;
@@ -316,7 +310,7 @@ export default function SearchResultsList({
                       {/* Scores + Grade */}
                       <div className="flex items-center gap-3 mt-1">
                         <div className="flex items-center gap-2 bg-sand-100 rounded-lg px-2.5 py-1">
-                          <div className={`w-3 h-3 rounded-full ${getSurfScoreColor(getMetricsForLevel(spot.derivedMetrics, spot.displayLevel || '').surfScore)}`} />
+                          <div className={`w-3 h-3 rounded-full ${getSurfScoreColors(getMetricsForLevel(spot.derivedMetrics, spot.displayLevel || '').surfScore).dot}`} />
                           <span className="text-lg font-bold text-ocean-800">
                             {Math.round(getMetricsForLevel(spot.derivedMetrics, spot.displayLevel || '').surfScore)}
                           </span>

@@ -7,6 +7,8 @@ import type { SurfGrade, SurfingLevel, SurfInfo, SurfInfoDerivedMetrics, LevelMe
  * If surferLevel is empty (All Levels), defaults to INTERMEDIATE.
  * Converts numeric grade to letter grade for display.
  */
+const VALID_SURF_GRADES: readonly SurfGrade[] = ['A', 'B', 'C', 'D', 'E'];
+
 export function getMetricsForLevel(
   derivedMetrics: SurfInfoDerivedMetrics | undefined,
   surferLevel: string = ''
@@ -16,10 +18,28 @@ export function getMetricsForLevel(
   const levelKey = surferLevelToKey(surferLevel);
   const metrics = derivedMetrics[levelKey] ?? fallback;
 
-  // Convert numeric grade to letter grade for display
+  // surfGrade in the API response may be:
+  //   a) a letter grade string ('A'–'E') — backend already converted, trust it
+  //   b) a raw numeric float (0.0–4.0)   — production may return this when the
+  //      backend stores surfGrade as a Number type in DynamoDB
+  // In case (b) we also fall back to surfGradeNumeric if it is valid.
+  const rawGrade = metrics.surfGrade as unknown;
+
+  if (typeof rawGrade === 'string' && VALID_SURF_GRADES.includes(rawGrade as SurfGrade)) {
+    return { ...metrics, surfGrade: rawGrade as SurfGrade };
+  }
+
+  // Derive numeric value: prefer surfGradeNumeric, fall back to parsing surfGrade
+  const numericFromGrade =
+    typeof rawGrade === 'number' ? rawGrade
+    : typeof rawGrade === 'string' ? Number(rawGrade)
+    : NaN;
+
+  const numericGrade = !isNaN(numericFromGrade) ? numericFromGrade : metrics.surfGradeNumeric;
+
   return {
     ...metrics,
-    surfGrade: convertSurfGradeToLabel(metrics.surfGradeNumeric)
+    surfGrade: convertSurfGradeToLabel(Number(numericGrade)),
   };
 }
 
@@ -94,6 +114,24 @@ export function generateSurfingLevel(waveHeight: number, windSpeed: number): Sur
 
 // --- UI Helpers ---
 
+/**
+ * Returns all color variants for a surf score.
+ * Single source of truth — use this everywhere a score needs coloring.
+ *
+ * @param score - Surf score (0–100). Strings are coerced to number.
+ */
+export function getSurfScoreColors(score: number | string): {
+  hex: string;        // CSS hex — for map markers / canvas
+  text: string;       // Tailwind text color class
+  bg: string;         // Tailwind bg + border classes for badge backgrounds
+  dot: string;        // Tailwind bg class for small dot indicators
+} {
+  const s = Number(score);
+  if (s >= 70) return { hex: '#22c55e', text: 'text-green-600', bg: 'bg-green-50 border-green-200', dot: 'bg-green-500' };
+  if (s >= 40) return { hex: '#eab308', text: 'text-yellow-600', bg: 'bg-yellow-50 border-yellow-200', dot: 'bg-yellow-500' };
+  return           { hex: '#ef4444', text: 'text-red-600',   bg: 'bg-red-50 border-red-200',     dot: 'bg-red-500'   };
+}
+
 export function getGradeBgColor(grade: string): string {
   switch (grade) {
     case 'A': return 'bg-green-100';
@@ -128,6 +166,17 @@ export function getGradeBorderColor(grade: string): string {
 }
 
 // --- Score Calculation ---
+
+/** Inverse of convertSurfGradeToLabel: letter grade → numeric (0.0–4.0). */
+function gradeLetterToNumeric(grade: SurfGrade): number {
+  switch (grade) {
+    case 'A': return 4.0;
+    case 'B': return 3.0;
+    case 'C': return 2.0;
+    case 'D': return 1.0;
+    default:  return 0.0;
+  }
+}
 
 export function calculateSurfScore(waveHeight: number, wavePeriod: number, windSpeed: number): number {
   let score = 50;
@@ -305,17 +354,17 @@ export function generateSurfInfoForSpot(
         BEGINNER: {
           surfScore: round2(surfScore * 0.85),
           surfGrade: generateSurfGrade(surfScore * 0.85),
-          surfGradeNumeric: 0.0,
+          surfGradeNumeric: gradeLetterToNumeric(generateSurfGrade(surfScore * 0.85)),
         },
         INTERMEDIATE: {
           surfScore: round2(surfScore),
           surfGrade: generateSurfGrade(surfScore),
-          surfGradeNumeric: 0.0,
+          surfGradeNumeric: gradeLetterToNumeric(generateSurfGrade(surfScore)),
         },
         ADVANCED: {
           surfScore: round2(surfScore * 1.1 > 100 ? 100 : surfScore * 1.1),
           surfGrade: generateSurfGrade(Math.min(100, surfScore * 1.1)),
-          surfGradeNumeric: 0.0,
+          surfGradeNumeric: gradeLetterToNumeric(generateSurfGrade(Math.min(100, surfScore * 1.1))),
         },
       },
       metadata: {

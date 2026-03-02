@@ -4,7 +4,7 @@ import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useLocale } from '@/components/LocaleProvider';
 import type { SurfInfo, SavedListItem } from '@/types';
 import { useSwipeDown } from '@/hooks/useSwipeDown';
-import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, getMetricsForLevel, surferLevelToKey, parseUTCTimestamp, isCoordString } from '@/lib/services/surfInfoService';
+import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, getMetricsForLevel, surferLevelToKey, parseUTCTimestamp, isCoordString, getSurfScoreColors } from '@/lib/services/surfInfoService';
 import { surfService } from '@/lib/apiServices';
 
 interface SpotDetailPanelProps {
@@ -23,12 +23,6 @@ interface SpotDetailPanelProps {
   llmFetchKey?: number;
 }
 
-function getScoreColor(score: number): string {
-  if (score >= 70) return 'text-green-600';
-  if (score >= 40) return 'text-yellow-600';
-  return 'text-red-600';
-}
-
 function getShortLevelLabel(level: string, locale: 'en' | 'ko'): string {
   const upper = level.toUpperCase();
   if (locale === 'ko') {
@@ -38,12 +32,6 @@ function getShortLevelLabel(level: string, locale: 'en' | 'ko'): string {
   }
   // English: use first letter
   return upper.charAt(0);  // B, I, A
-}
-
-function getScoreBgColor(score: number): string {
-  if (score >= 70) return 'bg-green-50 border-green-200';
-  if (score >= 40) return 'bg-yellow-50 border-yellow-200';
-  return 'bg-red-50 border-red-200';
 }
 
 export default function SpotDetailPanel({
@@ -410,11 +398,11 @@ export default function SpotDetailPanel({
         {/* Score + Grade + Level - Three boxes horizontally */}
         <div className="flex gap-2">
           {/* Score Box */}
-          <div className={`flex-1 p-2 rounded-xl border ${getScoreBgColor(surfScore)} text-center`}>
+          <div className={`flex-1 p-2 rounded-xl border ${getSurfScoreColors(surfScore).bg} text-center`}>
             <div className="text-xs text-ocean-600 font-medium mb-0.5">
               {locale === 'ko' ? '점수' : 'Score'}
             </div>
-            <div className={`text-2xl font-bold ${getScoreColor(surfScore)}`}>
+            <div className={`text-2xl font-bold ${getSurfScoreColors(surfScore).text}`}>
               {Math.round(surfScore)}
             </div>
           </div>
@@ -578,7 +566,7 @@ export default function SpotDetailPanel({
                 <tr>
                   <td className="py-0.5 px-0.5 font-medium text-ocean-600">{locale === 'ko' ? '점수' : 'Score'}</td>
                   {forecastData.scores.map((score, idx) => (
-                    <td key={idx} className={`py-0.5 px-0.5 text-center font-bold ${getScoreColor(score)} ${hours[idx] === selectedLocalHour ? 'bg-ocean-50' : ''}`}>
+                    <td key={idx} className={`py-0.5 px-0.5 text-center font-bold ${getSurfScoreColors(score).text} ${hours[idx] === selectedLocalHour ? 'bg-ocean-50' : ''}`}>
                       {score}
                     </td>
                   ))}

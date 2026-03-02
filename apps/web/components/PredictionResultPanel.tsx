@@ -2,7 +2,7 @@
 
 import { useLocale } from 'next-intl';
 import type { PredictionResult } from '@/types';
-import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, parseUTCTimestamp } from '@/lib/services/surfInfoService';
+import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, parseUTCTimestamp, getSurfScoreColors } from '@/lib/services/surfInfoService';
 import { useSwipeDown } from '@/hooks/useSwipeDown';
 
 interface PredictionResultPanelProps {
@@ -11,12 +11,6 @@ interface PredictionResultPanelProps {
   isOpen: boolean;
   onClose: () => void;
   showLocationPrompt?: boolean;
-}
-
-function getScoreColor(score: number): string {
-  if (score >= 70) return 'text-green-600';
-  if (score >= 40) return 'text-yellow-600';
-  return 'text-red-600';
 }
 
 function getLevelLabel(level: string, locale: string): string {
@@ -103,7 +97,7 @@ export default function PredictionResultPanel({
         <div className="flex items-center justify-center gap-10">
           {/* Score */}
           <div className="text-center">
-            <div className={`text-6xl font-bold ${getScoreColor(surfScore)}`}>
+            <div className={`text-6xl font-bold ${getSurfScoreColors(surfScore).text}`}>
               {Math.round(surfScore)}
             </div>
             <div className="text-sm text-ocean-400 mt-1">/100</div>

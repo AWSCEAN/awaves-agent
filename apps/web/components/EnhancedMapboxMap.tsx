@@ -8,7 +8,7 @@ import length from '@turf/length';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css';
 import type { SurfInfo, SavedListItem } from '@/types';
-import { getMetricsForLevel } from '@/lib/services/surfInfoService';
+import { getMetricsForLevel, getSurfScoreColors } from '@/lib/services/surfInfoService';
 
 export interface SpotSelectionData {
   surfInfo: SurfInfo;
@@ -44,12 +44,6 @@ interface EnhancedMapboxMapProps {
    *  Use [negative, 0] to shift marker left of a right sidebar. */
   centerOffset?: [number, number];
   surferLevel?: string;
-}
-
-function getSurfScoreColor(score: number): string {
-  if (score >= 70) return '#22c55e'; // green
-  if (score >= 40) return '#eab308'; // yellow
-  return '#ef4444'; // red
 }
 
 export default function EnhancedMapboxMap({
@@ -236,7 +230,7 @@ export default function EnhancedMapboxMap({
         if (!desiredKeys.has(spot.locationId)) return;
         if (markersRef.current[spot.locationId]) return;
 
-        const markerColor = getSurfScoreColor(getMetricsForLevel(spot.derivedMetrics, surferLevel).surfScore);
+        const markerColor = getSurfScoreColors(getMetricsForLevel(spot.derivedMetrics, surferLevel).surfScore).hex;
         const el = createMarkerElement(
           '\u{1F3C4}',
           markerColor,
@@ -360,7 +354,7 @@ export default function EnhancedMapboxMap({
       const overlaySpots = spots;
       const features = overlaySpots.map((spot) => {
         const score = getMetricsForLevel(spot.derivedMetrics, surferLevel).surfScore;
-        const color = getSurfScoreColor(score);
+        const color = getSurfScoreColors(score).hex;
 
         return {
           type: 'Feature' as const,
@@ -692,7 +686,7 @@ export default function EnhancedMapboxMap({
       const hasSurfMarker = markersRef.current[spot.locationId];
       const hasSavedMarker = markersRef.current[`saved-${spot.locationId}`];
       if (!hasSurfMarker && !hasSavedMarker) {
-        const nearbyMarkerColor = getSurfScoreColor(getMetricsForLevel(spot.derivedMetrics, surferLevel).surfScore);
+        const nearbyMarkerColor = getSurfScoreColors(getMetricsForLevel(spot.derivedMetrics, surferLevel).surfScore).hex;
         const el = createMarkerElement(
           '\u{1F3C4}',
           nearbyMarkerColor,
