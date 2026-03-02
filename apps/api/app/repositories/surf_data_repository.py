@@ -219,7 +219,7 @@ class SurfDataRepository(BaseDynamoDBRepository):
 
         t0 = _time.monotonic()
         try:
-            loc_ids = [s["locationId"] for s in spots]
+            loc_ids = list(dict.fromkeys(s["locationId"] for s in spots))
             # BatchGetItem: max 100 keys per request
             loc_map: dict[str, dict] = {}
             async with await cls.get_client() as client:

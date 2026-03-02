@@ -122,17 +122,15 @@ function MapPageContent() {
   // Saved items from GraphQL (BE DynamoDB)
   const { items: savedItems, saveItem, deleteItem, refetch } = useSavedItems();
 
-  // Fetch all spots on mount for default map markers (today's date, default time range)
+  // Fetch all spots on mount for default map markers.
+  // Call without date/time params → backend _get_all_spots_raw() path:
+  //   - always returns data (no cross-midnight UTC validation)
+  //   - always has nameKo (BatchGetItem dedup works on unique locationIds)
   useEffect(() => {
     const loadAllSpots = async () => {
       try {
-        const todayStr = format(new Date(), 'yyyy-MM-dd');
-        const fromTime = getDefaultFromTime();
-        const toTime = getDefaultToTime();
-        const utcFrom = localToUTC(todayStr, fromTime);
-        const utcTo = localToUTC(todayStr, toTime);
-        const response = await surfService.getAllSpots(utcFrom.date, utcFrom.time, utcTo.time);
-        if (response.success && response.data) {
+        const response = await surfService.getAllSpots();
+        if (response.success && response.data && response.data.length > 0) {
           setAllSpots(response.data);
         }
       } catch (err) {
@@ -456,7 +454,15 @@ function MapPageContent() {
 
   const handleMapSpotSelect = (data: SpotSelectionData) => {
     setTimeSlotSelection(null);
-    setSelectedSpotDetail(data);
+    // Secondary nameKo fallback: if the spot doesn't carry nameKo (e.g. date-range
+    // cache hasn't expired yet), look it up from allSpots which is loaded via
+    // _get_all_spots_raw() and always has nameKo populated.
+    const enrichedNameKo = data.surfInfo.nameKo
+      || allSpots.find(s => s.locationId === data.surfInfo.locationId)?.nameKo;
+    const spotDetail = enrichedNameKo && !data.surfInfo.nameKo
+      ? { ...data, surfInfo: { ...data.surfInfo, nameKo: enrichedNameKo } }
+      : data;
+    setSelectedSpotDetail(spotDetail);
     if (isMobile) {
       setShowResults(false);
     }
