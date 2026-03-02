@@ -280,11 +280,26 @@ class OpenSearchService:
                     item for item in items
                     if item.get("index", {}).get("status") not in (200, 201)
                 ]
-                logger.warning("Bulk index had %d failures", len(failed))
+                logger.error(
+                    "Bulk index had %d failures out of %d documents",
+                    len(failed), len(locations)
+                )
+                # Log details of first 5 failures for debugging
+                for idx, item in enumerate(failed[:5]):
+                    error_info = item.get("index", {})
+                    doc_id = error_info.get("_id", "unknown")
+                    status = error_info.get("status", "unknown")
+                    error_detail = error_info.get("error", {})
+                    logger.error(
+                        "  Failed document %d: id=%s, status=%s, error=%s",
+                        idx + 1, doc_id, status, error_detail
+                    )
+                if len(failed) > 5:
+                    logger.error("  ... and %d more failures", len(failed) - 5)
 
             return success_count
         except Exception as e:
-            logger.error("Bulk index failed: %s", e)
+            logger.error("Bulk index failed: %s", e, exc_info=True)
             emit_external_api_failure("OpenSearch")
             return 0
 
@@ -479,3 +494,99 @@ class OpenSearchService:
         except Exception as e:
             logger.error("Failed to delete index: %s", e)
             return False
+
+    @classmethod
+    async def scan_and_index_from_dynamodb(cls, dynamodb_table_name: str) -> dict:
+        """Scan DynamoDB locations table and bulk index into OpenSearch.
+
+        This is the canonical method for indexing locations from DynamoDB.
+        Used by both server startup and reindex API to ensure consistency.
+
+        Returns:
+            dict with keys: scanned_count, indexed_count, failed_count, success
+        """
+        import aioboto3
+        from botocore.config import Config
+        from app.config import settings
+
+        session = aioboto3.Session(region_name=settings.aws_region)
+        endpoint_url = settings.ddb_endpoint_url if settings.ddb_endpoint_url else None
+        config = Config(
+            retries={"max_attempts": 3, "mode": "adaptive"},
+            connect_timeout=5,
+            read_timeout=10,
+        )
+
+        try:
+            # Step 1: Scan all items from DynamoDB locations table
+            async with session.client("dynamodb", endpoint_url=endpoint_url, config=config) as client:
+                all_items: list[dict] = []
+                params: dict = {"TableName": dynamodb_table_name}
+                while True:
+                    response = await client.scan(**params)
+                    all_items.extend(response.get("Items", []))
+                    if "LastEvaluatedKey" not in response:
+                        break
+                    params["ExclusiveStartKey"] = response["LastEvaluatedKey"]
+
+            scanned_count = len(all_items)
+            if scanned_count == 0:
+                logger.warning("DynamoDB table '%s' is empty, no locations to index.", dynamodb_table_name)
+                return {"scanned_count": 0, "indexed_count": 0, "failed_count": 0, "success": True}
+
+            logger.info("Scanned %d locations from DynamoDB table '%s'.", scanned_count, dynamodb_table_name)
+
+            # Step 2: Transform DynamoDB items to OpenSearch document format
+            locations: list[dict] = []
+            for item in all_items:
+                locations.append({
+                    "locationId": item["locationId"]["S"],
+                    "lat": float(item.get("lat", {}).get("N", "0")),
+                    "lon": float(item.get("lon", {}).get("N", "0")),
+                    "display_name": item.get("displayName", {}).get("S", ""),
+                    "city": item.get("city", {}).get("S", ""),
+                    "state": item.get("state", {}).get("S", ""),
+                    "country": item.get("country", {}).get("S", ""),
+                    "display_name_ko": item.get("displayNameKo", {}).get("S", "") or item.get("displayNameKr", {}).get("S", ""),
+                    "city_ko": item.get("cityKo", {}).get("S", "") or item.get("cityKr", {}).get("S", ""),
+                    "state_ko": item.get("stateKo", {}).get("S", "") or item.get("stateKr", {}).get("S", ""),
+                    "country_ko": item.get("countryKo", {}).get("S", "") or item.get("countryKr", {}).get("S", ""),
+                })
+
+            # Step 3: Bulk index into OpenSearch
+            indexed_count = await cls.bulk_index_locations(locations)
+            failed_count = scanned_count - indexed_count
+
+            # Step 4: Validate results
+            if failed_count > 0:
+                logger.error(
+                    "Indexing incomplete: %d/%d locations failed to index",
+                    failed_count, scanned_count
+                )
+                return {
+                    "scanned_count": scanned_count,
+                    "indexed_count": indexed_count,
+                    "failed_count": failed_count,
+                    "success": False
+                }
+
+            logger.info(
+                "Successfully indexed all %d locations from DynamoDB into OpenSearch.",
+                indexed_count
+            )
+            return {
+                "scanned_count": scanned_count,
+                "indexed_count": indexed_count,
+                "failed_count": 0,
+                "success": True
+            }
+
+        except Exception as e:
+            logger.error("Failed to scan and index from DynamoDB: %s", e, exc_info=True)
+            return {
+                "scanned_count": 0,
+                "indexed_count": 0,
+                "failed_count": 0,
+                "success": False,
+                "error": str(e)
+            }
