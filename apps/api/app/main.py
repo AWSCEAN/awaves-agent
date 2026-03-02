@@ -202,6 +202,8 @@ async def _warm_cache_background():
     logger.info("Starting background cache warm-up...")
     try:
         async with xray_segment("background-cache-warmup"):
+            # Purge stale date-range caches (may lack nameKo from prior bug)
+            await CacheService.invalidate_date_range_caches()
             await CacheService.invalidate_surf_spots()
             await SurfDataRepository._get_all_spots_raw()
         logger.info("Background cache warm-up completed successfully")

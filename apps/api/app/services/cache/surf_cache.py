@@ -87,3 +87,22 @@ class SurfSpotsCacheService(BaseCacheService):
             await client.delete(cls.SURF_ALL_KEY)
         except Exception as e:
             logger.warning(f"Failed to invalidate surf spots cache: {e}")
+
+    @classmethod
+    async def invalidate_date_range_caches(cls) -> None:
+        """Invalidate all date-range surf spot caches.
+
+        Called on startup to purge any stale date-range data that may have
+        been cached without Korean name enrichment (nameKo).
+        """
+        client = await cls.get_client()
+        if not client:
+            return
+
+        try:
+            keys = await client.keys("awaves:surf:daterange:*")
+            if keys:
+                await client.delete(*keys)
+                logger.info("Invalidated %d stale date-range surf cache keys on startup.", len(keys))
+        except Exception as e:
+            logger.warning(f"Failed to invalidate date-range caches: {e}")
