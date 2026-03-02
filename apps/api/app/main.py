@@ -170,15 +170,24 @@ async def _seed_locations_if_empty() -> None:
 
     if result["success"]:
         logger.info(
-            "Successfully seeded %d/%d locations into OpenSearch from DynamoDB.",
-            result["indexed_count"], result["scanned_count"]
+            "Successfully seeded and validated all %d locations into OpenSearch (OpenSearch count: %d)",
+            result["scanned_count"], result["opensearch_count"]
         )
     else:
         logger.error(
-            "Failed to seed OpenSearch: %d/%d locations indexed, %d failed. Error: %s",
-            result["indexed_count"], result["scanned_count"], result["failed_count"],
+            "Failed to seed OpenSearch: DynamoDB=%d, BulkAPI=%d, OpenSearch=%d, Failed=%d, Missing=%d. Error: %s",
+            result["scanned_count"],
+            result["indexed_count"],
+            result["opensearch_count"],
+            result["failed_count"],
+            len(result.get("missing_ids", [])),
             result.get("error", "Unknown error")
         )
+        if result.get("missing_ids"):
+            logger.error(
+                "Missing locationIds (first 10): %s",
+                result["missing_ids"][:10]
+            )
 
 
 async def _warm_cache_background():

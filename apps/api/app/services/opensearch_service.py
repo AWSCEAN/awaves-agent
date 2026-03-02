@@ -479,6 +479,93 @@ class OpenSearchService:
             return -1
 
     @classmethod
+    async def get_all_location_ids(cls) -> set[str]:
+        """Get all locationIds currently in the OpenSearch index.
+
+        Returns:
+            Set of locationId strings, or empty set on error.
+        """
+        client = await cls.get_client()
+        if not client:
+            return set()
+
+        try:
+            exists = await client.indices.exists(index=cls.INDEX_NAME)
+            if not exists:
+                return set()
+
+            location_ids = set()
+            # Use scroll API to get all documents efficiently
+            response = await client.search(
+                index=cls.INDEX_NAME,
+                body={
+                    "_source": ["locationId"],
+                    "size": 1000,
+                    "query": {"match_all": {}},
+                },
+                scroll="2m"
+            )
+
+            scroll_id = response.get("_scroll_id")
+            hits = response.get("hits", {}).get("hits", [])
+
+            while hits:
+                for hit in hits:
+                    location_id = hit.get("_source", {}).get("locationId")
+                    if location_id:
+                        location_ids.add(location_id)
+
+                # Get next batch
+                response = await client.scroll(scroll_id=scroll_id, scroll="2m")
+                hits = response.get("hits", {}).get("hits", [])
+
+            # Clear scroll
+            if scroll_id:
+                try:
+                    await client.clear_scroll(scroll_id=scroll_id)
+                except Exception:
+                    pass
+
+            return location_ids
+        except Exception as e:
+            logger.error("Failed to get all locationIds: %s", e)
+            return set()
+
+    @classmethod
+    async def find_missing_location_ids(
+        cls, expected_location_ids: set[str]
+    ) -> tuple[set[str], set[str]]:
+        """Compare expected locationIds with what's actually in OpenSearch.
+
+        Args:
+            expected_location_ids: Set of locationIds that should be in the index.
+
+        Returns:
+            Tuple of (missing_ids, extra_ids):
+            - missing_ids: locationIds in DynamoDB but not in OpenSearch
+            - extra_ids: locationIds in OpenSearch but not in DynamoDB
+        """
+        indexed_ids = await cls.get_all_location_ids()
+
+        missing_ids = expected_location_ids - indexed_ids
+        extra_ids = indexed_ids - expected_location_ids
+
+        if missing_ids:
+            logger.error(
+                "Found %d locationIds in DynamoDB but NOT in OpenSearch: %s",
+                len(missing_ids),
+                sorted(list(missing_ids))[:10]  # Show first 10
+            )
+        if extra_ids:
+            logger.warning(
+                "Found %d locationIds in OpenSearch but NOT in DynamoDB: %s",
+                len(extra_ids),
+                sorted(list(extra_ids))[:10]  # Show first 10
+            )
+
+        return missing_ids, extra_ids
+
+    @classmethod
     async def delete_index(cls) -> bool:
         """Delete the locations index (for re-ingestion)."""
         client = await cls.get_client()
@@ -502,8 +589,20 @@ class OpenSearchService:
         This is the canonical method for indexing locations from DynamoDB.
         Used by both server startup and reindex API to ensure consistency.
 
+        Performs comprehensive validation:
+        1. Scans all items from DynamoDB
+        2. Bulk indexes into OpenSearch
+        3. Verifies OpenSearch document count matches DynamoDB count
+        4. Identifies any missing locationIds
+
         Returns:
-            dict with keys: scanned_count, indexed_count, failed_count, success
+            dict with keys:
+            - scanned_count: Number of items scanned from DynamoDB
+            - indexed_count: Number of documents bulk API reported as indexed
+            - opensearch_count: Actual document count from OpenSearch
+            - failed_count: Number of documents that failed to index
+            - missing_ids: List of locationIds missing from OpenSearch
+            - success: True if all validations pass
         """
         import aioboto3
         from botocore.config import Config
@@ -532,15 +631,28 @@ class OpenSearchService:
             scanned_count = len(all_items)
             if scanned_count == 0:
                 logger.warning("DynamoDB table '%s' is empty, no locations to index.", dynamodb_table_name)
-                return {"scanned_count": 0, "indexed_count": 0, "failed_count": 0, "success": True}
+                return {
+                    "scanned_count": 0,
+                    "indexed_count": 0,
+                    "opensearch_count": 0,
+                    "failed_count": 0,
+                    "missing_ids": [],
+                    "success": True
+                }
 
             logger.info("Scanned %d locations from DynamoDB table '%s'.", scanned_count, dynamodb_table_name)
 
             # Step 2: Transform DynamoDB items to OpenSearch document format
+            # and collect expected locationIds
             locations: list[dict] = []
+            expected_location_ids: set[str] = set()
+
             for item in all_items:
+                location_id = item["locationId"]["S"]
+                expected_location_ids.add(location_id)
+
                 locations.append({
-                    "locationId": item["locationId"]["S"],
+                    "locationId": location_id,
                     "lat": float(item.get("lat", {}).get("N", "0")),
                     "lon": float(item.get("lon", {}).get("N", "0")),
                     "display_name": item.get("displayName", {}).get("S", ""),
@@ -555,29 +667,62 @@ class OpenSearchService:
 
             # Step 3: Bulk index into OpenSearch
             indexed_count = await cls.bulk_index_locations(locations)
-            failed_count = scanned_count - indexed_count
 
-            # Step 4: Validate results
-            if failed_count > 0:
-                logger.error(
-                    "Indexing incomplete: %d/%d locations failed to index",
-                    failed_count, scanned_count
+            # Step 4: Verify actual OpenSearch document count
+            # Wait briefly for OpenSearch to finish indexing (refresh=True should handle this)
+            import asyncio
+            await asyncio.sleep(0.5)  # Brief delay to ensure index refresh completes
+
+            opensearch_count = await cls.get_document_count()
+            if opensearch_count < 0:
+                logger.error("Failed to get OpenSearch document count for validation")
+                opensearch_count = indexed_count  # Fallback to bulk API result
+
+            # Step 5: Find missing locationIds if counts don't match
+            missing_ids: list[str] = []
+            if opensearch_count != scanned_count:
+                logger.warning(
+                    "Count mismatch: DynamoDB=%d, BulkAPI=%d, OpenSearch=%d",
+                    scanned_count, indexed_count, opensearch_count
                 )
+                missing_set, _ = await cls.find_missing_location_ids(expected_location_ids)
+                missing_ids = sorted(list(missing_set))
+
+            # Step 6: Validate results
+            failed_count = scanned_count - indexed_count
+            validation_failed = (
+                failed_count > 0 or
+                opensearch_count != scanned_count or
+                len(missing_ids) > 0
+            )
+
+            if validation_failed:
+                logger.error(
+                    "Indexing validation failed: DynamoDB=%d, BulkAPI=%d, OpenSearch=%d, Missing=%d",
+                    scanned_count, indexed_count, opensearch_count, len(missing_ids)
+                )
+                if missing_ids:
+                    logger.error("Missing locationIds (first 10): %s", missing_ids[:10])
+
                 return {
                     "scanned_count": scanned_count,
                     "indexed_count": indexed_count,
+                    "opensearch_count": opensearch_count,
                     "failed_count": failed_count,
+                    "missing_ids": missing_ids,
                     "success": False
                 }
 
             logger.info(
-                "Successfully indexed all %d locations from DynamoDB into OpenSearch.",
-                indexed_count
+                "Successfully indexed and validated all %d locations (OpenSearch count: %d)",
+                scanned_count, opensearch_count
             )
             return {
                 "scanned_count": scanned_count,
                 "indexed_count": indexed_count,
+                "opensearch_count": opensearch_count,
                 "failed_count": 0,
+                "missing_ids": [],
                 "success": True
             }
 
@@ -586,7 +731,9 @@ class OpenSearchService:
             return {
                 "scanned_count": 0,
                 "indexed_count": 0,
+                "opensearch_count": 0,
                 "failed_count": 0,
+                "missing_ids": [],
                 "success": False,
                 "error": str(e)
             }
