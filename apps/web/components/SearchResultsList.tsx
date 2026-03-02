@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 import { ko, enUS } from 'date-fns/locale';
 import { useTranslations, useLocale } from 'next-intl';
 import type { SurfInfo, SurfingLevel } from '@/types';
-import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, getMetricsForLevel, surferLevelToKey } from '@/lib/services/surfInfoService';
+import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, getMetricsForLevel, surferLevelToKey, isCoordString } from '@/lib/services/surfInfoService';
 import { useSwipeDown } from '@/hooks/useSwipeDown';
 
 export interface SearchResult extends SurfInfo {
@@ -266,7 +266,11 @@ export default function SearchResultsList({
               const compositeKey = `${spot.locationId}#${spot.surfTimestamp}#${spot.displayLevel || ''}`;
               const savedKey = `${spot.locationId}#${spot.surfTimestamp}#${(spot.displayLevel || '').toUpperCase()}`;
               const isSaved = savedSpotIds.has(savedKey);
-              const displayName = locale === 'ko' && spot.nameKo ? spot.nameKo : spot.name;
+              const rawName = (locale === 'ko' && spot.nameKo) ? spot.nameKo : spot.name;
+              const [_srLat, _srLng] = spot.locationId.split('#');
+              const displayName = isCoordString(rawName)
+                ? `${parseFloat(_srLat).toFixed(4)}°, ${parseFloat(_srLng).toFixed(4)}°`
+                : rawName;
 
               // Determine if this item is currently selected
               const isSelected = selectedSpotDetail &&

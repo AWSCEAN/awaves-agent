@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import type { SavedItemResponse, FeedbackStatus, Language } from '@/types';
-import { parseUTCTimestamp } from '@/lib/services/surfInfoService';
+import { parseUTCTimestamp, convertSurfGradeToLabel, isCoordString } from '@/lib/services/surfInfoService';
 
 interface SpotNameInfo {
   name: string;
@@ -126,11 +126,16 @@ export default function SavedItemCard({
     setTimeout(() => setShowFeedbackToast(false), 2000);
   };
 
-  // Resolve display name
-  const resolvedSpotName = spotName
-    ? (lang === 'ko' && spotName.nameKo ? spotName.nameKo : spotName.name)
-    : null;
-  const locationName = resolvedSpotName || item.address || `${item.location_id.replace('#', ', ')}`;
+  // Convert numeric surf_grade (0.0–4.0 from GraphQL) to letter grade (A/B/C/D/E)
+  const gradeLabel = convertSurfGradeToLabel(item.surf_grade as unknown as number);
+
+  // Resolve display name — skip raw coordinate strings at every fallback level
+  const rawSpotName = spotName ? (lang === 'ko' && spotName.nameKo ? spotName.nameKo : spotName.name) : null;
+  const resolvedSpotName = rawSpotName && !isCoordString(rawSpotName) ? rawSpotName : null;
+  const resolvedAddress = item.address && !isCoordString(item.address) ? item.address : null;
+  const [_lat, _lng] = item.location_id.split('#');
+  const coordFallback = `${parseFloat(_lat).toFixed(4)}°, ${parseFloat(_lng).toFixed(4)}°`;
+  const locationName = resolvedSpotName || resolvedAddress || coordFallback;
   const regionLabel = lang === 'ko' && spotName?.regionKo ? spotName.regionKo : (item.region || spotName?.region);
   const countryLabel = lang === 'ko' && spotName?.countryKo ? spotName.countryKo : (item.country || spotName?.country);
 
@@ -201,8 +206,8 @@ export default function SavedItemCard({
               <span className="text-xl font-bold text-ocean-800">{item.surf_score.toFixed(0)}</span>
               <span className="text-[10px] text-ocean-400">/100</span>
             </div>
-            <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md flex-shrink-0 ${gradeColors[item.surf_grade] || 'bg-gray-100 text-gray-700'}`}>
-              {item.surf_grade}
+            <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md flex-shrink-0 ${gradeColors[gradeLabel] || 'bg-gray-100 text-gray-700'}`}>
+              {gradeLabel}
             </span>
             <span className="text-[10px] px-1 py-0.5 rounded bg-ocean-100 text-ocean-700 font-medium flex-shrink-0">
               {getLevelLabel(item.surfer_level)}
@@ -334,8 +339,8 @@ export default function SavedItemCard({
                 />
               </div>
             </div>
-            <div className={`w-16 h-16 rounded-xl flex flex-col items-center justify-center shadow-sm ${gradeColors[item.surf_grade] || 'bg-gray-100'}`}>
-              <span className="text-2xl font-bold">{item.surf_grade}</span>
+            <div className={`w-16 h-16 rounded-xl flex flex-col items-center justify-center shadow-sm ${gradeColors[gradeLabel] || 'bg-gray-100'}`}>
+              <span className="text-2xl font-bold">{gradeLabel}</span>
               <span className="text-[10px] opacity-80">{t.surfGrade}</span>
             </div>
           </div>

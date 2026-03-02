@@ -150,6 +150,15 @@ export function calculateSurfScore(waveHeight: number, wavePeriod: number, windS
 
 // --- Mock SurfInfo Generation ---
 
+/**
+ * Detect raw coordinate strings that should never be shown as a human-readable name.
+ * Matches both "lat#lng" (locationId format) and "lat, lng" (backend fallback format).
+ */
+export function isCoordString(s?: string | null): boolean {
+  if (!s) return true;
+  return /^-?\d+\.?\d*[#,]\s*-?\d+\.?\d*$/.test(s.trim());
+}
+
 export function toLocationId(lat: number, lng: number): string {
   return `${parseFloat(lat.toFixed(4))}#${parseFloat(lng.toFixed(4))}`;
 }

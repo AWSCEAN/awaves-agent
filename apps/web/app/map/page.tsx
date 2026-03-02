@@ -20,7 +20,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { useLocale as useAppLocale } from '@/components/LocaleProvider';
 import type { SurfInfo, SavedListItem, SurferLevel, SurfingLevel, SurfGrade, PredictionResult } from '@/types';
 import type { OverlayMode, SpotSelectionData } from '@/components/EnhancedMapboxMap';
-import { TIME_HOURS, getDefaultFromTime, getDefaultToTime, localToUTC, getMetricsForLevel, surferLevelToKey, convertSurfGradeToLabel } from '@/lib/services/surfInfoService';
+import { TIME_HOURS, getDefaultFromTime, getDefaultToTime, localToUTC, getMetricsForLevel, surferLevelToKey, convertSurfGradeToLabel, isCoordString } from '@/lib/services/surfInfoService';
 import { surfService } from '@/lib/apiServices';
 import { useSavedItems } from '@/hooks/useSavedItems';
 import SurfLoadingScreen from '@/components/SurfLoadingScreen';
@@ -160,7 +160,7 @@ function MapPageContent() {
       surfingLevel: (item.surfer_level?.toUpperCase() || 'BEGINNER') as SurfingLevel,
       surfScore: item.surf_score,
       surfGrade: convertSurfGradeToLabel(item.surf_grade),
-      name: item.address || formatCoordFallback(item.location_id),
+      name: (item.address && !isCoordString(item.address)) ? item.address : formatCoordFallback(item.location_id),
       nameKo: undefined,
     })),
     [savedItems]
@@ -366,6 +366,11 @@ function MapPageContent() {
   }, [locationQuery, selectedLocationId, selectedDate, surferLevel]);
 
   const handleAllowLocation = () => {
+    // Record the user's intent immediately so the prompt doesn't reappear
+    // on the next page load regardless of whether geolocation succeeds.
+    setShowLocationPrompt(false);
+    localStorage.setItem('locationPermissionGranted', 'true');
+
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -374,8 +379,6 @@ function MapPageContent() {
             lng: position.coords.longitude,
           };
           setUserLocation(loc);
-          setShowLocationPrompt(false);
-          localStorage.setItem('locationPermissionGranted', 'true');
           localStorage.setItem('userLocation', JSON.stringify(loc));
           fetchSpots(locationQuery || undefined, {
             date: format(selectedDate, 'yyyy-MM-dd'),
@@ -385,11 +388,9 @@ function MapPageContent() {
           });
         },
         () => {
-          setShowLocationPrompt(false);
+          // Geolocation request failed — prompt is already hidden above.
         }
       );
-    } else {
-      setShowLocationPrompt(false);
     }
   };
 
@@ -403,7 +404,9 @@ function MapPageContent() {
 
     // Use displayLevel from search result row if available, otherwise use surferLevel
     const effectiveLevel = ((surfInfo as unknown as { displayLevel?: string }).displayLevel) || surferLevel;
-    const displayName = surfInfo.name || surfInfo.address || surfInfo.locationId;
+    const enrichedName = allSpots.find(s => s.locationId === surfInfo.locationId)?.name;
+    const rawAddress = enrichedName || surfInfo.name || surfInfo.address;
+    const displayName = (rawAddress && !isCoordString(rawAddress)) ? rawAddress : '';
 
     try {
       await saveItem({
@@ -1165,7 +1168,7 @@ function MapPageContent() {
                   surferLevel: surferLevelToKey(effLevel),
                   surfScore: getMetricsForLevel(si.derivedMetrics, effLevel).surfScore,
                   surfGrade: getMetricsForLevel(si.derivedMetrics, effLevel).surfGradeNumeric,
-                  address: si.name || si.address || si.locationId,
+                  address: (() => { const n = allSpots.find(s => s.locationId === si.locationId)?.name || si.name || si.address; return (n && !isCoordString(n)) ? n : ''; })(),
                   region: si.region,
                   country: si.country,
                   waveHeight: si.conditions.waveHeight,

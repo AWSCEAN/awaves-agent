@@ -4,7 +4,7 @@ import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useLocale } from 'next-intl';
 import type { SurfInfo, SavedListItem } from '@/types';
 import { useSwipeDown } from '@/hooks/useSwipeDown';
-import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, getMetricsForLevel, surferLevelToKey, parseUTCTimestamp } from '@/lib/services/surfInfoService';
+import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, getMetricsForLevel, surferLevelToKey, parseUTCTimestamp, isCoordString } from '@/lib/services/surfInfoService';
 import { surfService } from '@/lib/apiServices';
 
 interface SpotDetailPanelProps {
@@ -144,7 +144,11 @@ export default function SpotDetailPanel({
     dragStartY.current = null;
   }, []);
 
-  const displayName = locale === 'ko' && surfInfo.nameKo ? surfInfo.nameKo : surfInfo.name;
+  const rawDisplayName = (locale === 'ko' && surfInfo.nameKo) ? surfInfo.nameKo : surfInfo.name;
+  const [_dpLat, _dpLng] = surfInfo.locationId.split('#');
+  const displayName = isCoordString(rawDisplayName)
+    ? `${parseFloat(_dpLat).toFixed(4)}°, ${parseFloat(_dpLng).toFixed(4)}°`
+    : rawDisplayName;
   // Use displayLevel from search result row if available, otherwise use surferLevel prop
   const effectiveLevel = ((surfInfo as unknown as { displayLevel?: string }).displayLevel) || surferLevel;
   const { surfScore, surfGrade } = getMetricsForLevel(surfInfo.derivedMetrics, effectiveLevel);
