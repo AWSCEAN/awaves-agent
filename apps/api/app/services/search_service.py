@@ -2,6 +2,7 @@
 
 import logging
 import time as _time
+from collections import defaultdict
 from typing import Optional
 
 from app.middleware.metrics import emit_external_api_failure
@@ -97,55 +98,69 @@ class SearchService:
         t0 = _time.monotonic()
         all_spots = await SurfDataRepository.get_spots_for_date_range(date, from_time, to_time)
         logger.info("[search] get_spots_for_date_range took %.0fms, %d spots", (_time.monotonic() - t0) * 1000, len(all_spots))
-        spots_by_id: dict[str, dict] = {s["locationId"]: s for s in all_spots}
+
+        # Group spots by locationId (multiple time slots per location)
+        spots_by_id: dict[str, list[dict]] = defaultdict(list)
+        for spot in all_spots:
+            spots_by_id[spot["locationId"]].append(spot)
+
+        logger.info("[search-debug] Grouped %d spots into %d unique locations", len(all_spots), len(spots_by_id))
+        if spots_by_id:
+            sample_loc = list(spots_by_id.keys())[0]
+            sample_times = [s["surfTimestamp"][11:16] for s in spots_by_id[sample_loc] if "surfTimestamp" in s]
+            logger.info("[search-debug] Sample location %s has %d time slots: %s", sample_loc, len(spots_by_id[sample_loc]), sample_times)
 
         # Step 3: Match OpenSearch results with surf data
         results = []
         for os_result in os_results:
             location_id = os_result["locationId"]
-            surf_data = spots_by_id.get(location_id)
+            surf_data_list = spots_by_id.get(location_id, [])
 
-            if surf_data:
-                # Copy to avoid mutating cached data
-                result = {**surf_data}
+            logger.info("[search-debug] Location %s: found %d time slots in surf_data", location_id, len(surf_data_list))
 
-                # Enrich with location metadata from OpenSearch
-                os_display = os_result.get("display_name", "")
-                result["display_name"] = os_display
-                result["city"] = os_result.get("city", "")
-                result["state"] = os_result.get("state", "")
-                result["country"] = os_result.get("country", "")
+            # Return all time slots for this location
+            if surf_data_list:
+                for surf_data in surf_data_list:
+                    # Copy to avoid mutating cached data
+                    result = {**surf_data}
 
-                # Korean address fields from OpenSearch
-                result["display_name_ko"] = os_result.get("display_name_ko", "")
-                result["city_ko"] = os_result.get("city_ko", "")
-                result["state_ko"] = os_result.get("state_ko", "")
-                result["country_ko"] = os_result.get("country_ko", "")
+                    # Enrich with location metadata from OpenSearch
+                    os_display = os_result.get("display_name", "")
+                    result["display_name"] = os_display
+                    result["city"] = os_result.get("city", "")
+                    result["state"] = os_result.get("state", "")
+                    result["country"] = os_result.get("country", "")
 
-                # Fill name/address from OpenSearch if DynamoDB didn't have them
-                if os_display:
-                    if not result.get("name") or result["name"] == f"{result['geo']['lat']}, {result['geo']['lng']}":
-                        result["name"] = os_display
-                    if not result.get("address"):
-                        result["address"] = os_display
+                    # Korean address fields from OpenSearch
+                    result["display_name_ko"] = os_result.get("display_name_ko", "")
+                    result["city_ko"] = os_result.get("city_ko", "")
+                    result["state_ko"] = os_result.get("state_ko", "")
+                    result["country_ko"] = os_result.get("country_ko", "")
 
-                # Set Korean name/address
-                os_display_ko = os_result.get("display_name_ko", "")
-                if os_display_ko:
-                    if not result.get("nameKo"):
-                        result["nameKo"] = os_display_ko
-                    if not result.get("addressKo"):
-                        result["addressKo"] = os_display_ko
+                    # Fill name/address from OpenSearch if DynamoDB didn't have them
+                    if os_display:
+                        if not result.get("name") or result["name"] == f"{result['geo']['lat']}, {result['geo']['lng']}":
+                            result["name"] = os_display
+                        if not result.get("address"):
+                            result["address"] = os_display
 
-                # Set Korean region/country
-                if os_result.get("state_ko"):
-                    result["regionKo"] = os_result["state_ko"]
-                if os_result.get("country_ko"):
-                    result["countryKo"] = os_result["country_ko"]
-                if os_result.get("city_ko"):
-                    result["cityKo"] = os_result["city_ko"]
+                    # Set Korean name/address
+                    os_display_ko = os_result.get("display_name_ko", "")
+                    if os_display_ko:
+                        if not result.get("nameKo"):
+                            result["nameKo"] = os_display_ko
+                        if not result.get("addressKo"):
+                            result["addressKo"] = os_display_ko
 
-                results.append(result)
+                    # Set Korean region/country
+                    if os_result.get("state_ko"):
+                        result["regionKo"] = os_result["state_ko"]
+                    if os_result.get("country_ko"):
+                        result["countryKo"] = os_result["country_ko"]
+                    if os_result.get("city_ko"):
+                        result["cityKo"] = os_result["city_ko"]
+
+                    results.append(result)
             else:
                 # No surf data found but location exists, return location info
                 results.append({
