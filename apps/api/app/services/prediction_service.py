@@ -317,15 +317,8 @@ def _add_week_info(prediction: dict, surf_date: str) -> None:
 
 
 async def _add_spot_name(prediction: dict, location_id: str) -> None:
-    """Look up spot name from DynamoDB."""
-    all_spots = await SurfDataRepository.get_all_spots_unpaginated()
-    spot_name = location_id
-    spot_name_ko = None
-    for spot in all_spots:
-        if spot.get("locationId") == location_id:
-            spot_name = spot.get("name", location_id)
-            spot_name_ko = spot.get("nameKo")
-            break
-
-    prediction["spotName"] = spot_name
-    prediction["spotNameKo"] = spot_name_ko
+    """Look up spot display name from the locations table."""
+    dummy = [{"locationId": location_id}]
+    await SurfDataRepository._enrich_with_korean(dummy)
+    prediction["spotName"] = dummy[0].get("name", location_id)
+    prediction["spotNameKo"] = dummy[0].get("nameKo")
