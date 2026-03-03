@@ -1,0 +1,360 @@
+import { useState, useMemo, useEffect } from 'react';
+import { format } from 'date-fns';
+import { ko, enUS } from 'date-fns/locale';
+import type { SurfInfo, SurfingLevel } from '../types';
+import { getGradeBgColor, getGradeTextColor, getGradeBorderColor, getMetricsForLevel, surferLevelToKey, isCoordString, getSurfScoreColors } from '../services/surfInfoService';
+import { useSwipeDown } from '../hooks/useSwipeDown';
+import { useLocale } from '../contexts/LocaleContext';
+
+export interface SearchResult extends SurfInfo {
+  distance?: number;
+  displayLevel?: SurfingLevel;
+}
+
+type SortMode = 'surfScore' | 'distance';
+
+interface SearchResultsListProps {
+  results: SearchResult[];
+  isOpen: boolean;
+  isLoading?: boolean;
+  onClose: () => void;
+  onSpotClick: (spot: SearchResult) => void;
+  onSaveSpot: (spot: SearchResult) => void;
+  onRemoveSpot?: (locationId: string, surfTimestamp?: string, surfingLevel?: string) => void;
+  savedSpotIds: Set<string>;
+  selectedDate?: Date;
+  selectedFromTime?: string;
+  selectedToTime?: string;
+  onSuggestByDistance?: () => void;
+  userLocation?: { lat: number; lng: number } | null;
+  onVisibleItemsChange?: (items: SearchResult[]) => void;
+  showLocationPrompt?: boolean;
+  surferLevel?: string;
+  selectedSpotDetail?: { surfInfo: SurfInfo } | null;
+}
+
+const ITEMS_PER_PAGE = 25;
+
+export default function SearchResultsList({
+  results,
+  isOpen,
+  isLoading = false,
+  onClose,
+  onSpotClick,
+  onSaveSpot,
+  onRemoveSpot,
+  savedSpotIds,
+  selectedDate,
+  selectedFromTime,
+  selectedToTime,
+  onSuggestByDistance,
+  userLocation,
+  onVisibleItemsChange,
+  showLocationPrompt = false,
+  surferLevel = '',
+  selectedSpotDetail = null,
+}: SearchResultsListProps) {
+  const { locale } = useLocale();
+  const dateLocale = locale === 'ko' ? ko : enUS;
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortMode, setSortMode] = useState<SortMode>('surfScore');
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; surfTimestamp: string; surfingLevel: string; name: string } | null>(null);
+  const swipe = useSwipeDown(onClose);
+
+  useEffect(() => { setCurrentPage(1); }, [results]);
+
+  const expandedResults = useMemo(() => {
+    const levels: SurfingLevel[] = surferLevel
+      ? [surferLevelToKey(surferLevel)]
+      : ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'];
+    const expanded: SearchResult[] = [];
+    for (const spot of results) {
+      for (const level of levels) {
+        expanded.push({ ...spot, displayLevel: level });
+      }
+    }
+    return expanded;
+  }, [results, surferLevel]);
+
+  const sortedResults = useMemo(() => {
+    const sorted = [...expandedResults];
+    if (sortMode === 'surfScore') {
+      return sorted.sort((a, b) => {
+        const scoreA = getMetricsForLevel(a.derivedMetrics, a.displayLevel || '').surfScore;
+        const scoreB = getMetricsForLevel(b.derivedMetrics, b.displayLevel || '').surfScore;
+        return scoreB - scoreA;
+      });
+    }
+    return sorted.sort((a, b) => {
+      if (a.distance === undefined && b.distance === undefined) return 0;
+      if (a.distance === undefined) return 1;
+      if (b.distance === undefined) return -1;
+      return a.distance - b.distance;
+    });
+  }, [expandedResults, sortMode]);
+
+  const totalPages = Math.ceil(sortedResults.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedResults = sortedResults.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  useEffect(() => { onVisibleItemsChange?.(paginatedResults); }, [currentPage, sortedResults]);
+
+  const getLevelLabel = (spot: SearchResult): string => {
+    const level = spot.displayLevel;
+    if (!level) return '';
+    if (level === 'BEGINNER') return locale === 'ko' ? '초급' : 'Beginner';
+    if (level === 'INTERMEDIATE') return locale === 'ko' ? '중급' : 'Intermediate';
+    if (level === 'ADVANCED') return locale === 'ko' ? '상급' : 'Advanced';
+    return '';
+  };
+
+  if (!isOpen) return null;
+
+  const getSortLabel = (mode: SortMode) => {
+    if (mode === 'surfScore') return locale === 'ko' ? '서핑 점수' : 'Surf Score';
+    return locale === 'ko' ? '거리' : 'Distance';
+  };
+
+  return (
+    <div
+      className={`
+        mobile-sheet-bottom fixed left-0 right-0 z-40 flex flex-col bg-white shadow-xl overflow-hidden
+        animate-slide-up rounded-t-2xl max-h-[70vh]
+        md:bottom-0 md:animate-none md:animate-slide-in-left md:rounded-none md:right-auto md:left-0 md:max-h-none md:w-96
+        transition-all duration-300
+        ${showLocationPrompt ? 'md:top-[100px]' : 'md:top-14'}
+      `}
+      onTouchStart={swipe.onTouchStart}
+      onTouchMove={swipe.onTouchMove}
+      onTouchEnd={swipe.onTouchEnd}
+    >
+      <div className="md:hidden bottom-sheet-handle" />
+
+      {/* Header */}
+      <div className="p-4 border-b border-sand-200">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="font-semibold text-ocean-800">{locale === 'ko' ? '검색 결과' : 'Search Results'}</h2>
+            <p className="text-sm text-ocean-500">
+              {isLoading
+                ? (locale === 'ko' ? '검색 중...' : 'Searching...')
+                : <>{results.length} {locale === 'ko' ? '개 결과' : 'results'} · {getSortLabel(sortMode)}</>}
+            </p>
+            {selectedDate && (
+              <p className="text-xs text-ocean-400 mt-1">
+                {format(new Date(selectedDate.getTime() + selectedDate.getTimezoneOffset() * 60000), 'PPP', { locale: dateLocale })}
+                {selectedFromTime && selectedToTime && ` · ${selectedFromTime} ~ ${selectedToTime} (UTC)`}
+              </p>
+            )}
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-sand-100 rounded-lg transition-colors">
+            <svg className="w-5 h-5 text-ocean-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex gap-2 mb-3">
+          <button
+            onClick={() => setSortMode('surfScore')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              sortMode === 'surfScore' ? 'bg-green-500 text-white' : 'bg-sand-100 text-ocean-700 hover:bg-sand-200'
+            }`}
+          >
+            {locale === 'ko' ? '서핑 점수' : 'Surf Score'}
+          </button>
+          <button
+            onClick={() => setSortMode('distance')}
+            disabled={!userLocation}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              sortMode === 'distance' ? 'bg-blue-500 text-white' : 'bg-sand-100 text-ocean-700 hover:bg-sand-200'
+            } ${!userLocation ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {locale === 'ko' ? '거리' : 'Distance'}
+          </button>
+        </div>
+
+        {onSuggestByDistance && (
+          <button
+            onClick={onSuggestByDistance}
+            className="w-full px-4 py-2 text-sm font-medium rounded-lg bg-ocean-500 text-white
+              hover:bg-ocean-600 transition-colors flex items-center justify-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            {locale === 'ko' ? '내 주변 스팟 추천' : 'Nearby Spots'}
+          </button>
+        )}
+      </div>
+
+      {/* Results */}
+      <div className="flex-1 overflow-y-auto">
+        {isLoading ? (
+          <div className="p-2 space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="p-3 rounded-xl border border-sand-100 animate-pulse">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-4 bg-sand-200 rounded" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-sand-200 rounded w-3/4" />
+                    <div className="h-3 bg-sand-100 rounded w-1/2" />
+                  </div>
+                  <div className="w-12 h-8 bg-sand-200 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : results.length === 0 ? (
+          <div className="p-8 text-center text-ocean-500">
+            <div className="text-4xl mb-2">🔍</div>
+            <p>{locale === 'ko' ? '검색 결과가 없습니다' : 'No results found'}</p>
+          </div>
+        ) : (
+          <ul className="p-2 space-y-2">
+            {paginatedResults.map((spot, index) => {
+              const compositeKey = `${spot.locationId}#${spot.surfTimestamp}#${spot.displayLevel || ''}`;
+              const savedKey = `${spot.locationId}#${spot.surfTimestamp}#${(spot.displayLevel || '').toUpperCase()}`;
+              const isSaved = savedSpotIds.has(savedKey);
+              const rawName = (locale === 'ko' && spot.nameKo) ? spot.nameKo : spot.name;
+              const [_srLat, _srLng] = spot.locationId.split('#');
+              const displayName = isCoordString(rawName)
+                ? `${parseFloat(_srLat).toFixed(4)}°, ${parseFloat(_srLng).toFixed(4)}°`
+                : rawName;
+
+              const isSelected = selectedSpotDetail &&
+                selectedSpotDetail.surfInfo.locationId === spot.locationId &&
+                selectedSpotDetail.surfInfo.surfTimestamp === spot.surfTimestamp &&
+                ((selectedSpotDetail.surfInfo as any).displayLevel || '').toUpperCase() === (spot.displayLevel || '').toUpperCase();
+
+              return (
+                <li
+                  key={compositeKey}
+                  className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                    isSelected
+                      ? 'bg-ocean-50 border-ocean-500 shadow-lg ring-2 ring-ocean-500/50'
+                      : 'bg-white border-sand-200 hover:border-ocean-300 hover:shadow-md'
+                  }`}
+                  onClick={() => onSpotClick(spot)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-bold text-ocean-400">#{startIndex + index + 1}</span>
+                        <h3 className="font-medium text-ocean-800 truncate">{displayName}</h3>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-ocean-500 mb-2 min-w-0 overflow-hidden">
+                        <span className="truncate min-w-0 flex-shrink">
+                          {locale === 'ko' && spot.regionKo ? spot.regionKo : spot.region},&nbsp;
+                          {locale === 'ko' && spot.countryKo ? spot.countryKo : spot.country}
+                        </span>
+                        {getLevelLabel(spot) && (
+                          <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                            spot.displayLevel === 'BEGINNER' ? 'bg-green-100 text-green-700' :
+                            spot.displayLevel === 'ADVANCED' ? 'bg-red-100 text-red-700' :
+                            'bg-orange-100 text-orange-700'
+                          }`}>
+                            {getLevelLabel(spot)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 mt-1">
+                        <div className="flex items-center gap-2 bg-sand-100 rounded-lg px-2.5 py-1">
+                          <div className={`w-3 h-3 rounded-full ${getSurfScoreColors(getMetricsForLevel(spot.derivedMetrics, spot.displayLevel || '').surfScore).dot}`} />
+                          <span className="text-lg font-bold text-ocean-800">
+                            {Math.round(getMetricsForLevel(spot.derivedMetrics, spot.displayLevel || '').surfScore)}
+                          </span>
+                          <span className="text-xs text-ocean-500">/100</span>
+                        </div>
+                        <span className={`px-3 py-1 rounded-lg text-base font-bold border ${getGradeBgColor(getMetricsForLevel(spot.derivedMetrics, spot.displayLevel || '').surfGrade)} ${getGradeTextColor(getMetricsForLevel(spot.derivedMetrics, spot.displayLevel || '').surfGrade)} ${getGradeBorderColor(getMetricsForLevel(spot.derivedMetrics, spot.displayLevel || '').surfGrade)}`}>
+                          {getMetricsForLevel(spot.derivedMetrics, spot.displayLevel || '').surfGrade}
+                        </span>
+                      </div>
+                      {spot.distance !== undefined && (
+                        <div className="mt-1 text-xs text-ocean-400">
+                          {locale === 'ko' ? '거리' : 'Distance'}: {spot.distance.toFixed(1)} km
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (isSaved && onRemoveSpot) {
+                          setConfirmDelete({ id: spot.locationId, surfTimestamp: spot.surfTimestamp, surfingLevel: spot.displayLevel || '', name: displayName });
+                        } else if (!isSaved) {
+                          onSaveSpot(spot);
+                        }
+                      }}
+                      className={`p-2 rounded-full transition-colors ${
+                        isSaved ? 'text-red-500 bg-red-50 hover:bg-red-100' : 'text-ocean-400 hover:text-red-500 hover:bg-red-50'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="p-4 border-t border-sand-200 flex items-center justify-between">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-1.5 text-sm font-medium rounded-lg bg-sand-100 text-ocean-700 hover:bg-sand-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            ←
+          </button>
+          <span className="text-sm text-ocean-600">
+            {locale === 'ko' ? `${currentPage} / ${totalPages}` : `Page ${currentPage} of ${totalPages}`}
+          </span>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="px-3 py-1.5 text-sm font-medium rounded-lg bg-sand-100 text-ocean-700 hover:bg-sand-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            →
+          </button>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 m-4 max-w-sm shadow-xl">
+            <h3 className="text-lg font-semibold text-ocean-800 mb-2">
+              {locale === 'ko' ? '저장 취소' : 'Remove from Saved'}
+            </h3>
+            <p className="text-sm text-ocean-600 mb-4">
+              {locale === 'ko'
+                ? `"${confirmDelete.name}"을(를) 저장 목록에서 삭제하시겠습니까?`
+                : `Remove "${confirmDelete.name}" from your saved spots?`}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-sand-100 text-ocean-700 hover:bg-sand-200"
+              >
+                {locale === 'ko' ? '취소' : 'Cancel'}
+              </button>
+              <button
+                onClick={() => {
+                  if (onRemoveSpot) onRemoveSpot(confirmDelete.id, confirmDelete.surfTimestamp, confirmDelete.surfingLevel);
+                  setConfirmDelete(null);
+                }}
+                className="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-red-500 text-white hover:bg-red-600"
+              >
+                {locale === 'ko' ? '삭제' : 'Remove'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

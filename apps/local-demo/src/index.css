@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ocean-deep: #094074;
+  --ocean-medium: #3C6997;
+  --ocean-light: #5ADBFF;
+  --sunset-yellow: #FFDD4A;
+  --sunset-orange: #FE9000;
+  --sand-light: #faf6ef;
+  --sand-medium: #e6d2af;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  background-color: var(--sand-light);
+  color: #1a1a1a;
+}
+
+@layer components {
+  .glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+  .btn-primary {
+    @apply bg-ocean-600 hover:bg-ocean-500 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+  .btn-secondary {
+    @apply bg-sand-200 hover:bg-sand-300 text-ocean-600 font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+  .btn-outline {
+    @apply border-2 border-ocean-600 text-ocean-600 hover:bg-ocean-600 hover:text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+  .card {
+    @apply bg-white rounded-xl shadow-md p-4 transition-shadow hover:shadow-lg;
+  }
+}
+
+/* Gradient backgrounds */
+.bg-ocean-gradient {
+  background: linear-gradient(135deg, var(--ocean-medium) 0%, var(--ocean-deep) 100%);
+}
+.bg-sand-gradient {
+  background: linear-gradient(180deg, #faf6ef 0%, #e6d2af 100%);
+}
+
+/* Mapbox overrides */
+.mapboxgl-map { font-size: 12px; line-height: 20px; }
+.mapboxgl-marker { position: absolute !important; top: 0; left: 0; will-change: transform; opacity: 1 !important; }
+.mapboxgl-canvas-container, .mapboxgl-canvas { position: absolute; top: 0; left: 0; }
+.mapboxgl-popup-content { padding: 0 !important; border-radius: 12px !important; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important; }
+.mapboxgl-popup-close-button { font-size: 20px; padding: 8px; color: #666; }
+.mapboxgl-popup-close-button:hover { background-color: transparent; color: #333; }
+.no-info-popup .mapboxgl-popup-content {
+  background: linear-gradient(135deg, #f0f7ff 0%, #e8f4fd 100%);
+  border: 1px solid #b8d8f8;
+  border-radius: 20px !important;
+  box-shadow: 0 2px 12px rgba(30,58,95,0.12) !important;
+}
+.no-info-popup .mapboxgl-popup-tip { border-top-color: #e8f4fd; }
+
+/* Hide scrollbar */
+.hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--sand-light); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: var(--ocean-medium); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ocean-deep); }
+
+/* Animations */
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-slide-in-right { animation: slide-in-right 0.3s ease-out forwards; }
+.animate-slide-in-left { animation: slide-in-left 0.3s ease-out forwards; }
+.animate-slide-up { animation: slide-up 0.3s ease-out forwards; }
+
+/* Mobile bottom sheets */
+@media (max-width: 767px) {
+  select, input { min-height: 40px; }
+  header button, header a { min-height: 40px; }
+
+  .mobile-sheet-bottom {
+    bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .bottom-sheet-handle {
+    width: 100%;
+    padding: 10px 0 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    cursor: ns-resize;
+    touch-action: none;
+  }
+  .bottom-sheet-handle::after {
+    content: '';
+    width: 40px;
+    height: 4px;
+    background: #cbd5e1;
+    border-radius: 2px;
+  }
+}
+
+/* Mapbox controls on mobile */
+@media (max-width: 767px) {
+  .mapboxgl-ctrl-top-right { top: 8px; right: 8px; }
+  .mapboxgl-ctrl-bottom-right { bottom: 80px; }
+}
+
+/* Bottom nav safe area */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
