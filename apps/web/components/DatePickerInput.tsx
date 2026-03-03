@@ -43,7 +43,10 @@ export default function DatePickerInput({ value, onChange, className = '' }: Dat
   }, []);
 
   const handleDayClick = (day: Date) => {
-    onChange(day);
+    // DayPicker returns a local-midnight Date. Convert to UTC midnight so
+    // toISOString() gives the correct calendar date for API calls.
+    const utcDay = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()));
+    onChange(utcDay);
     setIsOpen(false);
   };
 
@@ -56,7 +59,7 @@ export default function DatePickerInput({ value, onChange, className = '' }: Dat
           focus:outline-none focus:ring-2 focus:ring-ocean-500/50 focus:border-ocean-500
           bg-white text-ocean-800 text-left"
       >
-        {format(value, 'yyyy-MM-dd')}
+        {value.toISOString().split('T')[0]}
       </button>
 
       {isOpen && (
