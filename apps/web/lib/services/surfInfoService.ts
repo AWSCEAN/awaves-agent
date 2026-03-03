@@ -258,10 +258,10 @@ export function getCurrentTimeSlot(): string {
  */
 export function getDefaultFromTime(): string {
   const now = new Date();
-  const currentHour = now.getHours();
-  const currentMinute = now.getMinutes();
+  const currentHour = now.getUTCHours();
+  const currentMinute = now.getUTCMinutes();
 
-  // If we're at XX:00 exactly, use current hour
+  // If we're at XX:00 exactly, use current UTC hour
   // Otherwise, round up to next hour (max 23)
   const fromHour = currentMinute === 0 ? currentHour : Math.min(currentHour + 1, 23);
 

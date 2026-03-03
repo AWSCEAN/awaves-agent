@@ -20,7 +20,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { useLocale as useAppLocale } from '@/components/LocaleProvider';
 import type { SurfInfo, SavedListItem, SurferLevel, SurfingLevel, SurfGrade, PredictionResult } from '@/types';
 import type { OverlayMode, SpotSelectionData } from '@/components/EnhancedMapboxMap';
-import { TIME_HOURS, getDefaultFromTime, getDefaultToTime, localToUTC, getMetricsForLevel, surferLevelToKey, convertSurfGradeToLabel, isCoordString } from '@/lib/services/surfInfoService';
+import { getDefaultFromTime, getDefaultToTime, getMetricsForLevel, surferLevelToKey, convertSurfGradeToLabel, isCoordString } from '@/lib/services/surfInfoService';
 import { surfService } from '@/lib/apiServices';
 import { useSavedItems } from '@/hooks/useSavedItems';
 import SurfLoadingScreen from '@/components/SurfLoadingScreen';
@@ -54,7 +54,10 @@ function MapPageContent() {
 
   // Search state - input values (what user is selecting)
   const [locationQuery, setLocationQuery] = useState('');
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    const now = new Date();
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  });
   const [selectedFromTime, setSelectedFromTime] = useState<string>(getDefaultFromTime());
   const [selectedToTime, setSelectedToTime] = useState<string>(getDefaultToTime());
   const [surferLevel, setSurferLevel] = useState<SurferLevel | ''>('');
@@ -232,17 +235,18 @@ function MapPageContent() {
     }
   }, [searchParams, savedSpots]);
 
-  // Generate date options (10 days)
-  const dateOptions = useMemo(() =>
-    Array.from({ length: 10 }, (_, i) => addDays(new Date(), i)),
-    []
-  );
+  // Generate date options (10 days) anchored to UTC today
+  const dateOptions = useMemo(() => {
+    const now = new Date();
+    const utcToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    return Array.from({ length: 10 }, (_, i) => addDays(utcToday, i));
+  }, []);
 
   // Determine days from today and if we're in prediction mode (>10 days)
   const { daysFromToday, isPredictionMode } = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const days = differenceInDays(selectedDate, today);
+    const now = new Date();
+    const utcToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const days = differenceInDays(selectedDate, utcToday);
     return { daysFromToday: days, isPredictionMode: days > 9 };
   }, [selectedDate]);
 
@@ -263,23 +267,11 @@ function MapPageContent() {
     options?: { date?: string; fromTime?: string; toTime?: string; surferLevel?: string }
   ) => {
     try {
-      // Convert local date+time range to UTC for DynamoDB queries
-      const utcFrom = (options?.date && options?.fromTime)
-        ? localToUTC(options.date, options.fromTime)
-        : { date: options?.date, time: undefined };
-      const utcTo = (options?.date && options?.toTime)
-        ? localToUTC(options.date, options.toTime)
-        : { date: options?.date, time: undefined };
-
-      const utcOptions = {
-        ...options,
-        date: utcFrom.date,
-        fromTime: utcFrom.time,
-        toTime: utcTo.time,
-      };
+      // Times from selector are already UTC — pass through without conversion
+      const utcOptions = { ...options };
 
       // Always fetch all spots for the selected date/time range so map markers stay in sync
-      const allSpotsPromise = surfService.getAllSpots(utcFrom.date, utcFrom.time, utcTo.time);
+      const allSpotsPromise = surfService.getAllSpots(options?.date, options?.fromTime, options?.toTime);
 
       if (query) {
         const [response] = await Promise.all([
@@ -323,7 +315,7 @@ function MapPageContent() {
     setSearchToTime(selectedToTime);
     try {
       await fetchSpots(locationQuery || undefined, {
-        date: format(selectedDate, 'yyyy-MM-dd'),
+        date: selectedDate.toISOString().split('T')[0],
         fromTime: selectedFromTime,
         toTime: selectedToTime,
         surferLevel: surferLevel || undefined,
@@ -351,7 +343,7 @@ function MapPageContent() {
     try {
       const response = await surfService.predictSurf(
         selectedLocationId!,
-        format(selectedDate, 'yyyy-MM-dd'),
+        selectedDate.toISOString().split('T')[0],
         surferLevel,
       );
       if (response.success && response.data) {
@@ -380,7 +372,7 @@ function MapPageContent() {
           setUserLocation(loc);
           localStorage.setItem('userLocation', JSON.stringify(loc));
           fetchSpots(locationQuery || undefined, {
-            date: format(selectedDate, 'yyyy-MM-dd'),
+            date: selectedDate.toISOString().split('T')[0],
             fromTime: selectedFromTime,
             toTime: selectedToTime,
             surferLevel: surferLevel || undefined,
@@ -581,20 +573,16 @@ function MapPageContent() {
     setIsSearching(true);
     setSelectedSpotDetail(null);
     try {
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const utcFromNearby = selectedFromTime
-        ? localToUTC(dateStr, selectedFromTime)
-        : localToUTC(dateStr, getDefaultFromTime());
-      const utcToNearby = selectedToTime
-        ? localToUTC(dateStr, selectedToTime)
-        : localToUTC(dateStr, getDefaultToTime());
+      const dateStr = selectedDate.toISOString().split('T')[0];
+      const fromTime = selectedFromTime || getDefaultFromTime();
+      const toTime = selectedToTime || getDefaultToTime();
       const response = await surfService.getNearbySpots(
         userLocation.lat,
         userLocation.lng,
         100,
-        utcFromNearby.date,
-        utcFromNearby.time,
-        utcToNearby.time,
+        dateStr,
+        fromTime,
+        toTime,
       );
       if (response.success && response.data) {
         let nearby = (response.data as SearchResult[]).filter(
@@ -1081,13 +1069,13 @@ function MapPageContent() {
               <div className="glass rounded-2xl md:rounded-full shadow-lg px-2 py-1 overflow-x-auto hide-scrollbar">
                 <div className="flex items-center gap-0.5 flex-nowrap">
                   {dateOptions.map((date, index) => {
-                    const isSelected = format(date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
+                    const isSelected = date.toISOString().split('T')[0] === selectedDate.toISOString().split('T')[0];
                     const dayLabel = index === 0
                       ? (locale === 'ko' ? '오늘' : 'Today')
                       : index === 1
                         ? (locale === 'ko' ? '내일' : 'Tmrw')
                         : format(date, 'EEE', { locale: dateLocale });
-                    const dateLabel = format(date, 'd', { locale: dateLocale });
+                    const dateLabel = date.getUTCDate().toString();
 
                     return (
                       <button
@@ -1125,7 +1113,7 @@ function MapPageContent() {
                   : daysFromToday === 1
                     ? (locale === 'ko' ? '내일' : 'Tmrw')
                     : format(selectedDate, 'EEE', { locale: dateLocale })}{' '}
-                {format(selectedDate, 'd', { locale: dateLocale })}
+                {selectedDate.getUTCDate()}
               </span>
             </button>
           )}

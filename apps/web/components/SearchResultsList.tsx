@@ -170,8 +170,8 @@ export default function SearchResultsList({
             </p>
             {selectedDate && (
               <p className="text-xs text-ocean-400 mt-1">
-                {format(selectedDate, 'PPP', { locale: dateLocale })}
-                {selectedFromTime && selectedToTime && ` · ${selectedFromTime} ~ ${selectedToTime}`}
+                {format(new Date(selectedDate.getTime() + selectedDate.getTimezoneOffset() * 60000), 'PPP', { locale: dateLocale })}
+                {selectedFromTime && selectedToTime && ` · ${selectedFromTime} ~ ${selectedToTime} (UTC)`}
               </p>
             )}
           </div>

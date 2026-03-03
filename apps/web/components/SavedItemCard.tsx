@@ -141,27 +141,27 @@ export default function SavedItemCard({
 
   const mapHref = `/map?lat=${item.location_id.split('#')[0]}&lng=${item.location_id.split('#')[1]}`;
 
-  // Full timestamp for desktop
+  // Full timestamp for desktop (UTC)
   const formatFullTimestamp = (ts: string) => {
     const date = parseUTCTimestamp(ts);
     if (!date) return '';
-    const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${year}-${month}-${day} ${hours}:${minutes}`;
+    const year = date.getUTCFullYear();
+    const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+    const day = date.getUTCDate().toString().padStart(2, '0');
+    const hours = date.getUTCHours().toString().padStart(2, '0');
+    const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes} UTC`;
   };
 
-  // Compact timestamp for mobile
+  // Compact timestamp for mobile (UTC)
   const formatCompactTimestamp = (ts: string) => {
     const d = parseUTCTimestamp(ts);
     if (!d) return '';
-    const mm = (d.getMonth() + 1).toString().padStart(2, '0');
-    const dd = d.getDate().toString().padStart(2, '0');
-    const hh = d.getHours().toString().padStart(2, '0');
-    const min = d.getMinutes().toString().padStart(2, '0');
-    return `${mm}/${dd} ${hh}:${min}`;
+    const mm = (d.getUTCMonth() + 1).toString().padStart(2, '0');
+    const dd = d.getUTCDate().toString().padStart(2, '0');
+    const hh = d.getUTCHours().toString().padStart(2, '0');
+    const min = d.getUTCMinutes().toString().padStart(2, '0');
+    return `${mm}/${dd} ${hh}:${min} UTC`;
   };
 
   const parsedSurfTs = parseUTCTimestamp(item.surf_timestamp);

@@ -148,12 +148,12 @@ export default function SpotDetailPanel({
   // All 8 local time slots for forecast display
   const hours = [0, 3, 6, 9, 12, 15, 18, 21];
 
-  // Determine the local hour of the selected surfTimestamp to position multiplier=1.0
+  // Determine the UTC hour of the selected surfTimestamp to position multiplier=1.0
   const selectedLocalHour = useMemo(() => {
     const date = parseUTCTimestamp(surfInfo.surfTimestamp);
     if (!date) return 12;
-    // Round down to nearest 3-hour slot
-    return Math.floor(date.getHours() / 3) * 3;
+    // Round down to nearest 3-hour UTC slot
+    return Math.floor(date.getUTCHours() / 3) * 3;
   }, [surfInfo.surfTimestamp]);
 
   // Build multipliers centered on the selected time slot
@@ -310,12 +310,12 @@ export default function SpotDetailPanel({
                   {(() => {
                     const date = parseUTCTimestamp(surfInfo.surfTimestamp);
                     if (!date) return '';
-                    const year = date.getFullYear();
-                    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-                    const day = date.getDate().toString().padStart(2, '0');
-                    const hours = date.getHours().toString().padStart(2, '0');
-                    const minutes = date.getMinutes().toString().padStart(2, '0');
-                    return `${year}-${month}-${day} ${hours}:${minutes}`;
+                    const year = date.getUTCFullYear();
+                    const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+                    const day = date.getUTCDate().toString().padStart(2, '0');
+                    const hours = date.getUTCHours().toString().padStart(2, '0');
+                    const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+                    return `${year}-${month}-${day} ${hours}:${minutes} UTC`;
                   })()}
                 </span>
               </div>
@@ -365,10 +365,8 @@ export default function SpotDetailPanel({
                 const saveCompositeKey = `${save.locationId}#${save.surfTimestamp}#${save.surfingLevel.toUpperCase()}`;
                 const currentCompositeKey = `${surfInfo.locationId}#${surfInfo.surfTimestamp}#${(effectiveLevel || surferLevel || '').toUpperCase()}`;
                 const isActive = saveCompositeKey === currentCompositeKey;
-                const timeLabel = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-                const dateLabel = locale === 'ko'
-                  ? `${d.getMonth() + 1}/${d.getDate()}`
-                  : `${d.getMonth() + 1}/${d.getDate()}`;
+                const timeLabel = `${d.getUTCHours().toString().padStart(2, '0')}:${d.getUTCMinutes().toString().padStart(2, '0')}`;
+                const dateLabel = `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
                 const levelLabel = getShortLevelLabel(save.surfingLevel, locale as 'en' | 'ko');
                 return (
                   <button

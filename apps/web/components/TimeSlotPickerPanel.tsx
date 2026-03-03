@@ -20,21 +20,21 @@ interface TimeSlotPickerPanelProps {
 function formatTimestamp(ts: string, locale: string): { date: string; time: string } {
   const d = parseUTCTimestamp(ts);
   if (!d) return { date: '', time: '' };
-  const year = d.getFullYear();
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  const hours = d.getHours().toString().padStart(2, '0');
-  const minutes = d.getMinutes().toString().padStart(2, '0');
+  const year = d.getUTCFullYear();
+  const month = d.getUTCMonth() + 1;
+  const day = d.getUTCDate();
+  const hours = d.getUTCHours().toString().padStart(2, '0');
+  const minutes = d.getUTCMinutes().toString().padStart(2, '0');
 
   if (locale === 'ko') {
     return {
       date: `${year}년 ${month}월 ${day}일`,
-      time: `${hours}:${minutes}`,
+      time: `${hours}:${minutes} UTC`,
     };
   }
   return {
     date: `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`,
-    time: `${hours}:${minutes}`,
+    time: `${hours}:${minutes} UTC`,
   };
 }
 

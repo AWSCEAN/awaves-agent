@@ -105,7 +105,7 @@ export default function TimeRangeSelector({
           onClick={() => setActiveField(activeField === 'from' ? null : 'from')}
           className="w-full px-1.5 md:px-3 py-1.5 md:py-2 text-xs md:text-sm border border-sand-200 rounded-lg bg-white text-ocean-800
             focus:outline-none focus:ring-2 focus:ring-ocean-500/50 focus:border-ocean-500 text-left"
-          title="From"
+          title="From (UTC)"
         >
           {fromTime}
         </button>
@@ -142,7 +142,7 @@ export default function TimeRangeSelector({
           onClick={() => setActiveField(activeField === 'to' ? null : 'to')}
           className="w-full px-1.5 md:px-3 py-1.5 md:py-2 text-xs md:text-sm border border-sand-200 rounded-lg bg-white text-ocean-800
             focus:outline-none focus:ring-2 focus:ring-ocean-500/50 focus:border-ocean-500 text-left"
-          title="To"
+          title="To (UTC)"
         >
           {toTime}
         </button>
